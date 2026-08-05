@@ -1,0 +1,47 @@
+# One service. Deliberately.
+#
+# The obvious shape for a Django app is web + postgres + redis, and every one of
+# those is a container the DS723+ pays for in RAM whether or not anybody is
+# cooking. A household recipe collection is a few thousand rows read by four
+# people: SQLite in WAL mode is a file on the volume below, it is backed up by
+# whatever already backs up that share, and moving to Postgres later is a
+# dumpdata/loaddata rather than a rewrite.
+#
+# Use with Synology Container Manager: Project → Create → upload this file, or
+# `docker compose -f deploy/docker-compose.yml up -d --build` over SSH.
+
+services:
+  kitchen:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: kitchen-app:latest
+    container_name: kitchen
+    restart: unless-stopped
+
+    # Bound to localhost, not 0.0.0.0. The only thing that should reach this
+    # port is the Synology reverse proxy running on the same box; published on
+    # every interface it would also be reachable directly from the LAN, on plain
+    # HTTP, bypassing the proxy and its certificate.
+    ports:
+      - "127.0.0.1:8000:8000"
+
+    # Everything the app writes. The path is a real folder on the NAS
+    # (File Station → docker → kitchen → data) and it has to be writable by uid
+    # 1000, which is the container's user:
+    #     chown -R 1000:1000 /volume1/docker/kitchen/data
+    volumes:
+      - /volume1/docker/kitchen/data:/data
+
+    env_file:
+      - ../.env
+
+    # A container with no memory limit will happily take the whole NAS with it
+    # when something goes wrong. This is generous for two gunicorn workers.
+    mem_limit: 512m
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

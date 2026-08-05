@@ -1,0 +1,17 @@
+# Compiled catalogs are binary. Without this, git's autocrlf on a Windows
+# checkout rewrites bytes that happen to look like line endings and the .mo
+# arrives corrupt — which shows up as the whole app falling back to English,
+# with a file that looks committed and a diff that looks empty.
+*.mo binary
+*.woff2 binary
+
+# Everything else is text with LF in the repository, whatever the working copy
+# uses. Keeps a Windows checkout from showing every file as modified after a
+# clone on Linux (the container build) and back.
+* text=auto eol=lf
+
+# The entrypoint runs inside a Linux container: CRLF here makes the shebang
+# unparseable and the container exits with "no such file or directory", naming
+# the interpreter rather than the line ending.
+*.sh text eol=lf
+Dockerfile text eol=lf

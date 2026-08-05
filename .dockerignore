@@ -1,0 +1,31 @@
+# Keep the build context small, and keep local data out of the image.
+#
+# The last group is the one that matters: `COPY . /app` would otherwise bake a
+# developer's db.sqlite3 and their uploaded photographs into a published image,
+# and the running container would still not use them (it reads /data) — so they
+# would be a copy of somebody's household data, shipped, and invisible.
+
+.git
+.gitignore
+.venv
+__pycache__
+*.py[cod]
+.pytest_cache
+
+# Build output, regenerated inside the image.
+staticfiles/
+
+# Local runtime data.
+db.sqlite3
+db.sqlite3-shm
+db.sqlite3-wal
+media/
+logs/
+.secret_key
+
+# Secrets. The compose file passes .env in as `env_file`, which reads it on the
+# *host* at run time — it must never be a layer in the image.
+.env
+
+.idea
+.vscode

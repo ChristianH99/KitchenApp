@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% load static i18n %}
+{% block title %}{% translate "Recipes" %} – {% translate "Kitchen" %}{% endblock %}
+{% block topbar_title %}{% translate "Recipes" %}{% endblock %}
+{% block topbar_sub %}{% blocktranslate count n=recipes|length %}{{ n }} recipe{% plural %}{{ n }} recipes{% endblocktranslate %}{% endblock %}
+
+{% block content %}
+  <div class="list-toolbar">
+    <form method="get" class="search-form" role="search" id="recipe-search">
+      <span class="search-input-wrap">
+        <input type="text" name="q" value="{{ query }}" id="recipe-search-input"
+               placeholder="{% translate 'Search by name, ingredient or tag…' %}" autocomplete="off">
+        <button type="button" class="search-clear" id="recipe-search-clear"
+                aria-label="{% translate 'Clear search' %}" hidden>&times;</button>
+      </span>
+      {% comment %}The tag and the ordering ride along as hidden fields, so
+      searching inside a filtered list narrows it instead of silently throwing
+      the filter away.{% endcomment %}
+      {% if active_tag %}<input type="hidden" name="tag" value="{{ active_tag.slug }}">{% endif %}
+      {% if order != "title" %}<input type="hidden" name="order" value="{{ order }}">{% endif %}
+      <button class="button button--secondary" type="submit">{% translate "Search" %}</button>
+    </form>
+    <a class="button" href="{% url 'recipes:add' %}">{% translate "+ Add recipe" %}</a>
+  </div>
+
+  {% if tags %}
+    <div class="tag-row">
+      <a class="tag{% if not active_tag %} tag--active{% endif %}"
+         href="{% url 'recipes:list' %}{% if query %}?q={{ query|urlencode }}{% endif %}">{% translate "All" %}</a>
+      {% for tag in tags %}
+        <a class="tag{% if active_tag and active_tag.pk == tag.pk %} tag--active{% endif %}"
+           href="?tag={{ tag.slug }}{% if query %}&q={{ query|urlencode }}{% endif %}">{{ tag.name }}<span class="tag-count">{{ tag.n }}</span></a>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if recipes %}
+    <p class="hint">
+      {% if query and active_tag %}
+        {% blocktranslate with q=query tag=active_tag.name %}Matching “{{ q }}” in {{ tag }}.{% endblocktranslate %}
+      {% elif query %}
+        {% blocktranslate with q=query %}Matching “{{ q }}”.{% endblocktranslate %}
+      {% elif active_tag %}
+        {% blocktranslate with tag=active_tag.name %}Tagged {{ tag }}.{% endblocktranslate %}
+      {% endif %}
+      {% if order == "new" %}{% translate "Newest first." %}
+      {% elif order == "time" %}{% translate "Quickest first." %}
+      {% endif %}
+      <a href="?{% if query %}q={{ query|urlencode }}&{% endif %}{% if active_tag %}tag={{ active_tag.slug }}&{% endif %}order={% if order == 'new' %}title{% else %}new{% endif %}">
+        {% if order == "new" %}{% translate "Sort by name" %}{% else %}{% translate "Sort by newest" %}{% endif %}
+      </a>
+    </p>
+    {% include "recipes/_recipe_grid.html" %}
+  {% else %}
+    <div class="empty-state">
+      {% if query or active_tag %}
+        <h2>{% translate "Nothing found" %}</h2>
+        <p>{% translate "No recipe matches that. Try a single ingredient — the search looks inside ingredient lists, not only titles." %}</p>
+        <a class="button button--secondary" href="{% url 'recipes:list' %}">{% translate "Show all recipes" %}</a>
+      {% else %}
+        <h2>{% translate "No recipes yet" %}</h2>
+        <p>{% translate "This is where the household’s recipes live. Add the first one and it will show up here, searchable by name, tag or ingredient." %}</p>
+        <a class="button" href="{% url 'recipes:add' %}">{% translate "Add the first recipe" %}</a>
+      {% endif %}
+    </div>
+  {% endif %}
+{% endblock %}
+
+{% block scripts %}
+  <script src="{% static 'js/recipe_search.js' %}"></script>
+{% endblock %}

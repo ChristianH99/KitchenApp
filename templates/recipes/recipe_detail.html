@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% load static i18n l10n %}
+{% block title %}{{ recipe.title }} – {% translate "Kitchen" %}{% endblock %}
+{% block topbar_title %}{{ recipe.title }}{% endblock %}
+{% block topbar_sub %}{% if recipe.created_by %}{% blocktranslate with who=recipe.created_by.get_short_name|default:recipe.created_by.get_username %}added by {{ who }}{% endblocktranslate %}{% endif %}{% endblock %}
+
+{% comment %}Edit rides in the topbar: it is reachable from anywhere on a long
+recipe without scrolling back. Delete deliberately does not — it lives at the
+foot of the method, because a destructive action next to the one people press
+every day is a destructive action somebody will press by accident.{% endcomment %}
+{% block topbar_actions %}
+  {% if may_edit %}
+    <a class="button button--small" href="{% url 'recipes:edit' recipe.slug %}">{% translate "Edit" %}</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  <a class="back-link" href="{% url 'recipes:list' %}">&larr; {% translate "All recipes" %}</a>
+
+  {% if recipe.image %}
+    <figure class="recipe-hero">
+      <img src="{{ recipe.image.url }}" alt="{{ recipe.title }}">
+    </figure>
+  {% endif %}
+
+  <h1>{{ recipe.title }}</h1>
+  {% if recipe.description %}<p class="page-lead">{{ recipe.description }}</p>{% endif %}
+
+  {% if recipe.tags.all %}
+    <div class="tag-row">
+      {% for tag in recipe.tags.all %}
+        <a class="tag" href="{% url 'recipes:list' %}?tag={{ tag.slug }}">{{ tag.name }}</a>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="recipe-meta-row">
+    {% if recipe.prep_minutes %}
+      <div class="recipe-meta">
+        <span class="recipe-meta-label">{% translate "Preparation" %}</span>
+        <span class="recipe-meta-value">{{ recipe.prep_minutes }} {% translate "min" %}</span>
+      </div>
+    {% endif %}
+    {% if recipe.cook_minutes %}
+      <div class="recipe-meta">
+        <span class="recipe-meta-label">{% translate "Cooking" %}</span>
+        <span class="recipe-meta-value">{{ recipe.cook_minutes }} {% translate "min" %}</span>
+      </div>
+    {% endif %}
+    {% if recipe.total_minutes %}
+      <div class="recipe-meta">
+        <span class="recipe-meta-label">{% translate "Total" %}</span>
+        <span class="recipe-meta-value">{{ recipe.total_minutes }} {% translate "min" %}</span>
+      </div>
+    {% endif %}
+    <div class="recipe-meta">
+      <span class="recipe-meta-label">{% translate "Servings" %}</span>
+      <span class="recipe-meta-value">{{ recipe.servings }}</span>
+    </div>
+  </div>
+
+  <div class="recipe-body">
+    <aside class="recipe-ingredients">
+      <h2>{% translate "Ingredients" %}</h2>
+      {% if ingredients %}
+        {% comment %}The servings stepper rewrites the amounts in place
+        (static/js/recipe_scale.js). It starts `hidden` and that script reveals
+        it, so a page without JavaScript shows the recipe's own amounts rather
+        than a control that does nothing when pressed.{% endcomment %}
+        <div class="serving-scaler" data-serving-scaler hidden>
+          <div class="serving-stepper">
+            <button type="button" class="serving-step" data-serving-down
+                    aria-label="{% translate 'Fewer servings' %}">&minus;</button>
+            <span class="serving-count" data-serving-count
+                  aria-live="polite">{{ recipe.servings }}</span>
+            <button type="button" class="serving-step" data-serving-up
+                    aria-label="{% translate 'More servings' %}">+</button>
+          </div>
+          <span class="serving-label">{% translate "servings" %}</span>
+          <span class="serving-scaled-note" data-serving-note hidden>{% translate "scaled" %}</span>
+        </div>
+        <ul class="ingredient-list" data-ingredients data-base-servings="{{ recipe.servings }}">
+          {% for item in ingredients %}
+            <li>
+              {% comment %}The unscaled amount rides along in a data attribute so
+              the scaler multiplies the stored number rather than parsing the
+              text it wrote last time — which accumulates rounding error the
+              moment somebody steps up and back down again.
+
+              `unlocalize` is load-bearing, not tidiness. This attribute is read
+              by JavaScript, and the page's default language is German: without
+              it Django writes 1.5 as "1,5", `parseFloat` stops at the comma,
+              and one and a half kilos of plums silently become one.{% endcomment %}
+              <span class="ingredient-amount" data-amount="{{ item.amount|default_if_none:''|unlocalize }}">
+                {% if item.amount_display %}{{ item.amount_display }}{% endif %}
+              </span>
+              <span class="ingredient-name">
+                {% if item.unit %}{{ item.unit }} {% endif %}{{ item.name }}
+                {% if item.note %}<span class="ingredient-note">{{ item.note }}</span>{% endif %}
+              </span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="hint">{% translate "No ingredients recorded." %}</p>
+      {% endif %}
+    </aside>
+
+    <div>
+      <h2>{% translate "Method" %}</h2>
+      {% if recipe.instructions %}
+        {% comment %}Stored as plain text and rendered with `linebreaks`, on
+        purpose: a rich-text editor is a second sanitiser to get right, and a
+        method is paragraphs.{% endcomment %}
+        <div class="recipe-instructions">{{ recipe.instructions|linebreaks }}</div>
+      {% else %}
+        <p class="hint">{% translate "No method recorded." %}</p>
+      {% endif %}
+
+      {% if recipe.notes %}
+        <div class="recipe-notes">
+          <h3>{% translate "Notes" %}</h3>
+          {{ recipe.notes|linebreaks }}
+        </div>
+      {% endif %}
+
+      {% if recipe.source or recipe.source_url %}
+        <p class="recipe-source">
+          {% translate "Source" %}:
+          {% if recipe.source_url %}
+            {% comment %}rel="noopener noreferrer" because the target is a site
+            somebody pasted in: without it the opened page gets a handle on this
+            one through window.opener, and the referrer would tell it the
+            household's private hostname.{% endcomment %}
+            <a href="{{ recipe.source_url }}" target="_blank" rel="noopener noreferrer">{% firstof recipe.source recipe.source_url %}</a>
+          {% else %}
+            {{ recipe.source }}
+          {% endif %}
+        </p>
+      {% endif %}
+
+      {% if may_edit %}
+        <form method="post" action="{% url 'recipes:delete' recipe.slug %}"
+              class="form-actions"
+              data-confirm-title="{% translate 'Delete this recipe?' %}"
+              data-confirm="{% blocktranslate with title=recipe.title %}“{{ title }}” and its ingredient list will be removed. This cannot be undone.{% endblocktranslate %}"
+              data-confirm-accept="{% translate 'Delete' %}"
+              data-confirm-danger>
+          {% csrf_token %}
+          <button type="submit" class="button button--danger button--small">{% translate "Delete recipe" %}</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{% static 'js/recipe_scale.js' %}"></script>
+{% endblock %}

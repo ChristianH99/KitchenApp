@@ -1,0 +1,73 @@
+"""Two middlewares: the login gate, and a tamed OIDC session refresh."""
+
+from urllib.parse import urlencode
+
+from django.conf import settings
+from django.shortcuts import redirect
+from django.urls import reverse
+from mozilla_django_oidc.middleware import SessionRefresh
+
+from apps.accounts import pages
+
+
+class LoginRequiredMiddleware:
+    """Refuse an anonymous request to anything not named in ``pages.OPEN``.
+
+    The check runs in ``process_view`` rather than ``__call__`` because that is
+    the first point at which ``resolver_match`` exists — and the pair it holds
+    is what the open list is written in terms of. Matching on ``request.path``
+    instead would mean a prefix comparison, and a prefix comparison is how
+    ``/media/`` came to cover ``/mediathek/`` in somebody else's app.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        return self.get_response(request)
+
+    def process_view(self, request, view_func, view_args, view_kwargs):
+        if request.user.is_authenticated:
+            return None
+        match = request.resolver_match
+        if match is not None and (match.app_name or "", match.url_name) in pages.OPEN:
+            return None
+        # The Django admin runs its own login; sending it through ours would
+        # land a staff user on a page that cannot reach /admin/ afterwards.
+        if request.path.startswith("/admin/"):
+            return None
+        login_url = reverse(settings.LOGIN_URL)
+        return redirect(f"{login_url}?{urlencode({'next': request.get_full_path()})}")
+
+
+class OIDCSessionRefresh(SessionRefresh):
+    """Re-check the identity provider — but only for sessions that came from it.
+
+    ``mozilla_django_oidc``'s own middleware asks one question: does this
+    session carry an unexpired ``oidc_id_token_expiration``? Anything else is
+    redirected to the authorization endpoint to find out. For an app where OIDC
+    is the *only* way in, that is correct. Here it is wrong in both directions
+    and each way is a real failure:
+
+    * The **local fallback account** has no OIDC expiry, because it never spoke
+      to a provider. Unpatched, it is bounced to the SSO server on its very
+      first request — so the one account that exists to get in *while SSO is
+      broken* is the account SSO breakage locks out. The fallback would look
+      like it worked (the login succeeds) and then never render a page.
+    * With **OIDC switched off entirely** — a fresh checkout, a development
+      machine — there is no authorization endpoint to redirect to, and building
+      the redirect from an empty setting raises rather than returning a page.
+
+    So the refresh applies to a session that actually holds an OIDC token, and
+    only while the provider is configured at all.
+    """
+
+    def is_refreshable_url(self, request):
+        if not settings.OIDC_ENABLED:
+            return False
+        # The session's own token, not the user's — an SSO account signing in
+        # through the local form (which cannot happen: those accounts have no
+        # usable password) would still not have a provider session to renew.
+        if not request.session.get("oidc_id_token"):
+            return False
+        return super().is_refreshable_url(request)

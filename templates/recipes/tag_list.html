@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Tags" %} – {% translate "Kitchen" %}{% endblock %}
+{% block topbar_title %}{% translate "Tags" %}{% endblock %}
+
+{% block content %}
+  {% if tags %}
+    <p class="page-lead">{% translate "Every tag in use, and what is filed under it. Tags are created by typing them on a recipe — there is nothing to set up here." %}</p>
+    <div class="tag-cards">
+      {% for tag in tags %}
+        <div class="tag-card">
+          <div class="tag-card-title">
+            <a href="{% url 'recipes:list' %}?tag={{ tag.slug }}">{{ tag.name }}</a>
+            <span class="pill pill--herb">{{ tag.n }}</span>
+          </div>
+          <ul class="tag-card-list">
+            {% comment %}Three titles as a preview, then a count. The whole list
+            would make a tag with forty recipes a page of its own, which is what
+            the tag's *own* page is for.{% endcomment %}
+            {% for recipe in tag.recipes.all|slice:":3" %}
+              <li><a href="{{ recipe.get_absolute_url }}">{{ recipe.title }}</a></li>
+            {% endfor %}
+            {% if tag.n > 3 %}
+              <li class="hint">{% blocktranslate count n=tag.n|add:"-3" %}and {{ n }} more{% plural %}and {{ n }} more{% endblocktranslate %}</li>
+            {% endif %}
+          </ul>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <h2>{% translate "No tags yet" %}</h2>
+      <p>{% translate "Tags appear here once recipes carry them. Add “soup”, “vegetarian” or “Sunday” to a recipe and it becomes a way to find it again." %}</p>
+      <a class="button button--secondary" href="{% url 'recipes:list' %}">{% translate "Go to the recipes" %}</a>
+    </div>
+  {% endif %}
+{% endblock %}

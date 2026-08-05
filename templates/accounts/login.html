@@ -1,0 +1,98 @@
+{% load static i18n %}{% get_current_language as LANGUAGE_CODE %}<!doctype html>
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% translate "Sign in" %} – {% translate "Kitchen" %}</title>
+  <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
+  <link rel="stylesheet" href="{% static 'css/main.css' %}">
+</head>
+<body class="login-body">
+  <main class="login-card">
+    <div class="login-brand">
+      <span class="brand">
+        {% include "_brand.html" %}
+        <span class="brand-word">{% translate "Kitchen" %}</span>
+      </span>
+    </div>
+    <h1 class="login-title">{% translate "Sign in" %}</h1>
+
+    {% if locked_out %}
+      <p class="notice notice--error">{% blocktranslate count minutes=lockout_minutes %}Too many failed attempts. Please wait a minute and try again.{% plural %}Too many failed attempts. Please wait {{ minutes }} minutes and try again.{% endblocktranslate %}</p>
+    {% elif form.errors %}
+      {% comment %}Deliberately the same sentence whether the account exists or
+      not — two different messages are an account-enumeration oracle, and it
+      costs nothing to not have one.{% endcomment %}
+      <p class="notice notice--error">{% translate "Wrong username or password. Please try again." %}</p>
+    {% endif %}
+
+    {% if oidc_enabled %}
+      {% comment %}The way in. A link rather than a form because the OIDC
+      handshake is a redirect the browser follows — there is nothing to post.{% endcomment %}
+      <div class="login-sso">
+        <a class="button button--big" href="{% url 'oidc_authentication_init' %}?next={{ next|urlencode }}">
+          {% translate "Sign in with Synology" %}
+        </a>
+      </div>
+      {% if not show_local %}
+        <p class="login-divider">{% translate "or" %}</p>
+        {% comment %}The fallback is present and visibly secondary. It exists
+        because an OIDC-only app is unreachable exactly when SSO is broken —
+        including its administration — and it is folded away because a household
+        that gets into the habit of using it is a household keeping passwords in
+        two places.{% endcomment %}
+        <a class="login-local-toggle" href="?local=1{% if next %}&next={{ next|urlencode }}{% endif %}">
+          {% translate "Sign in with a local account" %}
+        </a>
+      {% endif %}
+    {% endif %}
+
+    {% if show_local or not oidc_enabled %}
+      {% if oidc_enabled %}<p class="login-divider">{% translate "or" %}</p>{% endif %}
+      <form method="post" action="{% url 'accounts:login' %}" class="login-form">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next }}">
+        <p>
+          <label for="{{ form.username.id_for_label }}">{% translate "Username" %}</label>
+          {{ form.username }}
+        </p>
+        <p>
+          <label for="{{ form.password.id_for_label }}">{% translate "Password" %}</label>
+          <span class="pw-wrap">
+            {{ form.password }}
+            <button type="button" class="pw-reveal" data-pw-reveal
+                    aria-label="{% translate 'Show password (hold)' %}" title="{% translate 'Show password (hold)' %}">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </span>
+        </p>
+        <button class="button button--big" type="submit">{% translate "Sign in" %}</button>
+      </form>
+    {% endif %}
+
+    {% comment %}The language choice, on the login page too: somebody who cannot
+    read the sign-in form cannot sign in to change it. Plain links rather than
+    the topbar's globe menu — there is no topbar here, and a white-on-terracotta
+    icon button would be invisible on this card.{% endcomment %}
+    {% get_current_language as CURRENT_LANGUAGE %}
+    {% get_available_languages as AVAILABLE_LANGUAGES %}
+    {% get_language_info_list for AVAILABLE_LANGUAGES as languages %}
+    <div class="login-lang">
+      {% for language in languages %}
+        <form method="post" action="{% url 'set_language' %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <input type="hidden" name="language" value="{{ language.code }}">
+          <button type="submit" class="link-button{% if language.code == CURRENT_LANGUAGE %} login-lang--active{% endif %}">{{ language.name_local|capfirst }}</button>
+        </form>
+      {% endfor %}
+    </div>
+  </main>
+
+  <script src="{% static 'js/login.js' %}"></script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+[project]
+name = "kitchenapp"
+version = "0.1.0"
+description = "Self-hosted kitchen app (recipes first) for a Synology NAS, authenticated against Synology SSO over OIDC."
+requires-python = ">=3.13"
+dependencies = [
+    "django>=5.2",
+    # The OIDC client. One identity provider, one dependency, no social-account
+    # tables — see docs/DECISIONS.md for why this rather than django-allauth.
+    "mozilla-django-oidc>=4.0",
+    # Serves STATIC_ROOT from the app process, so the container needs no nginx.
+    "whitenoise>=6.6",
+    "gunicorn>=23.0",
+    # Recipe photographs: resizing on upload, and verifying that an uploaded
+    # file really is an image before it is stored under MEDIA_ROOT.
+    "pillow>=11.0",
+    "tzlocal>=5.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-django>=4.9",
+]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]

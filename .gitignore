@@ -1,0 +1,25 @@
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# Runtime data. Everything the app writes lives under DATA_DIR, which in a
+# checkout is the repository root — so the database, uploaded photographs, the
+# generated development signing key and the logs all land here and none of them
+# belong in git.
+db.sqlite3
+db.sqlite3-shm
+db.sqlite3-wal
+/media/
+/logs/
+.secret_key
+
+# collectstatic output. Build artefact, regenerated on every release.
+/staticfiles/
+
+# Secrets. .env.example is committed; .env never is.
+.env
+
+.pytest_cache/
+.idea/
+.vscode/

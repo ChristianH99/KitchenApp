@@ -1,0 +1,19 @@
+{% comment %}
+The app's mark: a lidded pot with two handles, over a flame. Inline SVG rather
+than an image file so it takes `currentColor` and can sit on the green sidebar
+and the white login card without a second asset — and so it stays crisp at the
+one size it is drawn at and the three it is scaled to.
+
+Included by base.html (sidebar), the login page and the empty recipe card, which
+is why it is a partial rather than markup repeated three times.
+{% endcomment %}
+<svg class="brand-mark" viewBox="0 0 32 32" fill="none" stroke="currentColor"
+     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  {# the lid, with its knob #}
+  <path d="M8 10h16"></path>
+  <path d="M16 10V7"></path>
+  {# the body of the pot, tapering slightly, with a handle each side #}
+  <path d="M7 13h18l-1.6 9.5a3 3 0 0 1-3 2.5h-8.8a3 3 0 0 1-3-2.5z"></path>
+  <path d="M25 15h2.5a1.5 1.5 0 0 1 0 3H24.5"></path>
+  <path d="M7 15H4.5a1.5 1.5 0 0 0 0 3H7.5"></path>
+</svg>

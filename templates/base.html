@@ -1,0 +1,150 @@
+{% load static i18n %}{% get_current_language as LANGUAGE_CODE %}<!doctype html>
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% translate "Kitchen" %}{% endblock %}</title>
+  {% comment %}Inter and Manrope are served from static/fonts/ — never linked
+  from Google. static/css/fonts.css says why.{% endcomment %}
+  <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
+  <link rel="stylesheet" href="{% static 'css/main.css' %}">
+  {% comment %}Defines gettext() in the browser from the compiled djangojs
+  catalog, so the scripts in static/js render in the active language. Must load
+  before any app script that calls it. Note that a {# #} comment cannot span
+  lines — Django's lexer matches it without DOTALL, so a multi-line attempt is
+  rendered onto the page for the reader to enjoy.{% endcomment %}
+  <script src="{% url 'javascript-catalog' %}"></script>
+</head>
+<body>
+  <a href="#main-content" class="skip-link">{% translate "Skip to content" %}</a>
+  <div class="shell">
+    <aside class="shell-sidebar" id="shell-sidebar">
+      <div class="shell-brand">
+        <a class="brand" href="{% url 'recipes:home' %}">
+          {% include "_brand.html" %}
+          <span class="brand-word">{% translate "Kitchen" %}</span>
+        </a>
+      </div>
+      {% comment %}Which entry is current comes from apps/nav.py, keyed on the
+      (app, url_name) pair Django resolved — not from comparing url_name here.
+      A url_name is only unique within an app, so the moment a second app has a
+      "list" or a "settings", the inline version marks two entries at once and
+      nobody notices for a month.{% endcomment %}
+      <nav class="shell-nav">
+        <a class="shell-nav-item{% if 'home' in nav_current %} active{% endif %}"
+           href="{% url 'recipes:home' %}">{% translate "Start" %}</a>
+
+        <a class="shell-nav-item shell-nav-parent{% if 'recipes' in nav_current %} active{% endif %}"
+           href="{% url 'recipes:list' %}">{% translate "Recipes" %}</a>
+        <div class="shell-nav-sub">
+          <a class="shell-nav-subitem{% if 'recipes.list' in nav_current %} active{% endif %}"
+             href="{% url 'recipes:list' %}">{% translate "All recipes" %}</a>
+          <a class="shell-nav-subitem{% if 'recipes.tags' in nav_current %} active{% endif %}"
+             href="{% url 'recipes:tags' %}">{% translate "Tags" %}</a>
+        </div>
+      </nav>
+      <div class="shell-sidebar-footer">
+        {% if user.is_staff %}
+          <a class="shell-admin-link" href="{% url 'admin:index' %}">{% translate "Administration" %}</a>
+        {% endif %}
+        {% if user.is_authenticated %}
+          <div class="shell-user">
+            {% comment %}The display name if the identity provider gave us one,
+            otherwise the username — which for an SSO account is the OIDC `sub`
+            and is not a thing to show a person (apps/accounts/oidc.py explains
+            why it is the username all the same).{% endcomment %}
+            <span class="shell-user-name" title="{{ user.get_username }}">{% firstof user.get_full_name user.get_username %}</span>
+            <form method="post" action="{% url 'accounts:logout' %}" class="shell-logout-form">
+              {% csrf_token %}
+              <button type="submit" class="shell-logout">{% translate "Sign out" %}</button>
+            </form>
+          </div>
+        {% endif %}
+      </div>
+    </aside>
+    <div class="shell-overlay" id="shell-overlay"></div>
+    <div class="shell-main">
+      <header class="shell-topbar">
+        {% comment %}No aria-expanded rendered here: the server cannot know the
+        viewport, and the sidebar is shown by default on desktop but off-canvas
+        on a phone — so any value written here is simply wrong on one of them
+        until shell.js runs. shell.js sets it from the actual state on load.{% endcomment %}
+        <button class="shell-hamburger" id="shell-hamburger" aria-controls="shell-sidebar"
+                aria-label="{% translate 'Toggle navigation' %}">
+          <span class="shell-hamburger-icon"><span></span><span></span><span></span></span>
+        </button>
+        <div class="topbar-titles">
+          <span class="topbar-page">{% block topbar_title %}{% translate "Kitchen" %}{% endblock %}</span>
+          <span class="topbar-sub">{% block topbar_sub %}{% endblock %}</span>
+        </div>
+        <div class="topbar-actions">
+          {% block topbar_actions %}{% endblock %}
+          {% include "_lang_switcher.html" %}
+        </div>
+      </header>
+      <main class="content" id="main-content">
+        {% comment %}role="status" (an aria-live="polite" region), so a message
+        is announced rather than silently added to the page — it is the app's
+        answer to something somebody just did. shell.js gives each one a dismiss
+        button.{% endcomment %}
+        {% if messages %}
+          <ul class="messages" role="status">
+            {% for message in messages %}
+              <li class="notice notice--{{ message.tags|default:'info' }}">{{ message }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+
+  {% comment %}The app's own confirm/alert dialog, on every page. Nothing calls
+  window.confirm() or window.alert(): a browser dialog wears the OS's styling,
+  cannot be translated by us, states its question as one unformatted string
+  (which is why callers end up gluing "\n\n" into it) and puts the answer behind
+  a control that looks nothing like the page. The one exception is the browser's
+  own "leave this page?" on tab close, which no page is allowed to draw.
+
+  Filled by window.appConfirm()/appAlert() in shell.js, which also give it the
+  focus management every dialog here gets.{% endcomment %}
+  <div class="modal-overlay" id="app-dialog" hidden data-app-dialog>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="app-dialog-title">
+      <h2 class="modal-title" id="app-dialog-title" data-dialog-title></h2>
+      <div class="modal-body" data-dialog-body></div>
+      <div class="modal-actions">
+        <button type="button" class="button" data-dialog-accept></button>
+        <button type="button" class="button button--secondary" data-dialog-cancel>{% translate "Cancel" %}</button>
+      </div>
+    </div>
+  </div>
+
+  {% comment %}Shown when somebody navigates away from a form with unsaved
+  changes. Opted into per form with data-unsaved-guard — currently the recipe
+  form, which is long enough that losing it to a stray click matters.{% endcomment %}
+  <div class="modal-overlay" id="unsaved-modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="unsaved-title">
+      <h2 class="modal-title" id="unsaved-title">{% translate "Unsaved changes" %}</h2>
+      <p class="modal-body">{% translate "You have unsaved changes on this page. Do you want to save them before leaving?" %}</p>
+      <div class="modal-actions">
+        <button type="button" class="button" data-unsaved-save>{% translate "Save changes" %}</button>
+        <button type="button" class="button button--secondary" data-unsaved-discard>{% translate "Discard" %}</button>
+        <button type="button" class="link-button" data-unsaved-cancel>{% translate "Cancel" %}</button>
+      </div>
+    </div>
+  </div>
+
+  {% comment %}Page help: the topbar "?" (block topbar_actions) opens this. A
+  page supplies the *whole* overlay, not just its contents — see
+  templates/recipes/recipe_form.html for the shape.{% endcomment %}
+  {% block help_modal %}{% endblock %}
+
+  {% comment %}The shell's own behaviour — the dialog machinery, data-confirm
+  forms, the help pop-up, the language menu, the sidebar toggle, the dismissable
+  messages. A file rather than inline blocks because the app ships a
+  Content-Security-Policy, which cannot tell our inline script from an injected
+  one (config/csp.py).{% endcomment %}
+  <script src="{% static 'js/shell.js' %}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

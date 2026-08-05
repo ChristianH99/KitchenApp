@@ -1,0 +1,39 @@
+{% load i18n %}
+{% comment %}
+A grid of recipe cards. Used by the landing page and the list, so the two cannot
+drift into showing different things about the same recipe.
+
+`recipes` may or may not carry the `ingredient_count` annotation — the landing
+page's queryset does, a plain related manager would not — so the ingredient line
+is guarded rather than assumed. A card that quietly reads "0 ingredients" for a
+full recipe is worse than one that omits the line.
+{% endcomment %}
+<div class="recipe-grid">
+  {% for recipe in recipes %}
+    <a class="recipe-card" href="{{ recipe.get_absolute_url }}">
+      <div class="recipe-card-image{% if not recipe.image %} recipe-card-image--empty{% endif %}">
+        {% if recipe.image %}
+          {% comment %}Lazy, because the list is the one page that can hold forty
+          photographs, and eager loading them is a household's uplink spent
+          before anybody has scrolled.{% endcomment %}
+          <img src="{{ recipe.image.url }}" alt="" loading="lazy">
+        {% else %}
+          {% include "_brand.html" %}
+        {% endif %}
+      </div>
+      <div class="recipe-card-body">
+        <h3 class="recipe-card-title">{{ recipe.title }}</h3>
+        {% if recipe.description %}<p class="recipe-card-desc">{{ recipe.description }}</p>{% endif %}
+        <div class="recipe-card-meta">
+          {% if recipe.total_minutes %}
+            <span><strong>{{ recipe.total_minutes }}</strong> {% translate "min" %}</span>
+          {% endif %}
+          <span><strong>{{ recipe.servings }}</strong> {% translate "servings" %}</span>
+          {% if recipe.ingredient_count %}
+            <span><strong>{{ recipe.ingredient_count }}</strong> {% translate "ingredients" %}</span>
+          {% endif %}
+        </div>
+      </div>
+    </a>
+  {% endfor %}
+</div>

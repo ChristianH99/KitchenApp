@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% load static i18n %}
+{% block title %}{% if recipe %}{{ recipe.title }}{% else %}{% translate "New recipe" %}{% endif %} – {% translate "Kitchen" %}{% endblock %}
+{% block topbar_title %}{% if recipe %}{% translate "Edit recipe" %}{% else %}{% translate "New recipe" %}{% endif %}{% endblock %}
+
+{% block topbar_actions %}
+  <button type="button" class="topbar-help" data-help-open
+          aria-label="{% translate 'Help for this page' %}" title="{% translate 'Help for this page' %}">?</button>
+{% endblock %}
+
+{% block content %}
+  <a class="back-link" href="{% if recipe %}{{ recipe.get_absolute_url }}{% else %}{% url 'recipes:list' %}{% endif %}">&larr; {% translate "Back" %}</a>
+
+  {% if form.errors or formset.non_form_errors %}
+    <p class="notice notice--error">{% translate "Something on this page needs another look — the fields concerned are marked below." %}</p>
+  {% endif %}
+
+  {% comment %}enctype is what makes the photograph upload work at all; without
+  it the file field posts its *name* and nothing else, which fails silently.
+  data-unsaved-guard turns on the leave-this-page dialog in shell.js — this form
+  is long enough that losing it to a stray click matters.{% endcomment %}
+  <form method="post" enctype="multipart/form-data" data-unsaved-guard novalidate>
+    {% csrf_token %}
+
+    <p>
+      <label for="{{ form.title.id_for_label }}">{% translate "Title" %} <span class="required-marker">*</span></label>
+      {{ form.title }}
+      <span class="field-error">{{ form.title.errors|striptags }}</span>
+    </p>
+
+    <p>
+      <label for="{{ form.description.id_for_label }}">{% translate "Description" %}</label>
+      {{ form.description }}
+      <span class="help">{{ form.description.help_text }}</span>
+    </p>
+
+    <div class="form-grid">
+      <p>
+        <label for="{{ form.servings.id_for_label }}">{% translate "Servings" %} <span class="required-marker">*</span></label>
+        {{ form.servings }}
+        <span class="field-error">{{ form.servings.errors|striptags }}</span>
+      </p>
+      <p>
+        <label for="{{ form.prep_minutes.id_for_label }}">{% translate "Preparation (min)" %}</label>
+        {{ form.prep_minutes }}
+      </p>
+      <p>
+        <label for="{{ form.cook_minutes.id_for_label }}">{% translate "Cooking (min)" %}</label>
+        {{ form.cook_minutes }}
+      </p>
+    </div>
+
+    <h2 class="form-section">{% translate "Ingredients" %}</h2>
+    <p class="help">{% blocktranslate %}For the number of servings above. Amount and unit are separate so the recipe can be scaled — leave the amount blank for “salt” or “a little oil”.{% endblocktranslate %}</p>
+
+    {{ formset.management_form }}
+    {% if formset.non_form_errors %}<p class="field-error">{{ formset.non_form_errors|striptags }}</p>{% endif %}
+
+    <div class="ingredient-head" aria-hidden="true">
+      <span>{% translate "Amount" %}</span>
+      <span>{% translate "Unit" %}</span>
+      <span>{% translate "Ingredient" %}</span>
+      <span class="ingredient-note-col">{% translate "Note" %}</span>
+      <span></span>
+    </div>
+    <div class="ingredient-rows" data-ingredient-rows>
+      {% for row in formset %}
+        {% comment %}Every field of the form lives inside its own row — the pk
+        and the DELETE box included. A field rendered beside the row is one that
+        removing (or later reordering) the row leaves behind, and a formset is
+        an index range rather than a list: a form missing from the POST is a
+        hole Django validates against its own defaults.{% endcomment %}
+        <div class="ingredient-row" data-ingredient-row>
+          {{ row.id }}
+          <p>
+            <label class="sr-only" for="{{ row.amount.id_for_label }}">{% translate "Amount" %}</label>
+            {{ row.amount }}
+          </p>
+          <p>
+            <label class="sr-only" for="{{ row.unit.id_for_label }}">{% translate "Unit" %}</label>
+            {{ row.unit }}
+          </p>
+          <p>
+            <label class="sr-only" for="{{ row.name.id_for_label }}">{% translate "Ingredient" %}</label>
+            {{ row.name }}
+            <span class="field-error">{{ row.non_field_errors|striptags }}{{ row.name.errors|striptags }}</span>
+          </p>
+          <p class="ingredient-note-field">
+            <label class="sr-only" for="{{ row.note.id_for_label }}">{% translate "Note" %}</label>
+            {{ row.note }}
+          </p>
+          <p class="ingredient-delete-box">{{ row.DELETE }}</p>
+          <button type="button" class="ingredient-remove" data-ingredient-remove
+                  aria-label="{% translate 'Remove this line' %}" title="{% translate 'Remove this line' %}">&times;</button>
+        </div>
+      {% endfor %}
+    </div>
+    <p>
+      <button type="button" class="button button--secondary button--small" data-ingredient-add>
+        {% translate "+ Another line" %}
+      </button>
+    </p>
+
+    <h2 class="form-section">{% translate "Method" %}</h2>
+    <p>
+      <label for="{{ form.instructions.id_for_label }}">{% translate "Instructions" %}</label>
+      {{ form.instructions }}
+      <span class="help">{% translate "One step per paragraph. Blank lines separate them." %}</span>
+    </p>
+
+    <h2 class="form-section">{% translate "Photograph, tags and source" %}</h2>
+    <p>
+      <label for="{{ form.image.id_for_label }}">{% translate "Photograph" %}</label>
+      {{ form.image }}
+      <span class="field-error">{{ form.image.errors|striptags }}</span>
+      <span class="help">{% translate "Resized automatically. JPEG, PNG or WebP." %}</span>
+    </p>
+    <p>
+      <label for="{{ form.tags_text.id_for_label }}">{% translate "Tags" %}</label>
+      {{ form.tags_text }}
+      <span class="help">{{ form.tags_text.help_text }}</span>
+    </p>
+    <div class="form-grid">
+      <p>
+        <label for="{{ form.source.id_for_label }}">{% translate "Source" %}</label>
+        {{ form.source }}
+        <span class="help">{{ form.source.help_text }}</span>
+      </p>
+      <p>
+        <label for="{{ form.source_url.id_for_label }}">{% translate "Link" %}</label>
+        {{ form.source_url }}
+        <span class="field-error">{{ form.source_url.errors|striptags }}</span>
+      </p>
+    </div>
+    <p>
+      <label for="{{ form.notes.id_for_label }}">{% translate "Notes" %}</label>
+      {{ form.notes }}
+      <span class="help">{{ form.notes.help_text }}</span>
+    </p>
+
+    <div class="form-actions">
+      <button type="submit" class="button">{% if recipe %}{% translate "Save changes" %}{% else %}{% translate "Add recipe" %}{% endif %}</button>
+      <a class="link-button" href="{% if recipe %}{{ recipe.get_absolute_url }}{% else %}{% url 'recipes:list' %}{% endif %}">{% translate "Cancel" %}</a>
+    </div>
+  </form>
+{% endblock %}
+
+{% comment %}A page supplies the *whole* help overlay, not just its contents —
+base.html's help_modal block is empty. Supplying only the inner markup does not
+fail; it renders the help text onto the page under a stray heading.{% endcomment %}
+{% block help_modal %}
+  <div class="modal-overlay help-modal" hidden data-help-modal>
+    <div class="modal help-panel" role="dialog" aria-modal="true" aria-labelledby="help-title">
+      <button type="button" class="modal-close" data-help-close aria-label="{% translate 'Close' %}">&times;</button>
+      <h2 class="modal-title" id="help-title">{% translate "Writing a recipe" %}</h2>
+      <div class="modal-body">
+        <p>{% translate "Only a title and a number of servings are required. Everything else can be filled in later — a recipe that is just a title and three ingredients is still worth keeping." %}</p>
+        <h3>{% translate "Why the ingredients are in columns" %}</h3>
+        <p>{% translate "Amount, unit and ingredient are separate fields so the recipe page can scale them: change the servings there and every amount follows. A line with no amount — salt, pepper — simply stays as it is." %}</p>
+        <h3>{% translate "Tags" %}</h3>
+        <p>{% translate "Type them separated by commas. Tags that do not exist yet are created; existing ones are matched regardless of capitalisation." %}</p>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{% static 'js/recipe_form.js' %}"></script>
+{% endblock %}

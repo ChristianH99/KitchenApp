@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Kitchen" %}{% endblock %}
+{% block topbar_title %}{% translate "Start" %}{% endblock %}
+
+{% block content %}
+  {% if recipe_count %}
+    <div class="stat-row">
+      <div class="stat">
+        <div class="stat-value">{{ recipe_count }}</div>
+        <span class="stat-label">{% translate "Recipes" %}</span>
+      </div>
+      <div class="stat">
+        <div class="stat-value">{{ tag_count }}</div>
+        <span class="stat-label">{% translate "Tags" %}</span>
+      </div>
+    </div>
+
+    {% if top_tags %}
+      <div class="section-heading">
+        <h2>{% translate "Browse by tag" %}</h2>
+        <a href="{% url 'recipes:tags' %}">{% translate "All tags" %}</a>
+      </div>
+      <div class="tag-row">
+        {% for tag in top_tags %}
+          <a class="tag" href="{% url 'recipes:list' %}?tag={{ tag.slug }}">{{ tag.name }}<span class="tag-count">{{ tag.n }}</span></a>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="section-heading">
+      <h2>{% translate "Recently added" %}</h2>
+      <a href="{% url 'recipes:list' %}?order=new">{% translate "All recipes" %}</a>
+    </div>
+    {% include "recipes/_recipe_grid.html" with recipes=recent %}
+  {% else %}
+    {% comment %}"Nothing here yet" is a heading and a centred card, never a bare
+    paragraph on a blank page — which reads as a page that failed to load rather
+    than as an empty collection.{% endcomment %}
+    <div class="empty-state">
+      <h2>{% translate "No recipes yet" %}</h2>
+      <p>{% translate "This is where the household’s recipes live. Add the first one and it will show up here, searchable by name, tag or ingredient." %}</p>
+      <a class="button" href="{% url 'recipes:add' %}">{% translate "Add the first recipe" %}</a>
+    </div>
+  {% endif %}
+{% endblock %}
