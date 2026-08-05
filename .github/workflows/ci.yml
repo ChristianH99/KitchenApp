@@ -33,8 +33,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Pinned to an exact version, not a floating major. This action publishes
+      # `v7.5`/`v7.6`-style tags but no bare `v9`, so `@v9` fails to resolve —
+      # and "unable to find version" is a red build that looks like the action
+      # is gone rather than like a tag that was never cut.
       - name: Install uv
-        uses: astral-sh/setup-uv@v9
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
 
