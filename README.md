@@ -22,13 +22,53 @@ Almost. There is deliberately one local fallback account; see below.
 | **[docs/BRIEFING.md](docs/BRIEFING.md)** | The briefing this was built from, and the nine places this repository departs from it — each with its reason. Read before changing something back towards the brief. |
 | **[CLAUDE.md](CLAUDE.md)** | Conventions and the rules that are load-bearing. |
 
+## Releases
+
+A tag builds the image; nothing is built on the NAS.
+
+```
+git tag v1.2.0 && git push origin v1.2.0
+```
+
+`.github/workflows/release.yml` runs the suite, builds `linux/amd64`, **starts
+the image it just built** and checks it answers `/healthz` with the version it
+claims to be, then pushes `ghcr.io/christianh99/kitchenapp:<version>` and
+attaches four files to the GitHub release: the image as a `docker load`-able
+tarball, a `docker-compose.yml` pinned to that version, `env.example` and
+`SHA256SUMS`. The attachment path needs no registry and no credentials, which
+is the point of having it as well as the registry. DEPLOYMENT.md §8.
+
+`.github/workflows/ci.yml` runs on every push and pull request: the test suite,
+plus a build of the image and a smoke test that starts the container and checks
+what it serves. That second job is the one that matters most here — gunicorn
+cannot run on the Windows machine this is developed on, so CI is the only place
+the *server* is ever exercised.
+
 ## What it does
 
 Recipes with **structured ingredients** — an amount, a unit and a name in
 separate columns rather than a block of text. That is the one decision the rest
 follows from: the recipe page can then scale a recipe from four servings to six
 with a stepper, and a shopping list is reachable later without re-typing the
-collection.
+collection. A line can be marked **optional**, and a substitute is a full
+ingredient line of its own (`alternative_for`) rather than a note, so "180 g
+margarine instead of 200 g butter" scales like everything else.
+
+A method can also be a **diagram** — the Cooking-for-Engineers table, with the
+ingredients down the left and the operations merging to the right. Steps point
+at the step they feed into and ingredients point at the step that consumes them,
+which is a tree; `apps/recipes/diagram.py` turns it into the rowspan/colspan
+geometry. The prose instructions stay exactly as they were and are shown
+alongside: the table says *what combines with what*, the paragraphs say *how*.
+
+A **cooking view** walks that diagram one step at a time, lighting up the
+current operation and the lines that go into it, with a stopwatch and a
+per-step timer. When you finish, it records how long it really took and how far
+the food actually went — "2 portions and one for the lunchbox" — so the recipe
+page can eventually say what "serves four" means in *this* house.
+
+A **People** page manages the household's accounts, both the local ones and the
+Synology identities, without sending anybody to the Django admin.
 
 Beyond that: photographs (resized on upload), free tags, search that looks
 inside ingredient lists as well as titles, and a note field for what you would
@@ -69,11 +109,12 @@ uv run python manage.py runserver           # development server
 uv run python manage.py migrate
 uv run python manage.py createsuperuser
 uv run python manage.py collectstatic       # required before pytest, see above
-uv run pytest                               # ~180 tests, ~45 s
+uv run pytest                               # ~260 tests, ~90 s
 
 # After touching any translatable string:
-uv run python manage.py makemessages -l de --no-obsolete
-uv run python manage.py makemessages -d djangojs -l de --no-obsolete
+uv run python manage.py makemessages -l de --no-obsolete --no-wrap
+uv run python manage.py makemessages -d djangojs -l de --no-obsolete --no-wrap
+uv run python tools/fix_po.py               # not optional on Windows, see below
 uv run python manage.py compilemessages -l de --ignore=.venv
 ```
 
@@ -81,6 +122,17 @@ uv run python manage.py compilemessages -l de --ignore=.venv
 `$env:PATH = "C:\Program Files\Git\usr\bin;$env:PATH"`. Without it the command
 fails with *"Can't find msguniq"*, which reads as gettext being missing rather
 than merely unreachable.
+
+**`--no-wrap` and `tools/fix_po.py` are both load-bearing here.** Without
+`--no-wrap`, gettext breaks a long `msgstr` across continuation lines — which is
+correct `.po` and which the completeness check in `config/tests.py` reads as an
+*empty* translation, so a perfectly translated catalog fails the suite. And on
+Windows `makemessages` wraps a long `#:` reference block onto a second line
+beginning with a space instead of a second `#:`; `msgfmt` then refuses the whole
+file, writes no `.mo`, and the app carries on serving the *previous* catalog —
+so the session's translations look compiled and simply are not there.
+`tools/fix_po.py` repairs that, and there is now a test that fails on it rather
+than leaving it to be rediscovered.
 
 After `makemessages`, **check for `#, fuzzy` entries before compiling**.
 `msgmerge` guesses a translation from a similar msgid and marks it fuzzy;
@@ -138,29 +190,54 @@ apps/accounts/         Getting in.
                        list of accounts, which the first cannot.
   views.py             The sign-in page: Synology as the button, the local
                        password folded away below it.
+  users.py             The People page — the household's accounts, managed here
+                       rather than in the Django admin, which speaks Django's
+                       vocabulary and shows a Synology account under an opaque
+                       `sub`. Authorisation is per view here (staff only) and
+                       checked from the outside by a test that walks the
+                       URLconf for `user-*`.
+  forms.py             The two kinds of account. `has_usable_password()` is what
+                       tells them apart — not a heuristic: the OIDC backend calls
+                       `set_unusable_password()` precisely so a DSM-managed
+                       identity can never also be reachable through the local
+                       form.
 
 apps/recipes/          The collection.
-  models.py            Recipe, RecipeIngredient, Tag. Ingredients are rows, not
-                       text — see below.
+  models.py            Recipe, RecipeStep, RecipeIngredient, Tag, CookLog,
+                       CookPortion. Ingredients are rows, not text — see below.
+  diagram.py           Laying a recipe out as the Cooking-for-Engineers table.
+                       Pure: model instances in, dataclasses out, so a page can
+                       hand it prefetched lists. The header comment is the one
+                       to read — the column an operation sits in is *not* its
+                       depth, and the three ways the obvious version renders
+                       something wrong are each spelled out.
   images.py            The one door an uploaded photograph comes through: size
                        cap, Pillow verification, a resize, and a filename *we*
                        generate. The upload's own name is never used; an
                        extension is what a server picks a Content-Type from.
-  forms.py             The recipe form and its ingredient formset. Tags are a
+  forms.py             The recipe form and its two formsets. Tags are a
                        comma-separated text field rather than a multi-select,
                        because a multi-select asks somebody to go elsewhere and
                        create three objects first — which is how collections end
-                       up untagged.
-  views.py             Four pages, all pure reads except the form. Two rules run
-                       through it: a read must not write, and the cost must not
-                       grow with the collection.
+                       up untagged. The diagram is wired up by *row index*
+                       rather than by primary key; the module docstring says
+                       why, and it is the only version that works while a
+                       recipe is being typed in for the first time.
+  views.py             The pages, all pure reads except the two forms. Two rules
+                       run through it: a read must not write, and the cost must
+                       not grow with the collection. The cooking view is a GET
+                       and nothing else — the stopwatch is in the browser.
   management/commands/seed_demo.py
                        A development account and four sample recipes, chosen to
                        cover the cases that differ (a fractional amount, an
-                       amount-less line, a four-digit amount, a short recipe).
-                       Refuses to run with DEBUG off.
+                       amount-less line, a four-digit amount, a short recipe) —
+                       and three diagram shapes: a branch, a standing
+                       instruction with nothing flowing into it, and one recipe
+                       with no diagram at all. Refuses to run with DEBUG off.
 
 templates/, static/    The shell (sidebar, topbar, dialogs) and the pages.
+tools/fix_po.py        Repairs the reference lines makemessages mangles on
+                       Windows. Run between makemessages and compilemessages.
 locale/de/             The German catalogs. .mo files are committed — nothing at
                        runtime compiles a .po.
 deploy/                Dockerfile, entrypoint, compose file. Never yet run; see

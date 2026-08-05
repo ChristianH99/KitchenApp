@@ -4,13 +4,15 @@
 {% block topbar_title %}{{ recipe.title }}{% endblock %}
 {% block topbar_sub %}{% if recipe.created_by %}{% blocktranslate with who=recipe.created_by.get_short_name|default:recipe.created_by.get_username %}added by {{ who }}{% endblocktranslate %}{% endif %}{% endblock %}
 
-{% comment %}Edit rides in the topbar: it is reachable from anywhere on a long
-recipe without scrolling back. Delete deliberately does not — it lives at the
-foot of the method, because a destructive action next to the one people press
-every day is a destructive action somebody will press by accident.{% endcomment %}
+{% comment %}Cook and Edit ride in the topbar: both are reachable from anywhere
+on a long recipe without scrolling back, and "cook" is the thing somebody
+standing in a kitchen with a phone is actually looking for. Delete deliberately
+does not — it lives at the foot of the method, because a destructive action next
+to the one people press every day is one somebody will press by accident.{% endcomment %}
 {% block topbar_actions %}
+  <a class="button button--small" href="{{ recipe.get_cook_url }}">{% translate "Cook" %}</a>
   {% if may_edit %}
-    <a class="button button--small" href="{% url 'recipes:edit' recipe.slug %}">{% translate "Edit" %}</a>
+    <a class="button button--secondary button--small" href="{% url 'recipes:edit' recipe.slug %}">{% translate "Edit" %}</a>
   {% endif %}
 {% endblock %}
 
@@ -57,17 +59,28 @@ every day is a destructive action somebody will press by accident.{% endcomment 
       <span class="recipe-meta-label">{% translate "Servings" %}</span>
       <span class="recipe-meta-value">{{ recipe.servings }}</span>
     </div>
+    {% comment %}What it has *actually* taken, from the cooking log — beside the
+    number somebody wrote down when they typed the recipe in, not instead of it.
+    The two disagreeing is the interesting part.{% endcomment %}
+    {% if typical_minutes %}
+      <div class="recipe-meta recipe-meta--measured">
+        <span class="recipe-meta-label">{% translate "Measured" %}</span>
+        <span class="recipe-meta-value">{{ typical_minutes }} {% translate "min" %}</span>
+      </div>
+    {% endif %}
   </div>
 
   <div class="recipe-body">
     <aside class="recipe-ingredients">
       <h2>{% translate "Ingredients" %}</h2>
       {% if ingredients %}
-        {% comment %}The servings stepper rewrites the amounts in place
-        (static/js/recipe_scale.js). It starts `hidden` and that script reveals
-        it, so a page without JavaScript shows the recipe's own amounts rather
-        than a control that does nothing when pressed.{% endcomment %}
-        <div class="serving-scaler" data-serving-scaler hidden>
+        {% comment %}The servings stepper rewrites every amount on the page in
+        place (static/js/recipe_scale.js) — this list and the diagram both, since
+        both carry data-amount. It starts `hidden` and that script reveals it, so
+        a page without JavaScript shows the recipe's own amounts rather than a
+        control that does nothing when pressed.{% endcomment %}
+        <div class="serving-scaler" data-serving-scaler hidden
+             data-base-servings="{{ recipe.servings }}">
           <div class="serving-stepper">
             <button type="button" class="serving-step" data-serving-down
                     aria-label="{% translate 'Fewer servings' %}">&minus;</button>
@@ -81,7 +94,7 @@ every day is a destructive action somebody will press by accident.{% endcomment 
         </div>
         <ul class="ingredient-list" data-ingredients data-base-servings="{{ recipe.servings }}">
           {% for item in ingredients %}
-            <li>
+            <li{% if item.optional %} class="is-optional"{% endif %}>
               {% comment %}The unscaled amount rides along in a data attribute so
               the scaler multiplies the stored number rather than parsing the
               text it wrote last time — which accumulates rounding error the
@@ -96,7 +109,15 @@ every day is a destructive action somebody will press by accident.{% endcomment 
               </span>
               <span class="ingredient-name">
                 {% if item.unit %}{{ item.unit }} {% endif %}{{ item.name }}
+                {% if item.optional %}<span class="ingredient-flag">{% translate "optional" %}</span>{% endif %}
                 {% if item.note %}<span class="ingredient-note">{{ item.note }}</span>{% endif %}
+                {% for alt in item.substitutes %}
+                  <span class="ingredient-alt">
+                    {% translate "or" %}
+                    <span class="ingredient-amount" data-amount="{{ alt.amount|default_if_none:''|unlocalize }}">{{ alt.amount_display }}</span>
+                    {{ alt.unit }} {{ alt.name }}{% if alt.note %} <span class="ingredient-note">{{ alt.note }}</span>{% endif %}
+                  </span>
+                {% endfor %}
               </span>
             </li>
           {% endfor %}
@@ -107,13 +128,25 @@ every day is a destructive action somebody will press by accident.{% endcomment 
     </aside>
 
     <div>
-      <h2>{% translate "Method" %}</h2>
+      {% comment %}The diagram is the method when there is one, and the prose
+      below it is the same method in sentences. Neither replaces the other: the
+      table says what combines with what and in which order, which is the thing
+      a paragraph is bad at; the paragraph says how, which is the thing a cell
+      four words wide cannot.{% endcomment %}
+      {% if diagram %}
+        <h2>{% translate "Method" %}</h2>
+        {% include "recipes/_diagram.html" %}
+        <p class="hint diagram-hint">{% translate "Read left to right: everything in a row joins the box beside it." %}</p>
+      {% endif %}
+
       {% if recipe.instructions %}
+        <h2>{% if diagram %}{% translate "In detail" %}{% else %}{% translate "Method" %}{% endif %}</h2>
         {% comment %}Stored as plain text and rendered with `linebreaks`, on
         purpose: a rich-text editor is a second sanitiser to get right, and a
         method is paragraphs.{% endcomment %}
         <div class="recipe-instructions">{{ recipe.instructions|linebreaks }}</div>
-      {% else %}
+      {% elif not diagram %}
+        <h2>{% translate "Method" %}</h2>
         <p class="hint">{% translate "No method recorded." %}</p>
       {% endif %}
 
@@ -123,6 +156,57 @@ every day is a destructive action somebody will press by accident.{% endcomment 
           {{ recipe.notes|linebreaks }}
         </div>
       {% endif %}
+
+      {% comment %}What actually happened, the times this was cooked. The
+      interesting column is not the date but how far it went: "it says four, it
+      fed two of us and left a box for Thursday" is the sentence a household
+      wants back, and it needs the portions rather than a number of people.{% endcomment %}
+      <div class="cook-history">
+        <div class="section-heading">
+          <h2>{% translate "Cooked" %}</h2>
+          <a class="button button--secondary button--small" href="{{ recipe.get_cook_url }}">{% translate "Cook this now" %}</a>
+        </div>
+        {% if logs %}
+          <ul class="cook-log-list">
+            {% for log in logs %}
+              <li class="cook-log">
+                <div class="cook-log-head">
+                  <span class="cook-log-date">{{ log.cooked_at|date:"SHORT_DATE_FORMAT" }}</span>
+                  {% if log.cooked_by %}
+                    <span class="cook-log-who">{% firstof log.cooked_by.get_short_name log.cooked_by.get_username %}</span>
+                  {% endif %}
+                  {% if log.minutes %}<span class="pill">{{ log.minutes }} {% translate "min" %}</span>{% endif %}
+                  <span class="pill pill--herb">{% blocktranslate count n=log.servings_made %}{{ n }} serving{% plural %}{{ n }} servings{% endblocktranslate %}</span>
+                </div>
+                {% if log.portions_display %}
+                  <div class="cook-log-portions">
+                    {% for count, label in log.portions_display %}
+                      <span class="pill pill--saffron">{{ count }} × {{ label }}</span>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+                {% if log.notes %}<p class="cook-log-note">{{ log.notes }}</p>{% endif %}
+                {% if user.is_staff or log.cooked_by_id == user.id %}
+                  <form method="post" action="{% url 'recipes:cook-log-delete' recipe.slug log.pk %}"
+                        class="cook-log-remove"
+                        data-confirm-title="{% translate 'Remove this entry?' %}"
+                        data-confirm="{% translate 'The record of this cooking will be removed. The recipe itself is untouched.' %}"
+                        data-confirm-accept="{% translate 'Remove' %}"
+                        data-confirm-danger>
+                    {% csrf_token %}
+                    <button type="submit" class="link-button">{% translate "Remove" %}</button>
+                  </form>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+          {% if log_more %}
+            <p class="hint">{% blocktranslate count n=log_more %}and {{ n }} earlier cooking{% plural %}and {{ n }} earlier cookings{% endblocktranslate %}</p>
+          {% endif %}
+        {% else %}
+          <p class="hint">{% translate "Nobody has recorded cooking this yet." %}</p>
+        {% endif %}
+      </div>
 
       {% if recipe.source or recipe.source_url %}
         <p class="recipe-source">

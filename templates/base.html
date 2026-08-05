@@ -42,8 +42,23 @@
           <a class="shell-nav-subitem{% if 'recipes.tags' in nav_current %} active{% endif %}"
              href="{% url 'recipes:tags' %}">{% translate "Tags" %}</a>
         </div>
+
+        {% comment %}Staff only. Hiding the link is presentation, not access
+        control — every view behind it carries its own check and a test walks
+        the URLconf to make sure none of them has lost it.{% endcomment %}
+        {% if user.is_staff %}
+          <a class="shell-nav-item{% if 'users' in nav_current %} active{% endif %}"
+             href="{% url 'accounts:user-list' %}">{% translate "People" %}</a>
+        {% endif %}
       </nav>
       <div class="shell-sidebar-footer">
+        {% comment %}Which build this is. Blank in a checkout and blank renders
+        as nothing — a version string is a claim, and a working copy has none to
+        make. Not a translatable string: it is a version number, and wrapping it
+        in a label would put one word of German around three digits.{% endcomment %}
+        {% if app_version %}
+          <span class="shell-version">{{ app_version }}</span>
+        {% endif %}
         {% if user.is_staff %}
           <a class="shell-admin-link" href="{% url 'admin:index' %}">{% translate "Administration" %}</a>
         {% endif %}

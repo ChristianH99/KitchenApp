@@ -292,6 +292,15 @@ a:hover { color: var(--terracotta-hover); }
 }
 .shell-admin-link { font-size: var(--text-sm); color: rgba(255,255,255,0.65); }
 .shell-admin-link:hover { color: var(--saffron); }
+/* The running build. Monospaced and quiet: it is read once, after an update,
+   to answer "did that take" — and the rest of the time it should be furniture. */
+.shell-version {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 0.04em;
+}
 .shell-user { display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); }
 .shell-user-name {
   font-size: var(--text-sm);
@@ -391,6 +400,34 @@ a:hover { color: var(--terracotta-hover); }
   transition: background var(--dur-3), border-color var(--dur-3);
 }
 .topbar-help:hover { background: rgba(255,255,255,0.16); border-color: var(--white); }
+
+/* A `.button` in the topbar cannot wear the page's primary colour, because the
+   bar already is that colour — terracotta on terracotta is a button-shaped
+   shadow. So the pair is inverted here: the primary action goes solid white,
+   the secondary takes the outlined chrome the help button and the hamburger
+   already share. This only became visible when the bar grew a second action;
+   with one there was nothing for it to be less prominent than. */
+.shell-topbar .button {
+  background: var(--white);
+  color: var(--terracotta);
+  box-shadow: none;
+}
+.shell-topbar .button:hover {
+  background: var(--cream);
+  color: var(--terracotta-hover);
+  transform: none;
+  box-shadow: none;
+}
+.shell-topbar .button--secondary {
+  background: transparent;
+  color: var(--white);
+  border: 1.5px solid rgba(255,255,255,0.45);
+}
+.shell-topbar .button--secondary:hover {
+  background: rgba(255,255,255,0.16);
+  border-color: var(--white);
+  color: var(--white);
+}
 
 .shell-hamburger {
   background: transparent;
@@ -978,12 +1015,359 @@ body.modal-open { overflow: hidden; }
    range, not a list: a form missing from the POST is a hole, and Django reads
    the absent fields against that form's defaults, concludes it changed and
    validates it — which is how a deleted row comes back carrying "this field is
-   required". Ticking DELETE and hiding is what the formset actually supports. */
-.ingredient-row--deleted { display: none; }
+   required". Ticking DELETE and hiding is what the formset actually supports.
+   One class for both formsets on this page — see .row--deleted below. */
 .ingredient-delete-box { display: none; }
 
 .image-preview { margin-top: var(--space-5); }
 .image-preview img { max-width: 14rem; border-radius: var(--radius-sm); border: 1px solid var(--border); display: block; }
+
+/* ===== THE DIAGRAM =====
+   The Cooking-for-Engineers table: ingredients down the left, operations
+   merging left to right. Geometry (rowspan/colspan) comes from
+   apps/recipes/diagram.py; this only draws it.
+
+   A real <table> with `border-collapse: collapse`, which is what makes a cell
+   spanning four rows show one continuous outline instead of four stacked
+   boxes — the whole visual point of the diagram. */
+/* Grid and flex items default to `min-width: auto` — "never shrink below my
+   content". For a column holding a wide table or a text input that is not a
+   soft preference: the item keeps its full content width, the grid grows past
+   the viewport, and the *page* scrolls sideways, taking the topbar and the
+   sidebar with it. Every column here that can hold something wide says
+   `min-width: 0`, so the overflow happens inside the element that actually has
+   a scrollbar for it.
+
+   Measured, not guessed: at a 390px viewport the recipe page was 508px wide
+   before this rule and is exactly 390px after it, with the diagram scrolling
+   inside its own box. */
+.recipe-body > *,
+.ingredient-row > *,
+.step-row > *,
+.form-grid > *,
+.diagram-scroll { min-width: 0; }
+
+.diagram-scroll {
+  /* A diagram with five columns does not fit a phone, and the alternative to
+     scrolling it is reflowing it — which destroys the one thing it says. The
+     scroll is on this wrapper rather than on the page, so the rest of the
+     recipe still behaves. */
+  overflow-x: auto;
+  margin-bottom: var(--space-6);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
+}
+.diagram { width: 100%; min-width: 28rem; border-collapse: collapse; }
+.diagram-cell {
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--herb-light);
+  vertical-align: middle;
+  font-size: var(--text-sm);
+  background: var(--white);
+  transition: background var(--dur-3), border-color var(--dur-3);
+}
+/* The global table rules strip the last row's border and tint rows on hover.
+   Both are right for a list of records and wrong for a drawing. */
+.diagram tbody tr:last-child .diagram-cell { border-bottom: 1px solid var(--herb-light); }
+.diagram tbody tr:hover .diagram-cell { background: var(--white); }
+.diagram tbody + tbody .diagram-cell { border-top: 1px solid var(--herb-light); }
+
+.diagram-cell--ingredient { text-align: left; color: var(--text-dark); }
+.diagram-cell--ingredient .ingredient-amount {
+  flex: none;
+  display: inline;
+  margin-right: var(--space-2);
+}
+.diagram-unit { color: var(--text-mid); }
+.diagram-name { color: var(--text-dark); font-weight: 600; }
+.diagram-note { display: block; font-size: var(--text-xs); color: var(--text-light); }
+.diagram-flag {
+  margin-left: var(--space-3);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--saffron-deep);
+}
+.diagram-alt {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--text-mid);
+  font-style: italic;
+}
+/* Optional lines are quieter but not hidden: the recipe works without them and
+   somebody standing at a cupboard needs to see that at a glance. */
+.diagram-cell--ingredient.is-optional .diagram-name { font-weight: 500; color: var(--text-mid); }
+
+.diagram-cell--step {
+  text-align: center;
+  background: var(--herb-bg);
+  color: var(--herb);
+  font-family: 'Manrope', sans-serif;
+  font-weight: 700;
+}
+.diagram tbody tr:hover .diagram-cell--step { background: var(--herb-bg); }
+.diagram-step-text { display: block; }
+.diagram-step-time {
+  display: block;
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  color: var(--herb-light);
+}
+/* The gap between an ingredient and the operation it feeds is a cell, because a
+   row that simply omits it has silently shifted everything after it one column
+   left. It has to look like nothing, which means no border of its own. */
+.diagram-cell--filler { border: none; background: transparent; }
+.diagram tbody tr:hover .diagram-cell--filler { background: transparent; }
+.diagram-hint { margin-bottom: var(--space-8); }
+
+/* Where the cooking view is standing right now, and where it has been. */
+.diagram-cell.is-current {
+  background: var(--saffron-bg);
+  border-color: var(--saffron-deep);
+  box-shadow: inset 0 0 0 1px var(--saffron-deep);
+}
+.diagram tbody tr:hover .diagram-cell.is-current { background: var(--saffron-bg); }
+.diagram-cell.is-done { background: var(--success-bg); color: var(--success-strong); }
+.diagram tbody tr:hover .diagram-cell.is-done { background: var(--success-bg); }
+
+/* ===== COOKING VIEW ===== */
+.cook-bar {
+  position: sticky;
+  top: var(--topbar-h);
+  z-index: var(--z-sticky-heading);
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-6);
+  padding: var(--space-5) var(--space-6);
+  margin-bottom: var(--space-7);
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+.cook-timer { display: flex; align-items: center; gap: var(--space-5); }
+.cook-clock {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  color: var(--text-dark);
+  line-height: 1;
+}
+.cook-timer-buttons { display: flex; align-items: center; gap: var(--space-4); }
+/* Inside the sticky bar the scaler is one control among several, not the head
+   of a panel — so it drops the rule underneath it. */
+.cook-servings { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+.cook-progress {
+  margin-left: auto;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-mid);
+}
+
+.cook-step {
+  padding: var(--space-8);
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--terracotta);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+.cook-step-count {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-light);
+}
+/* Deliberately large. This is read from two steps away, with wet hands, on a
+   phone lying on a worktop. */
+.cook-step-text { font-size: var(--text-4xl); line-height: 1.15; margin: 0 0 var(--space-5); }
+.cook-step-detail { font-size: var(--text-md); color: var(--text-mid); margin: 0 0 var(--space-6); }
+.cook-step-from { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); font-size: var(--text-sm); color: var(--text-mid); }
+.cook-step-ingredients { list-style: none; margin: var(--space-6) 0 0; padding: 0; }
+.cook-step-ingredients li {
+  display: flex; gap: var(--space-5);
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--border-light);
+  font-size: var(--text-lg);
+}
+.cook-step-ingredients li:last-child { border-bottom: none; }
+.cook-step-timer { display: flex; align-items: center; gap: var(--space-6); margin-top: var(--space-7); }
+.cook-step-remaining {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--text-dark);
+}
+.cook-step.is-ready { border-left-color: var(--success); background: var(--success-bg); }
+.cook-step.is-ready .cook-step-remaining { color: var(--success-strong); }
+
+.cook-nav { display: flex; align-items: center; gap: var(--space-5); margin: var(--space-7) 0 var(--space-9); }
+.cook-nav .button { flex: 1 1 auto; justify-content: center; }
+.cook-plain { margin-bottom: var(--space-9); }
+
+.cook-finish {
+  margin-top: var(--space-9);
+  padding: var(--space-8);
+  background: var(--saffron-bg);
+  border: 1px solid var(--saffron);
+  border-radius: var(--radius-md);
+}
+.cook-finish h3 { margin-top: var(--space-7); }
+/* One column per portion size, wrapping rather than scrolling: five short
+   number fields side by side on a tablet, two or three on a phone. The columns
+   stretch to fill the row but the inputs do not — a 12rem box for a number
+   that is never more than two digits reads as a text field somebody has
+   mislabelled. */
+.portion-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: var(--space-5); }
+.portion-field { margin: 0; }
+.portion-field input { width: 100%; max-width: 5rem; }
+
+/* ===== COOKING HISTORY ===== */
+.cook-history { margin-top: var(--space-10); }
+.cook-log-list { list-style: none; margin: 0; padding: 0; }
+.cook-log {
+  padding: var(--space-6) 0;
+  border-bottom: 1px solid var(--border-light);
+}
+.cook-log:last-child { border-bottom: none; }
+.cook-log-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-4); }
+.cook-log-date { font-family: 'Manrope', sans-serif; font-weight: 700; color: var(--text-dark); }
+.cook-log-who { font-size: var(--text-sm); color: var(--text-light); }
+.cook-log-portions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-4); }
+.cook-log-note { margin: var(--space-4) 0 0; font-size: var(--text-sm); color: var(--text-mid); }
+.cook-log-remove { display: inline-block; margin-top: var(--space-3); }
+/* The measured time sits beside the one somebody typed in when they added the
+   recipe, and says which is which. The two disagreeing is the interesting part. */
+.recipe-meta--measured .recipe-meta-value { color: var(--success-strong); }
+
+/* Optional lines and substitutes, in the plain ingredient list. */
+.ingredient-flag {
+  margin-left: var(--space-3);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--saffron-deep);
+}
+.ingredient-alt { display: block; font-size: var(--text-sm); color: var(--text-mid); font-style: italic; }
+.ingredient-alt .ingredient-amount { flex: none; display: inline; text-align: left; font-style: normal; }
+.ingredient-list li.is-optional .ingredient-name { color: var(--text-mid); }
+
+/* ===== RECIPE FORM (steps and the diagram controls) ===== */
+.step-rows { display: flex; flex-direction: column; gap: var(--space-4); }
+.step-row {
+  display: grid;
+  grid-template-columns: 2fr 6rem 2fr auto;
+  gap: var(--space-4);
+  align-items: start;
+}
+.step-row > p { margin: 0; }
+.step-delete-box { display: none; }
+/* One class for both formsets: a removed row is hidden, never taken out of the
+   DOM. A formset is an index range, not a list — see static/js/recipe_form.js. */
+.row--deleted { display: none; }
+
+/* The row of small controls under a formset row: "optional", and the two
+   selects that say where this line belongs in the diagram. Under rather than
+   beside, because they are the second question about a row and the first one
+   (what is it, how much) has to stay one uninterrupted line. */
+.row-extras {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-5);
+  padding-top: var(--space-2);
+}
+.row-extra { display: inline-flex; align-items: center; gap: var(--space-3); }
+.row-extra[hidden] { display: none; }
+.row-extra-label, .checkbox-inline span {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-light);
+}
+.row-extra-select {
+  padding: var(--space-2) var(--space-4);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--white);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  color: var(--text-dark);
+  max-width: 12rem;
+}
+.checkbox-inline { display: inline-flex; align-items: center; gap: var(--space-3); }
+/* `form p` is a column of label-above-field; a checkbox and its label are a
+   row. Written as `form p.checkbox-row` rather than with !important — the
+   column rule is `form p`, so one extra class outranks it on specificity, and
+   an !important here would have to be answered with another one by whatever
+   needs to override it next. */
+form p.checkbox-row { flex-direction: row; align-items: center; gap: var(--space-4); }
+
+/* The live picture of what the selects add up to. Nested boxes rather than the
+   real table: the geometry lives in apps/recipes/diagram.py where it is tested,
+   and a second implementation in JavaScript would be the thing that quietly
+   disagrees with the page it is previewing. */
+.diagram-preview {
+  margin-top: var(--space-7);
+  padding: var(--space-7);
+  background: var(--paper);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+}
+.diagram-preview h3 { margin-bottom: var(--space-5); }
+/* Nesting is what the preview says, so it cannot reflow — every level adds its
+   own padding and its own label, and a deep recipe is simply wider than a
+   phone. It scrolls inside itself for the same reason the diagram does. */
+.preview-scroll { overflow-x: auto; }
+.preview-box {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--herb-light);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+}
+.preview-inputs { display: flex; flex-direction: column; gap: var(--space-3); flex: 1 1 auto; }
+.preview-line {
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--cream);
+  font-size: var(--text-sm);
+  color: var(--text-dark);
+}
+.preview-step {
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-xs);
+  background: var(--herb-bg);
+  color: var(--herb);
+  font-family: 'Manrope', sans-serif;
+  font-weight: 700;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+.diagram-preview .preview-box { margin-bottom: var(--space-5); }
+
+/* ===== PEOPLE ===== */
+.people-table th[scope="row"] { font-weight: 600; text-transform: none; letter-spacing: normal; font-size: var(--text-base); background: transparent; color: var(--text-dark); }
+.people-sub { display: block; font-size: var(--text-xs); color: var(--text-light); font-weight: 400; }
+/* Four actions on one line push the table past the content width on a laptop,
+   and the fourth — Delete — is the one that falls off the right-hand edge. So
+   they wrap: the row is a little taller and every action is reachable without
+   discovering that the table scrolls sideways. */
+.people-actions { width: 1%; }
+.people-actions-group { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); }
+.people-actions form { margin: 0; }
+.people-table td, .people-table th { padding: var(--space-5); }
+.people-table tr.is-inactive td, .people-table tr.is-inactive th { opacity: 0.55; }
+.numeric { text-align: right; font-variant-numeric: tabular-nums; }
+.pill--off { background: var(--danger-bg); color: var(--danger); }
+.link-button--danger { color: var(--danger); }
+.link-button--danger:hover { color: var(--danger); }
 
 /* ===== TAG LIST ===== */
 .tag-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: var(--space-6); }
@@ -1106,9 +1490,25 @@ textarea:focus-visible,
   .ingredient-row, .ingredient-head { grid-template-columns: 4.5rem 4.5rem 1fr auto; }
   /* The note column is the first thing to go: it is the only optional one. */
   .ingredient-row .ingredient-note-field, .ingredient-head .ingredient-note-col { display: none; }
+  /* A step's label and its detail are both prose; side by side they are two
+     columns of four words each. Stacked, the row stays typeable on a phone. */
+  .step-row { grid-template-columns: 1fr 5rem auto; }
+  .step-row .step-field-detail { grid-column: 1 / -1; }
+  /* Read from arm's length rather than from a desk — but --text-4xl is a
+     headline on a 6-inch screen, and a two-word instruction wrapping over three
+     lines is harder to take in, not easier. */
+  .cook-step-text { font-size: var(--text-2xl); }
+  .cook-step { padding: var(--space-6); }
+  .cook-clock { font-size: var(--text-2xl); }
+  .diagram-cell { padding: var(--space-3) var(--space-4); font-size: var(--text-xs); }
 }
 
 @media (max-width: 520px) {
   .recipe-grid { grid-template-columns: 1fr; }
   .recipe-meta-row { gap: var(--space-6); }
+  /* The progress counter loses its push to the right once the bar wraps: on
+     its own line, "Step 3 of 7" flush right reads as a stray fragment. */
+  .cook-progress { margin-left: 0; }
+  .cook-nav { flex-wrap: wrap; }
+  .row-extra-select { max-width: 9rem; }
 }

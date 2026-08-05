@@ -1,0 +1,57 @@
+# The published image, rather than one built here.
+#
+# The sibling file, `docker-compose.yml`, builds from this checkout — which is
+# still the right thing on a laptop, and was the only option before there was a
+# pipeline. This one *pulls*, and it is what belongs on the NAS: a DS723+ has
+# two cores that are already running DSM, Home Assistant and a backup, and
+# compiling a Python image on them takes minutes for a result that is a
+# guess-for-a-guess of what CI already built and tested.
+#
+# `.github/workflows/release.yml` rewrites the two placeholders below and
+# attaches the result to the release as `docker-compose.yml`, so what you
+# download is already pinned to the version you downloaded it from.
+#
+# The version is **pinned, not `latest`**. A compose file saying `latest` cannot
+# be rolled back by re-reading it: `docker compose up -d` after a bad release
+# would fetch the same bad image again, and the only way back would be to
+# remember which version was good. With the tag written down, rolling back is
+# editing one line — see DEPLOYMENT.md §7.
+#
+# config/tests.py checks that the image named here is the one the workflow
+# actually pushes. That pair drifting apart produces a release nobody can
+# deploy, and neither file looks wrong on its own.
+
+services:
+  kitchen:
+    image: __IMAGE__:__VERSION__
+    container_name: kitchen
+    restart: unless-stopped
+
+    # Bound to localhost, not 0.0.0.0. The only thing that should reach this
+    # port is the Synology reverse proxy running on the same box; published on
+    # every interface it would also be reachable directly from the LAN, on plain
+    # HTTP, bypassing the proxy and its certificate.
+    ports:
+      - "127.0.0.1:8000:8000"
+
+    # Everything the app writes. The path is a real folder on the NAS
+    # (File Station → docker → kitchen → data) and it has to be writable by uid
+    # 1000, which is the container's user:
+    #     chown -R 1000:1000 /volume1/docker/kitchen/data
+    volumes:
+      - /volume1/docker/kitchen/data:/data
+
+    # Beside this file, not inside the repository. Rename the `env.example`
+    # attached to the release to `.env` and fill it in.
+    env_file:
+      - .env
+
+    # A container with no memory limit will happily take the whole NAS with it
+    # when something goes wrong. This is generous for two gunicorn workers.
+    mem_limit: 512m
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

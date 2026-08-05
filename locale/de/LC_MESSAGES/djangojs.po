@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kitchenapp 0.1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-05 07:45+0200\n"
+"POT-Creation-Date: 2026-08-05 09:30+0200\n"
 "PO-Revision-Date: 2026-08-05 12:00+0200\n"
 "Last-Translator: KitchenApp\n"
 "Language-Team: German\n"
@@ -16,6 +16,50 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: .\static\js\recipe_cook.js:89
+msgid "Pause"
+msgstr "Pause"
+
+#: .\static\js\recipe_cook.js:89
+msgid "Start"
+msgstr "Start"
+
+#: .\static\js\recipe_cook.js:116
+msgid "Start again?"
+msgstr "Von vorn anfangen?"
+
+#: .\static\js\recipe_cook.js:117
+msgid "The stopwatch goes back to zero and you return to the first step."
+msgstr "Die Stoppuhr geht auf null zurück und es geht wieder beim ersten Schritt los."
+
+#: .\static\js\recipe_cook.js:118
+msgid "Start again"
+msgstr "Von vorn anfangen"
+
+#: .\static\js\recipe_cook.js:186
+msgid "Step %(n)s of %(total)s"
+msgstr "Schritt %(n)s von %(total)s"
+
+#: .\static\js\recipe_cook.js:277
+msgid "Time is up"
+msgstr "Zeit ist um"
+
+#: .\static\js\recipe_cook.js:290
+msgid "Running"
+msgstr "Läuft"
+
+#: .\static\js\recipe_diagram.js:130
+msgid "Step %(n)s"
+msgstr "Schritt %(n)s"
+
+#: .\static\js\recipe_diagram.js:132
+msgid "Line %(n)s"
+msgstr "Zeile %(n)s"
+
+#: .\static\js\recipe_diagram.js:267
+msgid "Not in any step yet: %(names)s"
+msgstr "Noch in keinem Schritt: %(names)s"
 
 #: .\static\js\shell.js:175 .\static\js\shell.js:184
 msgid "OK"

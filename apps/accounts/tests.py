@@ -275,3 +275,229 @@ class TestSigningOut:
         session.save()
         response = client.post(reverse("accounts:logout"))
         assert response["Location"] == reverse("oidc_logout")
+
+
+# --------------------------------------------------------------------------
+# Managing the household's accounts
+# --------------------------------------------------------------------------
+
+def _people_urls():
+    """Every account-management route, discovered rather than listed.
+
+    The point of finding them by walking the URLconf is that a page added to
+    apps/accounts/users.py next month is covered the day it lands. The failure
+    story becomes "you forgot the decorator" instead of "you forgot to write a
+    test about the decorator", which is the difference that matters — a
+    forgotten check leaves a page that looks completely normal and answers to
+    anybody who is signed in.
+    """
+    from django.urls import get_resolver
+
+    found = []
+    for pattern in get_resolver().url_patterns:
+        if getattr(pattern, "app_name", None) != "accounts":
+            continue
+        for entry in pattern.url_patterns:
+            if entry.name and entry.name.startswith("user-"):
+                args = [1] if ":pk>" in str(entry.pattern) else []
+                found.append((entry.name, reverse("accounts:" + entry.name, args=args)))
+    return found
+
+
+@pytest.fixture
+def boss(db):
+    """A signed-in superuser — the account these pages are actually used from."""
+    from django.test import Client
+
+    person = User.objects.create_superuser(username="chefin", password="pw-that-is-long")
+    session = Client()
+    session.force_login(person)
+    return session, person
+
+
+class TestOnlyStaffMayManageAccounts:
+    def test_every_route_refuses_an_ordinary_account(self, client, user, db):
+        urls = _people_urls()
+        assert urls, "no accounts:user-* routes were found — has the prefix changed?"
+        for name, url in urls:
+            for response in (client.get(url), client.post(url)):
+                assert response.status_code in (404, 405), (
+                    name + " answers " + str(response.status_code) + " to somebody "
+                    "who is signed in but not staff"
+                )
+
+    def test_staff_may_see_the_list(self, staff, db):
+        from django.test import Client
+
+        session = Client()
+        session.force_login(staff)
+        assert session.get(reverse("accounts:user-list")).status_code == 200
+
+
+class TestTellingTheTwoKindsOfAccountApart:
+    """``has_usable_password()`` is not a heuristic here: the OIDC backend calls
+    ``set_unusable_password()`` on creation precisely so a DSM-managed account
+    can never also be reachable through the local form."""
+
+    def test_an_sso_account_is_recognised(self, db):
+        from apps.accounts.forms import is_sso_account
+
+        person = SynologyOIDCBackend().create_user({"sub": "sub-abc", "email": "a@x.org"})
+        assert is_sso_account(person)
+
+    def test_a_local_account_is_not(self, user):
+        from apps.accounts.forms import is_sso_account
+
+        assert not is_sso_account(user)
+
+    def test_an_sso_account_is_offered_no_password_page(self, boss, db):
+        """Giving it one would open the second, unmanaged door into a
+        DSM-managed identity that SSO exists to close."""
+        session, _ = boss
+        person = SynologyOIDCBackend().create_user({"sub": "sub-abc", "email": ""})
+        assert session.get(
+            reverse("accounts:user-password", args=[person.pk])
+        ).status_code == 404
+
+    def test_dsm_owns_an_sso_account_s_name(self, db):
+        """A value typed here would survive until the next sign-in and then be
+        silently replaced, which is worse than the field not being there."""
+        from apps.accounts.forms import UserEditForm
+
+        person = SynologyOIDCBackend().create_user({"sub": "sub-abc", "email": ""})
+        form = UserEditForm(instance=person)
+        assert form.fields["first_name"].disabled
+        assert form.fields["email"].disabled
+
+
+class TestCreatingALocalAccount:
+    def _payload(self, **overrides):
+        data = {
+            "username": "mira", "first_name": "Mira", "last_name": "", "email": "",
+            "password1": "kirschkuchen-42", "password2": "kirschkuchen-42",
+            "is_active": "on",
+        }
+        data.update(overrides)
+        return data
+
+    def test_it_creates_one_that_can_sign_in(self, boss, db):
+        session, _ = boss
+        session.post(reverse("accounts:user-add"), self._payload())
+        person = User.objects.get(username="mira")
+        assert person.check_password("kirschkuchen-42")
+        assert person.has_usable_password()
+
+    def test_two_different_passwords_are_refused(self, boss, db):
+        session, _ = boss
+        session.post(reverse("accounts:user-add"),
+                     self._payload(password2="kirschkuchen-43"))
+        assert not User.objects.filter(username="mira").exists()
+
+    def test_a_weak_password_is_refused(self, boss, db):
+        """The same validators as everywhere else. The version where only one
+        of the two password pages runs them is the version that lets a weak
+        password in through whichever page nobody looked at."""
+        session, _ = boss
+        session.post(reverse("accounts:user-add"),
+                     self._payload(password1="1234", password2="1234"))
+        assert not User.objects.filter(username="mira").exists()
+
+    def test_somebody_who_is_not_a_superuser_cannot_grant_one(self, staff, db):
+        """Otherwise "may manage accounts" is also "may grant yourself
+        everything", one page later."""
+        from django.test import Client
+
+        session = Client()
+        session.force_login(staff)
+        session.post(reverse("accounts:user-add"), self._payload(is_superuser="on"))
+        assert not User.objects.get(username="mira").is_superuser
+
+
+class TestTheDoorsThatMustNotCloseBehindYou:
+    def test_you_cannot_switch_your_own_account_off(self, boss):
+        session, person = boss
+        session.post(reverse("accounts:user-active", args=[person.pk]))
+        person.refresh_from_db()
+        assert person.is_active
+
+    def test_you_cannot_delete_your_own_account(self, boss):
+        session, person = boss
+        session.post(reverse("accounts:user-delete", args=[person.pk]))
+        assert User.objects.filter(pk=person.pk).exists()
+
+    def test_you_cannot_take_your_own_administration_right_away(self, boss):
+        """The page that manages accounts is behind this flag, so clearing it
+        on yourself is a one-way door out of the page you are standing on."""
+        session, person = boss
+        session.post(reverse("accounts:user-edit", args=[person.pk]), {
+            "first_name": "", "last_name": "", "email": "", "is_active": "on",
+        })
+        person.refresh_from_db()
+        assert person.is_staff
+
+    def test_the_last_administrator_cannot_be_switched_off(self, staff, db):
+        """An app with no active superuser cannot be recovered without a shell
+        on the NAS."""
+        from django.test import Client
+
+        only = User.objects.create_superuser(username="einzige", password="pw-long-enough")
+        session = Client()
+        session.force_login(staff)
+        session.post(reverse("accounts:user-active", args=[only.pk]))
+        only.refresh_from_db()
+        assert only.is_active
+
+    def test_one_of_two_administrators_may_go(self, boss, db):
+        session, _ = boss
+        second = User.objects.create_superuser(username="zweite", password="pw-long-enough")
+        session.post(reverse("accounts:user-delete", args=[second.pk]))
+        assert not User.objects.filter(pk=second.pk).exists()
+
+
+class TestSettingAPassword:
+    def test_an_administrator_can_set_one_without_the_old_password(self, boss, user):
+        """This is the household's way back in when somebody has forgotten
+        theirs; asking for the old one would make it useless for the only case
+        it exists for."""
+        session, _ = boss
+        session.post(reverse("accounts:user-password", args=[user.pk]), {
+            "password1": "haferflocken-77", "password2": "haferflocken-77",
+        })
+        user.refresh_from_db()
+        assert user.check_password("haferflocken-77")
+
+    def test_changing_your_own_does_not_sign_you_out(self, boss):
+        """Rotating the session hash ends every session including this one, and
+        being thrown to the login page by your own successful action reads as a
+        failure."""
+        session, person = boss
+        session.post(reverse("accounts:user-password", args=[person.pk]), {
+            "password1": "haferflocken-77", "password2": "haferflocken-77",
+        })
+        assert session.get(reverse("accounts:user-list")).status_code == 200
+
+
+class TestSwitchingAnAccountOff:
+    def test_it_is_reversible_and_keeps_their_recipes(self, boss, user, db):
+        from apps.recipes.models import Recipe
+
+        session, _ = boss
+        Recipe.objects.create(title="Griesbrei", created_by=user)
+        session.post(reverse("accounts:user-active", args=[user.pk]))
+        user.refresh_from_db()
+        assert not user.is_active
+        assert Recipe.objects.get(title="Griesbrei").created_by == user
+
+        session.post(reverse("accounts:user-active", args=[user.pk]))
+        user.refresh_from_db()
+        assert user.is_active
+
+    def test_deleting_keeps_the_recipes_but_loses_the_name(self, boss, user, db):
+        """SET_NULL, not CASCADE: deleting the account of somebody who has left
+        must not delete the recipes they contributed."""
+        from apps.recipes.models import Recipe
+
+        session, _ = boss
+        Recipe.objects.create(title="Griesbrei", created_by=user)
+        session.post(reverse("accounts:user-delete", args=[user.pk]))
+        assert Recipe.objects.get(title="Griesbrei").created_by is None

@@ -23,8 +23,18 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 
-from apps.recipes.forms import IngredientFormSet, RecipeForm
-from apps.recipes.models import Recipe, RecipeIngredient, Tag
+from apps.recipes import diagram as diagram_module
+from apps.recipes.forms import (
+    CookLogForm, IngredientFormSet, RecipeForm, StepFormSet,
+    prime_diagram_indices, wire_diagram,
+)
+from apps.recipes.models import CookLog, CookPortion, Recipe, Tag
+
+# How many past cookings the recipe page lists. A household that makes the same
+# soup every fortnight has a hundred of them within four years, and a page that
+# renders all of them grows without bound while the query count — which is what
+# the cost tests pin — stays perfectly flat.
+COOK_LOG_SHOWN = 10
 
 
 def _visible_recipes():
@@ -37,7 +47,13 @@ def _visible_recipes():
         Recipe.objects
         .select_related("created_by")
         .prefetch_related("tags")
-        .annotate(ingredient_count=Count("ingredients", distinct=True))
+        .annotate(ingredient_count=Count(
+            "ingredients", distinct=True,
+            # Substitutes are ingredient rows too, and counting them tells the
+            # card "9 ingredients" for a recipe with six and three "or use…"
+            # lines. The count on a card is what somebody has to buy.
+            filter=Q(ingredients__alternative_for__isnull=True),
+        ))
     )
 
 
@@ -110,40 +126,96 @@ def recipe_list(request):
     })
 
 
-@login_required
-def recipe_detail(request, slug):
-    recipe = get_object_or_404(
-        Recipe.objects.select_related("created_by").prefetch_related("tags", "ingredients"),
+def _loaded_recipe(slug):
+    """One recipe with everything a page about it needs, in three queries.
+
+    The diagram, the ingredient list and the cooking walk-through all read the
+    same two collections, so they are fetched once and handed round as lists —
+    ``apps/recipes/diagram.py`` takes them as arguments for exactly this
+    reason. Asking the ORM again per section would be a page whose cost grows
+    with how many sections it has.
+    """
+    return get_object_or_404(
+        Recipe.objects.select_related("created_by").prefetch_related(
+            "tags", "ingredients", "steps",
+        ),
         slug=slug,
     )
+
+
+@login_required
+def recipe_detail(request, slug):
+    recipe = _loaded_recipe(slug)
+    ingredients = list(recipe.ingredients.all())
+    steps = list(recipe.steps.all())
+
+    logs = list(
+        recipe.cook_logs.select_related("cooked_by").prefetch_related("portions")
+        [:COOK_LOG_SHOWN]
+    )
+    log_count = recipe.cook_logs.count()
+
     return render(request, "recipes/recipe_detail.html", {
         "recipe": recipe,
-        "ingredients": recipe.ingredients.all(),
+        # top_level() attaches each line's substitutes and drops the substitute
+        # rows themselves — the plain list and the diagram must agree about
+        # what a line is, so they are derived from one call.
+        "ingredients": diagram_module.top_level(ingredients),
+        "diagram": diagram_module.build(recipe, ingredients=ingredients, steps=steps),
+        "logs": logs,
+        "log_count": log_count,
+        "log_more": max(0, log_count - len(logs)),
+        "typical_minutes": _typical_minutes(logs),
         "may_edit": _may_edit(request.user, recipe),
     })
+
+
+def _typical_minutes(logs):
+    """What it has actually taken, rounded to five minutes.
+
+    The median rather than the mean: one evening that was interrupted by a
+    phone call for forty minutes should not move the number the household
+    plans around, and with four or five entries a mean is entirely at that
+    evening's mercy.
+    """
+    measured = sorted(log.minutes for log in logs if log.minutes)
+    if not measured:
+        return None
+    middle = measured[len(measured) // 2]
+    return max(5, round(middle / 5) * 5)
 
 
 @login_required
 def recipe_add(request):
     if request.method == "POST":
         form = RecipeForm(request.POST, request.FILES)
-        formset = IngredientFormSet(request.POST, instance=Recipe())
-        if form.is_valid() and formset.is_valid():
+        blank = Recipe()
+        formset = IngredientFormSet(request.POST, instance=blank)
+        steps = StepFormSet(request.POST, instance=blank)
+        if form.is_valid() and formset.is_valid() and steps.is_valid():
             with transaction.atomic():
                 recipe = form.save(commit=False)
                 recipe.created_by = request.user
                 recipe.save()
                 form.save_tags(recipe)
+                # Steps first: an ingredient's `step_index` can only become a
+                # foreign key once the step it names has a primary key.
+                steps.instance = recipe
+                steps.save()
                 formset.instance = recipe
                 formset.save()
+                wire_diagram(steps, formset)
             messages.success(request, _("“%(title)s” was added.") % {"title": recipe.title})
             return redirect(recipe.get_absolute_url())
     else:
         form = RecipeForm()
-        formset = IngredientFormSet(instance=Recipe())
+        blank = Recipe()
+        formset = IngredientFormSet(instance=blank)
+        steps = StepFormSet(instance=blank)
 
+    prime_diagram_indices(steps, formset)
     return render(request, "recipes/recipe_form.html", {
-        "form": form, "formset": formset, "recipe": None,
+        "form": form, "formset": formset, "steps": steps, "recipe": None,
     })
 
 
@@ -159,18 +231,23 @@ def recipe_edit(request, slug):
     if request.method == "POST":
         form = RecipeForm(request.POST, request.FILES, instance=recipe)
         formset = IngredientFormSet(request.POST, instance=recipe)
-        if form.is_valid() and formset.is_valid():
+        steps = StepFormSet(request.POST, instance=recipe)
+        if form.is_valid() and formset.is_valid() and steps.is_valid():
             with transaction.atomic():
                 form.save()
+                steps.save()
                 formset.save()
+                wire_diagram(steps, formset)
             messages.success(request, _("“%(title)s” was saved.") % {"title": recipe.title})
             return redirect(recipe.get_absolute_url())
     else:
         form = RecipeForm(instance=recipe)
         formset = IngredientFormSet(instance=recipe)
+        steps = StepFormSet(instance=recipe)
 
+    prime_diagram_indices(steps, formset)
     return render(request, "recipes/recipe_form.html", {
-        "form": form, "formset": formset, "recipe": recipe,
+        "form": form, "formset": formset, "steps": steps, "recipe": recipe,
     })
 
 
@@ -184,6 +261,102 @@ def recipe_delete(request, slug):
     recipe.delete()
     messages.success(request, _("“%(title)s” was deleted.") % {"title": title})
     return redirect("recipes:list")
+
+
+# --------------------------------------------------------------------------
+# Cooking
+# --------------------------------------------------------------------------
+
+@login_required
+def recipe_cook(request, slug):
+    """The guided walk through a recipe, one step at a time.
+
+    A GET and nothing more. The stopwatch lives in the browser
+    (static/js/recipe_cook.js, backed by localStorage) rather than as a
+    "cooking session" row here, for two reasons that both matter on this
+    hardware: opening a page would otherwise take SQLite's single write lock —
+    the thing every other request in the house is queueing behind — and a
+    session that only exists server-side is a session that ends when somebody's
+    phone goes to sleep mid-recipe. The elapsed time arrives once, with the
+    POST that records the cooking.
+    """
+    recipe = _loaded_recipe(slug)
+    ingredients = list(recipe.ingredients.all())
+    steps = list(recipe.steps.all())
+    return render(request, "recipes/recipe_cook.html", _cook_context(
+        request, recipe,
+        diagram_module.build(recipe, ingredients=ingredients, steps=steps),
+        diagram_module.top_level(ingredients),
+        CookLogForm(initial={"servings_made": recipe.servings}),
+    ))
+
+
+def _cook_context(request, recipe, diagram, ingredients, log_form, invalid=False):
+    return {
+        "recipe": recipe,
+        "diagram": diagram,
+        "ingredients": ingredients,
+        "log_form": log_form,
+        # A failed save has to come back with the finish panel already open, or
+        # the errors are behind a button somebody has to find again.
+        "finish_open": invalid,
+        "may_edit": _may_edit(request.user, recipe),
+    }
+
+
+@login_required
+@require_POST
+def recipe_cooked(request, slug):
+    """Record that this was cooked: how long it took and how far it went."""
+    recipe = _loaded_recipe(slug)
+    form = CookLogForm(request.POST)
+
+    if form.is_valid():
+        with transaction.atomic():
+            log = form.save(commit=False)
+            log.recipe = recipe
+            log.cooked_by = request.user
+            log.save()
+            CookPortion.objects.bulk_create([
+                CookPortion(log=log, size=size, count=count)
+                for size, count in form.portion_counts().items()
+            ])
+            minutes = form.cleaned_data.get("minutes")
+            # Writing the measured time back onto the recipe is an *edit* of
+            # the recipe, so it answers to the same question as the edit page:
+            # anybody may record that they cooked it, not everybody may change
+            # what it says.
+            if form.cleaned_data.get("apply_time") and minutes and _may_edit(request.user, recipe):
+                recipe.cook_minutes = minutes
+                recipe.save(update_fields=["cook_minutes"])
+        messages.success(request, _("Noted — “%(title)s” cooked.") % {"title": recipe.title})
+        return redirect(recipe.get_absolute_url())
+
+    ingredients = list(recipe.ingredients.all())
+    steps = list(recipe.steps.all())
+    return render(request, "recipes/recipe_cook.html", _cook_context(
+        request, recipe,
+        diagram_module.build(recipe, ingredients=ingredients, steps=steps),
+        diagram_module.top_level(ingredients),
+        form, invalid=True,
+    ))
+
+
+@login_required
+@require_POST
+def cook_log_delete(request, slug, pk):
+    """Remove one entry from the history — the person who made it, or staff.
+
+    Not tied to who may edit the *recipe*: a cooking is somebody's own record
+    of their own evening, and the person who typed 'small portion' by mistake
+    is the person who should be able to take it back.
+    """
+    log = get_object_or_404(CookLog, pk=pk, recipe__slug=slug)
+    if not (request.user.is_staff or log.cooked_by_id == request.user.id):
+        raise Http404
+    log.delete()
+    messages.success(request, _("The entry was removed."))
+    return redirect("recipes:detail", slug=slug)
 
 
 @login_required

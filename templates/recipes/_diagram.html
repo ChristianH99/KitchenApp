@@ -1,0 +1,58 @@
+{% load i18n l10n %}
+{% comment %}The Cooking-for-Engineers table. Geometry from apps/recipes/diagram.py.
+
+A real <table> rather than a grid of <div>s, and it is not nostalgia: this is
+tabular data whose whole meaning is which cells span which rows, `rowspan` says
+that in one attribute that assistive technology already understands, and the
+CSS-grid version has to re-state every span as a pair of line numbers computed
+in the same place — plus a second implementation of "what happens when it does
+not fit on a phone".
+
+`data-step` is on both an operation's cell and on the rows that feed it, so the
+cooking view can light up "the current step and what goes into it" with one
+selector rather than a map of ids.
+
+`unlocalize` on data-amount is load-bearing here for the same reason as on the
+detail page: German writes 1.5 as "1,5" and parseFloat stops at the comma.{% endcomment %}
+<div class="diagram-scroll">
+  <table class="diagram">
+    <caption class="sr-only">{% blocktranslate with title=recipe.title %}Method for {{ title }} as a diagram{% endblocktranslate %}</caption>
+    {% for block in diagram.blocks %}
+      <tbody>
+        {% for row in block %}
+          <tr>
+            {% for cell in row %}
+              {% if cell.kind == "ingredient" %}
+                <td class="diagram-cell diagram-cell--ingredient{% if cell.ingredient.optional %} is-optional{% endif %}"
+                    rowspan="{{ cell.rowspan }}" colspan="{{ cell.colspan }}"
+                    data-step="{{ cell.ingredient.step_id|default_if_none:'' }}">
+                  <span class="ingredient-amount" data-amount="{{ cell.ingredient.amount|default_if_none:''|unlocalize }}">{{ cell.ingredient.amount_display }}</span>
+                  <span class="diagram-unit">{{ cell.ingredient.unit }}</span>
+                  <span class="diagram-name">{{ cell.ingredient.name }}</span>
+                  {% if cell.ingredient.note %}<span class="diagram-note">{{ cell.ingredient.note }}</span>{% endif %}
+                  {% if cell.ingredient.optional %}<span class="diagram-flag">{% translate "optional" %}</span>{% endif %}
+                  {% for alt in cell.alternatives %}
+                    <span class="diagram-alt">
+                      {% translate "or" %}
+                      <span class="ingredient-amount" data-amount="{{ alt.amount|default_if_none:''|unlocalize }}">{{ alt.amount_display }}</span>
+                      {{ alt.unit }} {{ alt.name }}{% if alt.note %} <span class="diagram-note">{{ alt.note }}</span>{% endif %}
+                    </span>
+                  {% endfor %}
+                </td>
+              {% elif cell.kind == "step" %}
+                <td class="diagram-cell diagram-cell--step" rowspan="{{ cell.rowspan }}"
+                    colspan="{{ cell.colspan }}" data-step="{{ cell.step.id }}">
+                  <span class="diagram-step-text">{{ cell.step.text }}</span>
+                  {% if cell.step.minutes %}<span class="diagram-step-time">{{ cell.step.minutes }} {% translate "min" %}</span>{% endif %}
+                </td>
+              {% else %}
+                <td class="diagram-cell diagram-cell--filler" rowspan="{{ cell.rowspan }}"
+                    colspan="{{ cell.colspan }}"></td>
+              {% endif %}
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    {% endfor %}
+  </table>
+</div>

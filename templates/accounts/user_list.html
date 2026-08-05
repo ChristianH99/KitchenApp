@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% translate "People" %} – {% translate "Kitchen" %}{% endblock %}
+{% block topbar_title %}{% translate "People" %}{% endblock %}
+{% block topbar_sub %}{% blocktranslate count n=active_count %}{{ n }} account can sign in{% plural %}{{ n }} accounts can sign in{% endblocktranslate %}{% endblock %}
+
+{% block topbar_actions %}
+  <button type="button" class="topbar-help" data-help-open
+          aria-label="{% translate 'Help for this page' %}" title="{% translate 'Help for this page' %}">?</button>
+{% endblock %}
+
+{% block content %}
+  <div class="list-toolbar">
+    <h1>{% translate "People" %}</h1>
+    <a class="button" href="{% url 'accounts:user-add' %}">{% translate "Add an account" %}</a>
+  </div>
+
+  {% if sso_count %}
+    <p class="hint">{% blocktranslate count n=sso_count %}{{ n }} of these signs in through Synology. Their name and e-mail come from DSM and are refreshed at every sign-in.{% plural %}{{ n }} of these sign in through Synology. Their names and e-mail addresses come from DSM and are refreshed at every sign-in.{% endblocktranslate %}</p>
+  {% endif %}
+
+  <div class="table-card">
+    <table class="people-table">
+      <thead>
+        <tr>
+          <th scope="col">{% translate "Name" %}</th>
+          <th scope="col">{% translate "Signs in with" %}</th>
+          <th scope="col">{% translate "Rights" %}</th>
+          <th scope="col" class="numeric">{% translate "Recipes" %}</th>
+          <th scope="col" class="numeric">{% translate "Cooked" %}</th>
+          <th scope="col">{% translate "Last seen" %}</th>
+          <th scope="col"><span class="sr-only">{% translate "Actions" %}</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for person in people %}
+          <tr{% if not person.is_active %} class="is-inactive"{% endif %}>
+            <th scope="row">
+              <a href="{% url 'accounts:user-edit' person.pk %}">{% firstof person.get_full_name person.get_username %}</a>
+              {% comment %}A Synology account's username is the provider's `sub`
+              — an opaque string, never an e-mail (apps/accounts/oidc.py). Shown
+              small and only when it is not already the name above it, because
+              it is an identifier rather than something to read.{% endcomment %}
+              {% if person.is_sso %}
+                <span class="people-sub" title="{% translate 'Synology identity' %}">{{ person.get_username|truncatechars:22 }}</span>
+              {% elif person.get_full_name %}
+                <span class="people-sub">{{ person.get_username }}</span>
+              {% endif %}
+              {% if person.email %}<span class="people-sub">{{ person.email }}</span>{% endif %}
+            </th>
+            <td>
+              {% if person.is_sso %}
+                <span class="pill pill--herb">{% translate "Synology" %}</span>
+              {% else %}
+                <span class="pill">{% translate "Password" %}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if person.is_superuser %}
+                <span class="pill pill--saffron">{% translate "Administrator" %}</span>
+              {% elif person.is_staff %}
+                <span class="pill pill--saffron">{% translate "Manages people" %}</span>
+              {% else %}
+                <span class="pill">{% translate "Cooks" %}</span>
+              {% endif %}
+              {% if not person.is_active %}<span class="pill pill--off">{% translate "switched off" %}</span>{% endif %}
+            </td>
+            <td class="numeric">{{ person.recipe_count }}</td>
+            <td class="numeric">{{ person.cooked_count }}</td>
+            <td>{% if person.last_login %}{{ person.last_login|date:"SHORT_DATE_FORMAT" }}{% else %}<span class="hint">{% translate "never" %}</span>{% endif %}</td>
+            <td class="people-actions">
+              <div class="people-actions-group">
+              <a class="link-button" href="{% url 'accounts:user-edit' person.pk %}">{% translate "Edit" %}</a>
+              {% if not person.is_sso %}
+                <a class="link-button" href="{% url 'accounts:user-password' person.pk %}">{% translate "Password" %}</a>
+              {% endif %}
+              {% if person.pk != user.pk %}
+                <form method="post" action="{% url 'accounts:user-active' person.pk %}"
+                      data-confirm-title="{% if person.is_active %}{% translate 'Switch this account off?' %}{% else %}{% translate 'Switch this account on?' %}{% endif %}"
+                      data-confirm="{% if person.is_active %}{% translate 'They will not be able to sign in. Their recipes keep their name and nothing is deleted.' %}{% else %}{% translate 'They will be able to sign in again.' %}{% endif %}"
+                      data-confirm-accept="{% if person.is_active %}{% translate 'Switch off' %}{% else %}{% translate 'Switch on' %}{% endif %}">
+                  {% csrf_token %}
+                  <button type="submit" class="link-button">{% if person.is_active %}{% translate "Switch off" %}{% else %}{% translate "Switch on" %}{% endif %}</button>
+                </form>
+                <form method="post" action="{% url 'accounts:user-delete' person.pk %}"
+                      data-confirm-title="{% translate 'Delete this account?' %}"
+                      data-confirm="{% translate 'The account is removed for good. Recipes they added stay in the collection but lose their name. Switching the account off is the reversible version of this.' %}"
+                      data-confirm-accept="{% translate 'Delete' %}"
+                      data-confirm-danger>
+                  {% csrf_token %}
+                  <button type="submit" class="link-button link-button--danger">{% translate "Delete" %}</button>
+                </form>
+              {% endif %}
+              </div>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7">{% translate "Nobody yet." %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}
+
+{% block help_modal %}
+  <div class="modal-overlay help-modal" hidden data-help-modal>
+    <div class="modal help-panel" role="dialog" aria-modal="true" aria-labelledby="help-title">
+      <button type="button" class="modal-close" data-help-close aria-label="{% translate 'Close' %}">&times;</button>
+      <h2 class="modal-title" id="help-title">{% translate "Accounts in this app" %}</h2>
+      <div class="modal-body">
+        <h3>{% translate "Two kinds" %}</h3>
+        <p>{% translate "An account marked “Synology” is the local end of a DSM identity. Its name and e-mail are copied from DSM at every sign-in, so changing them here would be undone; its password lives in DSM and cannot be set from this app at all." %}</p>
+        <p>{% translate "An account marked “Password” was created here. Use one for somebody who cooks in this house but has no DSM account — and keep one as the way back in when SSO is the thing that is broken." %}</p>
+        <h3>{% translate "Why somebody is missing" %}</h3>
+        <p>{% translate "This app has no way to read the list of DSM accounts. A Synology account appears here the first time it signs in, and not before." %}</p>
+        <h3>{% translate "Switching off, or deleting" %}</h3>
+        <p>{% translate "Switching an account off is reversible and keeps their name on the recipes they added. Deleting is not: the recipes stay in the collection but no longer say who contributed them." %}</p>
+      </div>
+    </div>
+  </div>
+{% endblock %}

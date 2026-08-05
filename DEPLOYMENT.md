@@ -2,12 +2,20 @@
 
 The run-book. Follow it in order; §3 is the part that goes wrong.
 
-> **None of this has been executed yet.** The image has never been built,
-> gunicorn has never served this app, and no OIDC round trip has completed
-> against a real Synology SSO Server. It is written from how DSM and these
-> components work, not from a run on this NAS — so expect to correct it as you
-> go, and please correct it *here* rather than only in your terminal history.
-> OPEN-ITEMS.md §2 lists exactly what is and is not known to work.
+> **None of this has been executed on the real NAS.** No OIDC round trip has
+> completed against a real Synology SSO Server, and no part of §1–§5 has been
+> done on this hardware. It is written from how DSM and these components work,
+> not from a run here — so expect to correct it as you go, and please correct it
+> *here* rather than only in your terminal history. OPEN-ITEMS.md §2 lists
+> exactly what is and is not known to work.
+>
+> **The container itself is no longer a guess.** The image has now been built,
+> started, and observed serving `/healthz`, the login redirect and its own
+> static files, with migrations applied on start-up — and §4.3(b), the
+> `docker load` path, was done end to end by deleting the image and restoring it
+> from the release tarball. What remains untested is that container running on a
+> *Synology*, behind *that* proxy, against *that* SSO server, and the GitHub
+> Actions plumbing that produces the release in the first place.
 
 Target shape:
 
@@ -161,8 +169,11 @@ and leaves the collection alone.
 
 ### 4.2 Configure
 
-Copy `.env.example` to `.env` beside the repository (never inside it; it is
-gitignored and `.dockerignore`d for a reason) and fill in at least:
+Put `.env` beside the compose file — never inside a checkout; it is gitignored
+and `.dockerignore`d for a reason. If you are deploying from a release, the
+attachment is called `env.example` (a dotfile would be invisible in File Station
+and is skipped by shell globs, which is why the release does not ship one);
+rename it to `.env`. From a checkout, copy `.env.example`. Fill in at least:
 
 ```
 DJANGO_DEBUG=False
@@ -180,10 +191,47 @@ Generate the key with:
 python -c "from django.core.management.utils import get_random_secret_key as g; print(g())"
 ```
 
-### 4.3 Build and start
+### 4.3 Get the image and start
 
-Container Manager → Project → Create → point it at the checkout and
-`deploy/docker-compose.yml`. Or over SSH:
+**Do not build on the NAS.** A DS723+ has two cores that are already running
+DSM, Home Assistant and a backup; compiling a Python image on them takes minutes
+it does not have, and it produces an artifact nobody can reproduce. Every tag
+pushed to GitHub builds, tests and publishes exactly one image
+(`.github/workflows/release.yml`) — take that one. §9 is how a release is cut.
+
+Pick whichever of these fits; they install the same bytes.
+
+**(a) From the registry.** The ordinary path, and the only one where
+`docker compose pull` later does the right thing on its own.
+
+```
+cd /volume1/docker/kitchen
+# Only if the package is private: a GitHub token with read:packages.
+#   echo <token> | sudo docker login ghcr.io -u <github-username> --password-stdin
+sudo docker compose pull
+sudo docker compose up -d
+```
+
+**(b) From the release attachment.** No registry, no credentials — which is the
+point: it still works when the package is private and this NAS has never been
+given a token, and when GitHub is unreachable but you already downloaded the
+file. Take `kitchen-<version>-linux-amd64.tar.gz`, `docker-compose.yml` and
+`env.example` from the release page and put the first two in
+`/volume1/docker/kitchen`:
+
+```
+cd /volume1/docker/kitchen
+sha256sum -c SHA256SUMS               # optional, and it takes a second
+gunzip -c kitchen-<version>-linux-amd64.tar.gz | sudo docker load
+sudo docker compose up -d
+```
+
+`docker load` brings the image in under the exact tag the compose file names, so
+`up -d` finds it locally and never reaches for the registry.
+
+**(c) From a checkout, building here.** Still supported, still the right thing
+on a laptop, and the fallback if the pipeline is broken and you need a fix
+tonight. This is the *other* compose file — the one with a `build:` section:
 
 ```
 cd /volume1/docker/kitchen/KitchenApp
@@ -268,26 +316,92 @@ rather than as a file copy.
 
 ---
 
-## 7. Updating
+## 7. Updating, and rolling back
+
+Edit the one line in `docker-compose.yml` that names the version, then:
 
 ```
-cd /volume1/docker/kitchen/KitchenApp
-git pull
-sudo docker compose -f deploy/docker-compose.yml up -d --build
+cd /volume1/docker/kitchen
+sudo docker compose pull        # or: gunzip -c kitchen-<new>-linux-amd64.tar.gz | sudo docker load
+sudo docker compose up -d
 ```
 
 Migrations run from `deploy/entrypoint.sh` on start-up. The image is disposable;
 `/data` is not.
 
+**Confirm the update actually landed.** Open the app and look at the bottom of
+the sidebar — the running version is printed there. This is not ceremony: a
+container kept alive by `restart: unless-stopped`, a compose file edited in the
+wrong folder and a browser holding a cached page all look exactly like a
+successful update from the NAS's side, and the only place the truth shows is a
+page served by the new code.
+
+**Rolling back** is putting the previous version back in that same line and
+running the same two commands. That is the whole reason the compose file pins a
+version instead of `latest`: with `latest` there is nothing to edit, `up -d`
+fetches the bad image again, and the way back is to remember which tag was good.
+
+The one thing a roll-back does not undo is a **migration**. Going back to an
+image older than a migration that has already run leaves the database ahead of
+the code. Nothing here has needed a destructive migration yet; if one ever does,
+take a copy of `/volume1/docker/kitchen/data` before updating — which is a
+sentence worth reading twice before the first update that follows a schema
+change.
+
 ---
 
-## 8. When something is wrong
+## 8. Cutting a release
+
+```
+git tag v1.2.0
+git push origin v1.2.0
+```
+
+That is the whole procedure. The tag starts `.github/workflows/release.yml`,
+which:
+
+1. runs the full test suite and the container smoke test (`ci.yml`, called as a
+   reusable workflow, so a release can never be verified by a stale copy of the
+   checks);
+2. builds `linux/amd64` with the version baked in as `KITCHEN_VERSION` and as
+   OCI labels;
+3. **starts the image it just built** and checks it answers `/healthz` and
+   reports the version it claims to be — because "the artifact we shipped was
+   never started" is the failure the whole pipeline exists to prevent;
+4. pushes `ghcr.io/christianh99/kitchenapp:<version>` and `:latest`;
+5. attaches the image tarball, a `docker-compose.yml` pinned to that version,
+   `env.example` and `SHA256SUMS` to the GitHub release, creating the release if
+   the tag was pushed on its own and attaching to it if you drafted one first.
+
+If an upload fails but the tag is fine, re-run it from the Actions tab —
+**Release → Run workflow** — and give it the tag. It rebuilds and replaces the
+assets rather than refusing because they already exist.
+
+Nothing here needs a secret to be configured: the workflow uses the
+`GITHUB_TOKEN` that Actions issues per run, with `packages: write` for the push
+and `contents: write` for the release. There is no long-lived credential to
+rotate, and nothing to leak.
+
+**The package is private until you say otherwise.** GHCR inherits nothing from
+the repository's visibility — a newly published package is private, and the NAS
+will get a 403 from `docker compose pull` that reads like a wrong image name.
+Either make it public (GitHub → your profile → Packages → *kitchenapp* →
+Package settings → Change visibility) or give the NAS a read-only token, or
+ignore the registry entirely and use the release attachment, which is path (b)
+in §4.3 and needs neither.
+
+---
+
+## 9. When something is wrong
 
 | Symptom | Where to look |
 |---|---|
 | Redirect loop at sign-in, no error | `X-Forwarded-Proto` missing from the proxy rule (§2). This is the common one. |
 | "Sign in with Synology" ends in a connection error | Hairpin DNS — the container cannot reach `sso.haeusslerr.de` (§3.3). |
 | CSRF failure on every form | `DJANGO_CSRF_TRUSTED_ORIGINS` missing the `https://` scheme. |
+| `docker compose pull` says denied / 403 | The GHCR package is private (§8). Make it public, give the NAS a read-only token, or use the release attachment instead. |
+| The app still shows the old version after an update | The sidebar is telling the truth and something else is not: check you edited the compose file in the folder you are running `up -d` from, and that `docker compose ps` shows a container created just now. |
+| The release ran but the assets are missing | Re-run **Release → Run workflow** with the tag. Uploads use `--clobber`, so a re-run replaces a half-written asset instead of failing on it. |
 | `DisallowedHost` on every request | `DJANGO_ALLOWED_HOSTS` does not include the hostname the proxy forwards. |
 | Every page renders unstyled | `collectstatic` did not run — check the build log, not the run log. |
 | Container restarts every ten seconds | Read `docker logs`; a missing `DJANGO_SECRET_KEY` raises at import with a sentence saying so. |

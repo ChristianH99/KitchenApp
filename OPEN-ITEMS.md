@@ -1,9 +1,10 @@
 # State of the work
 
-Written 2026-08-05, at the end of the session that created the repository. It
-exists so that somebody — or some agent — picking this up cold knows three
-things the code cannot tell them: **what has actually been run**, what was left
-out on purpose, and what is worth doing next.
+Written 2026-08-05 at the end of the session that created the repository, and
+updated the same day by the session that added the diagram, the cooking view and
+the account pages. It exists so that somebody — or some agent — picking this up
+cold knows three things the code cannot tell them: **what has actually been
+run**, what was left out on purpose, and what is worth doing next.
 
 Keep it current. A status document that is six weeks stale is worse than none,
 because it is believed.
@@ -16,15 +17,38 @@ Everything below was observed working, not merely written.
 
 | | How it was checked |
 |---|---|
-| The whole test suite | `uv run pytest` — **180 passed**, ~45 s |
-| Every page renders | Driven in Chrome against `runserver`: home, list, detail, form, tags, login |
+| The whole test suite | `uv run pytest` — **263 passed**, ~90 s |
+| Every page renders | Driven in Chrome against `runserver`: home, list, detail, form, tags, login, cooking view, People |
 | Adding a recipe end to end | Typed into the real form in the browser; ingredients, tags and slug all correct on save |
 | Blank formset rows dropped | Same submission — 5 rendered rows, 2 filled, 2 ingredients saved |
 | Tags reused, not duplicated | 8 tags before, 9 after a submission naming two existing ones and one new |
-| Servings scaling | Zwetschgenkuchen 12 → 18 in the browser: 1,5 kg → 2,25 kg, "umgerechnet" note appears |
-| German UI | `lang="de"`, sidebar and headings in German, catalogs compiled and loaded |
+| Servings scaling | Zwetschgenkuchen 12 → 18 in the browser: 1,5 kg → 2,25 kg, "umgerechnet" note appears — **and the diagram cells and the substitute follow in step**, read back from the DOM |
+| The diagram's geometry | Read the rendered `<table>` back out of the page cell by cell: the full-width "Ofen vorheizen" row, the four ingredients merging into "Hefeteig ansetzen", the rowspans and the empty filler cells all as in the reference picture |
+| A branching diagram | Kartoffelsalat: two arms (potatoes, dressing) meeting at "übergießen", the shallow arm spanning the columns between |
+| The diagram survives an edit | Opened the real edit form, pressed Save with nothing changed, and the diagram came back identical — the selects had been primed from the saved relations |
+| The cooking view | Walked Kartoffelsalat step by step in the browser: the current cell and its four ingredient rows light up, earlier steps go green, the stopwatch runs, "Fertig" opens the finish panel with the measured minutes filled in |
+| Creating a local account | Typed into the real People form; account created, password usable |
+| No sideways scroll at 390px | Measured, not eyeballed: the recipe page was 508px wide inside a 390px column before `min-width: 0` and is exactly 390px after it, with the diagram scrolling inside its own box. The form and the cooking view were measured the same way |
+| German UI | `lang="de"`, sidebar and headings in German, catalogs compiled and loaded; every new string translated |
 | Settings import with `DEBUG=False` | `manage.py check --deploy` — see §4 for the three warnings and why two of them stay |
-| `deploy/entrypoint.sh` parses | `sh -n` |
+| **The Docker image builds** | `docker build -f deploy/Dockerfile` on the development machine — **first time ever**, and it succeeded on the first attempt. 218 MB. Both feared failures (the `uv` layer, Pillow needing headers) did not happen; Pillow's manylinux wheels are enough |
+| **gunicorn serves this app** | Also a first. `docker run`, migrations applied on start-up from `entrypoint.sh`, two workers booted, the container reported itself `healthy` after ~60 s |
+| What the container serves | `/healthz` → `ok`; `/` → 302 to `/accounts/login/?next=%2F`; the login page → 200 with the full CSP header; the hashed `main.<hash>.css` → 200, so WhiteNoise really is serving from inside the image |
+| `migrate --check` and `check --deploy` inside the container | Exit 0, and only the two deliberate warnings plus a `W009` for the throwaway smoke-test key |
+| The version reaches the page | `KITCHEN_VERSION` build-arg → env var → rendered in the sidebar of a real signed-in page, checked from inside the running image |
+| No development data in the image | `/app` has no `db.sqlite3`, no `media/`, no `.env` — the `.dockerignore` does what its comment claims |
+| **The release attachment path, end to end** | `docker save \| gzip` → 73 MB; then the image was **deleted outright** and restored from the tarball alone with `docker load`; `docker compose up -d` found it locally without touching a registry, came up healthy, and wrote its database into the bind-mounted folder |
+| The generated compose file and checksums | `sed` substitution produces `image: ghcr.io/christianh99/kitchenapp:<version>`; `sha256sum -c` verifies all three assets; `dist/*` picks up all four files including `env.example` |
+| The workflows parse | YAML loads, and all 21 `run:` blocks pass `bash -n` with the GitHub expressions stubbed out |
+| The release notes | The heredoc was dry-run with the expressions filled in by hand — see §2 for what that does *not* cover |
+| `deploy/entrypoint.sh` parses | `sh -n`, and now also runs for real |
+
+**One caveat on the responsive work.** Chrome's `resize_window` had no effect in
+this session — the viewport stayed at 2048px however it was called — so the
+phone layout was verified by *measurement* (forcing the content column to 390px
+and checking what overflows) rather than by a phone-sized screenshot. That
+caught a real bug the eye would also have caught, and it is not the same as
+having looked at it. Worth ten minutes on an actual phone before trusting it.
 
 ## 2. What has **never** been run
 
@@ -32,16 +56,20 @@ This is the important half. None of it is known to be broken; none of it is
 known to work either, and the difference matters when somebody is standing at
 the NAS.
 
-- **The Docker image has never been built.** `deploy/Dockerfile` is written and
-  reasoned about but `docker build` has not been executed once. Expect to
-  iterate on it. Most likely first failures: the `uv` layer, and Pillow needing
-  `libjpeg-dev`/`zlib1g-dev` in the runtime stage (the slim image carries the
-  runtime libraries but a wheel-less Pillow build would need the headers —
-  Pillow ships manylinux wheels, so this probably does not bite, but it is the
-  first thing to check if the build stops there).
-- **gunicorn has never served this app.** It cannot run on Windows (`fcntl`), so
-  every observation above is through `runserver`. The WSGI callable is exercised
-  by the test client, so the application object is sound; the *server* is not.
+- **Neither GitHub workflow has ever run on a runner.** `.github/workflows/ci.yml`
+  and `release.yml` are written, their YAML parses, and every one of their 21
+  `run:` blocks passes `bash -n` — but no push has happened since they were
+  written. What *has* been done is run their substance by hand on the
+  development machine (see §1), so what is untested is the Actions plumbing:
+  the reusable-workflow call, `GITHUB_TOKEN` permissions, `gh release
+  create`/`upload`, the GHCR push. **Expect the first run to need a fix or
+  two**; that is what a first run is for.
+- **Nothing has been pushed to GHCR and no release has been cut.** So the
+  registry path in DEPLOYMENT.md §4.3(a) — including whether the package comes
+  out private, which it should — is reasoned about rather than seen. The
+  *attachment* path, §4.3(b), has been done end to end locally.
+- **`OIDC_ALLOWED_GROUPS` / `OIDC_STAFF_GROUP` against a real token.** The claim
+  handling is unit-tested but no DSM has ever supplied the claims.
 - **The OIDC flow has never touched a real Synology SSO Server.** The claim
   handling is unit-tested by handing the backend dictionaries — which is the
   only way to test the DSM version that omits the group claim — but no browser
@@ -67,12 +95,30 @@ list exists so it is re-opened knowingly.
   the project is laid out for them (`apps/recipes/` is one app among future
   siblings, not the whole thing), but only recipes exist. The structured
   ingredient rows are the groundwork; a shopping list is an aggregation over
-  `RecipeIngredient` and needs no schema change to recipes.
+  `RecipeIngredient` and needs no schema change to recipes. It now has two more
+  columns to respect: `optional` (don't buy saffron every week) and
+  `alternative_for` (don't buy both the butter and the margarine).
 - **HTMX.** The briefing asked for it and the app does not use it. Nothing here
   needs partial page updates yet: the servings scaler is pure client-side
-  arithmetic and everything else is a form post. Adding HTMX for its own sake
+  arithmetic, the cooking view shows and hides steps the server already
+  rendered, and everything else is a form post. Adding HTMX for its own sake
   would be a dependency and a second rendering path for no behaviour. The
   moment there is a live-filtering list or an inline edit, it earns its place.
+- **A server-rendered preview of the diagram while editing.** The form's preview
+  is a *nesting* built in JavaScript, not the real table. Drawing the real one
+  would mean either re-implementing the rowspan/colspan arithmetic in a second
+  language — the thing most likely to quietly disagree with the page it is
+  previewing — or a `fetch` to an endpoint that lays out an unsaved POST. The
+  second is the one to build if the preview ever needs to be exact; it is a view
+  and a template, not a rewrite.
+- **Editing the diagram by dragging.** Two `<select>`s per row is not elegant,
+  and it works on a phone, survives without JavaScript for everything except the
+  wiring itself, and needs no drag-and-drop library. A canvas editor is a real
+  feature, not a polish pass.
+- **Nutrition, cost per portion, and a real unit vocabulary.** `unit` is still
+  free text ("EL" / "Esslöffel" / "Tbsp" are three units as far as the database
+  is concerned). Normalising it is the prerequisite for all three, and there is
+  no reason to do it until one of them is wanted.
 - **Recipe versioning / history.** Somebody rewriting the family Rouladen is
   handled by *who may edit* (`apps/recipes/views._may_edit`), not by an audit
   trail. A household of four does not need one; if it turns out to, the shape to
@@ -109,24 +155,40 @@ list exists so it is re-opened knowingly.
 
 ## 5. Worth doing next, roughly in order
 
-1. **Build the image and run it.** Everything in §2 collapses into this one
-   task, and until it is done the deployment half of this repository is
-   untested. Do it before adding a single feature.
+1. **Push, and watch the first CI run.** The image and the container are known
+   good (§1); what is not is the Actions plumbing around them. Expect to
+   iterate. Then cut `v0.1.0` and check the release really carries its four
+   attachments and that the GHCR package appeared — and set its visibility,
+   which is the step that otherwise shows up later as a 403 on the NAS that
+   reads like a typo in the image name.
+
+   Then delete the §2 bullets it has disproved. Leaving them there once they
+   are false is the specific way this document becomes a liability.
 2. **Complete one OIDC round trip against the real SSO server**, then correct
    the endpoint defaults in `settings.py` and DEPLOYMENT.md §3.1 to what was
    actually found. Note the DSM version in the commit message — the next person
    to hit a moved endpoint will want to know which version this was true for.
-3. **Favourites.** Small, obviously wanted, and it exercises the first
+3. **Look at it on a real phone**, and at the cooking view in particular — that
+   is the page whose whole point is being used on one. See the caveat under §1:
+   the responsive work was measured rather than seen.
+4. **Favourites.** Small, obviously wanted, and it exercises the first
    per-user relation in the app.
-4. **A shopping list** across selected recipes. This is the feature the
+5. **A shopping list** across selected recipes. This is the feature the
    structured ingredients were for, and the first one that will show whether the
    unit field wants normalising (`EL` vs `Esslöffel` vs `Tbsp`) — which it
    currently is not, on purpose: free text until there is a reason.
-5. **Pagination on the recipe list.** It renders every recipe. Fine at a hundred
-   with lazy-loaded images; not fine at a thousand. The query-cost tests will
-   *not* catch this — they pin the query count, which stays flat while the
-   payload grows.
-6. **A print stylesheet for the recipe page.** People print recipes.
+6. **Pagination on the recipe list, and on the cooking history.** The list
+   renders every recipe; the recipe page renders the last ten cookings and says
+   how many more there are. Fine at a hundred with lazy-loaded images; not fine
+   at a thousand. The query-cost tests will *not* catch this — they pin the
+   query count, which stays flat while the payload grows.
+7. **A print stylesheet for the recipe page.** People print recipes, and the
+   diagram is the part that will come out wrong: it lives in a horizontally
+   scrolling box that a printer cannot scroll.
+8. **Somewhere to see the cooking history across recipes** — "what did we eat
+   this month", and whether "serves four" is ever true in this house. Every
+   number for it is already recorded; nothing reads it yet except the recipe
+   page's own median.
 
 ## 6. Things that will bite
 
@@ -138,11 +200,33 @@ visible from the code alone.
   entry" until it has run once.
 - **GNU gettext is not on PATH** on the development machine. It ships with Git:
   `$env:PATH = "C:\Program Files\Git\usr\bin;$env:PATH"`.
-- **`makemessages` on Windows can emit a malformed `#:` reference line** — a
+- **`makemessages` on Windows emits a malformed `#:` reference line** — a
   wrapped reference continues with a leading space instead of a second `#:`,
-  and `msgfmt` then refuses the whole file with "keyword unknown". It happened
-  once here. Symptom: `compilemessages` appears to succeed but no `.mo` appears.
-  Check with `msgfmt --check -o /dev/null locale/de/LC_MESSAGES/django.po`.
+  and `msgfmt` then refuses the whole file with "keyword unknown". It is not
+  occasional: it happened on *every* run in the second session, and `--no-wrap`
+  does not prevent it. Symptom: `compilemessages` prints an error that is easy
+  to scroll past, no `.mo` is written, and the app keeps serving the previous
+  catalog — so the translations look compiled and are not there. Run
+  `uv run python tools/fix_po.py` between `makemessages` and `compilemessages`;
+  `config/tests.py` also fails on it now.
+- **Pass `--no-wrap` to `makemessages`.** Otherwise gettext breaks a long
+  `msgstr` across continuation lines, which is valid `.po` and which the
+  completeness check reads as an *empty* translation. A fully translated catalog
+  then fails the suite, and the obvious next move is to "fix" the check.
+- **`runserver --noreload` caches templates for the life of the process.**
+  Django uses the cached template loader; the autoreloader is what normally
+  hides that. With `--noreload` a template edit changes nothing until restart,
+  and the symptom — the old markup rendering from a file that is plainly correct
+  — reads as a browser cache problem and is not one. This cost time in the
+  second session, twice.
+- **The static manifest is used in development too, and the URL is unhashed.**
+  So a CSS or JS edit needs `collectstatic`, *and* the browser will still serve
+  its cached copy. When a style change appears not to apply, rule those two out
+  before changing the CSS again.
+- **A grid or flex column defaults to `min-width: auto`** — "never shrink below
+  my content". Any column that can hold the diagram, a wide table or a text
+  input needs `min-width: 0`, or the page scrolls sideways on a phone and takes
+  the topbar with it. Caught by measurement here, not by looking.
 - **A value read by JavaScript must be `|unlocalize`d.** German renders `1.5` as
   `1,5` and `parseFloat` stops at the comma. There is a test for the one place
   this matters today; there is no test for the next place somebody adds.

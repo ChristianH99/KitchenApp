@@ -1,0 +1,155 @@
+# Every push and every pull request: run the suite, and **build the image**.
+#
+# The second half is the part that earns its keep here. Until this workflow
+# existed, `deploy/Dockerfile` had never been built once and gunicorn had never
+# served this app — the whole of OPEN-ITEMS.md §2. Both are now exercised on
+# every commit, on a machine that is not the developer's, which is the only way
+# "it works here" ever becomes "it works".
+#
+# It is also called by release.yml (`workflow_call` below), so a tag cannot
+# produce a published image that the suite has not passed.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+# A second push to the same branch makes the first run's answer irrelevant.
+# Tags are deliberately not cancelled — see release.yml.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Test suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      # Not optional, and not only a deployment step. STORAGES uses WhiteNoise's
+      # *manifest* storage in every mode, so {% static %} resolves through the
+      # gitignored staticfiles/staticfiles.json — a checkout that has never run
+      # this fails most of the suite with "Missing staticfiles manifest entry".
+      - name: Collect static files
+        run: uv run python manage.py collectstatic --noinput
+
+      - name: Run the tests
+        run: uv run pytest -q
+
+      # The catalogs are committed as .mo, and nothing at runtime compiles a
+      # .po. This proves the committed .mo is what the .po actually says —
+      # something the mtime check in config/tests.py cannot tell on a fresh
+      # checkout, where git gives every file the same timestamp.
+      #
+      # tools/check_catalogs.py compares the parsed *catalogs* rather than the
+      # bytes, because two msgfmt versions produce different .mo bytes for the
+      # same input and a red build reading "your translations are stale" when
+      # they are not is worse than no check at all.
+      - name: Check the committed catalogs match their sources
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends gettext
+          uv run python tools/check_catalogs.py
+
+  image:
+    name: Image builds and serves
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Plain `docker build` rather than the buildx actions. This runs a handful
+      # of times a day at most, the whole build is about four minutes cold, and
+      # every action added here is a third party in the path between a commit
+      # and an image that runs in somebody's kitchen.
+      - name: Build the image
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            --build-arg KITCHEN_VERSION=ci-${GITHUB_SHA::7} \
+            --build-arg BUILD_REVISION=$GITHUB_SHA \
+            --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --file deploy/Dockerfile \
+            --tag kitchen-app:ci \
+            .
+
+      # The smoke test. gunicorn cannot run on the Windows machine this is
+      # developed on (it needs fcntl), so this is the only place the *server* is
+      # ever exercised — as opposed to the WSGI callable, which the test client
+      # already covers. No volume is mounted: /data inside the image is already
+      # owned by the container's user, and a bind mount here would only be a
+      # uid-mismatch failure that says nothing about the app.
+      - name: Start the container
+        run: |
+          docker run --detach --name kitchen-smoke \
+            --publish 127.0.0.1:8000:8000 \
+            --env DJANGO_DEBUG=False \
+            --env DJANGO_SECRET_KEY=smoke-test-key-not-a-real-one-0123456789abcdef \
+            --env DJANGO_ALLOWED_HOSTS=127.0.0.1,localhost \
+            --env DJANGO_TRUST_PROXY_HEADERS=False \
+            kitchen-app:ci
+
+      - name: Wait for the health check to pass
+        run: |
+          for attempt in $(seq 1 45); do
+            status=$(docker inspect -f '{{.State.Health.Status}}' kitchen-smoke 2>/dev/null || echo missing)
+            case "$status" in
+              healthy) echo "healthy after ${attempt} tries"; exit 0 ;;
+              unhealthy) echo "::error::the container reported itself unhealthy"; exit 1 ;;
+            esac
+            sleep 2
+          done
+          echo "::error::the container never became healthy"
+          exit 1
+
+      # Three assertions, and each is a different thing that has never been
+      # observed before this workflow existed.
+      - name: Check what it serves
+        run: |
+          # gunicorn is listening and the database is reachable — /healthz runs
+          # one SELECT 1, which is why "ok" means more than a static view would.
+          body=$(curl -fsS http://127.0.0.1:8000/healthz)
+          test "$body" = "ok" || { echo "::error::/healthz said '$body'"; exit 1; }
+
+          # The login gate is on. A 200 here would mean the whole collection is
+          # readable by anybody who can reach the port.
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/)
+          test "$code" = "302" || { echo "::error::/ answered $code, expected a redirect to the login"; exit 1; }
+
+          # Static files are served by WhiteNoise from inside the image, which is
+          # what collectstatic-at-build-time is for. A 404 here is the "every
+          # page renders unstyled" failure, which looks fine in an HTML diff.
+          css=$(curl -s -o /dev/null -w '%{http_code}' -L http://127.0.0.1:8000/accounts/login/)
+          test "$css" = "200" || { echo "::error::the login page answered $css"; exit 1; }
+
+      - name: Migrations are applied and reversible-ish
+        run: docker exec kitchen-smoke python manage.py migrate --check
+
+      - name: Deployment checks
+        run: |
+          docker exec kitchen-smoke python manage.py check --deploy --fail-level ERROR
+
+      # Always, because the logs are the whole diagnosis when a step above fails
+      # and the container is about to be thrown away.
+      - name: Container logs
+        if: always()
+        run: docker logs kitchen-smoke || true
+
+      - name: Stop the container
+        if: always()
+        run: docker rm --force kitchen-smoke || true

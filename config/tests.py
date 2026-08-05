@@ -372,6 +372,104 @@ def test_everything_written_at_runtime_lives_under_the_data_dir():
         )
 
 
+# --------------------------------------------------------------------------
+# The build pipeline
+# --------------------------------------------------------------------------
+
+WORKFLOWS = BASE_DIR / ".github" / "workflows"
+RELEASE_WORKFLOW = WORKFLOWS / "release.yml"
+RELEASE_COMPOSE = BASE_DIR / "deploy" / "docker-compose.release.yml"
+
+
+class TestTheReleasePipelineAgreesWithItself:
+    """Three files have to say the same thing about one image, and none of them
+    looks wrong on its own. The failure mode is a release that builds, pushes
+    and attaches perfectly — and a compose file on the NAS that pulls something
+    that was never published."""
+
+    def test_the_release_workflow_exists(self):
+        assert RELEASE_WORKFLOW.exists(), (
+            "the release workflow is gone; a tag would now produce nothing"
+        )
+
+    def test_the_compose_file_pulls_rather_than_builds(self):
+        """A `build:` section here would quietly turn a two-core NAS into a
+        build machine again — and worse, `docker compose up` would then succeed
+        with a *locally* built image while looking exactly like a pull."""
+        source = RELEASE_COMPOSE.read_text(encoding="utf-8")
+        for line in source.splitlines():
+            stripped = line.strip()
+            assert not stripped.startswith("build:"), (
+                "docker-compose.release.yml has a build: section; it is the "
+                "pull-based file. deploy/docker-compose.yml is the one that builds."
+            )
+
+    def test_the_workflow_substitutes_every_placeholder(self):
+        """The compose file ships with `__IMAGE__` and `__VERSION__` in it and
+        the workflow rewrites them. A placeholder the workflow does not know
+        about is shipped verbatim, and `image: __IMAGE__:1.2.0` fails on the NAS
+        rather than in CI."""
+        compose = RELEASE_COMPOSE.read_text(encoding="utf-8")
+        workflow = RELEASE_WORKFLOW.read_text(encoding="utf-8")
+        placeholders = set(re.findall(r"__[A-Z_]+__", compose))
+        assert placeholders, (
+            "docker-compose.release.yml no longer has placeholders — either it "
+            "hardcodes a version, or the substitution has been removed"
+        )
+        for placeholder in placeholders:
+            assert placeholder in workflow, (
+                f"{placeholder} is in docker-compose.release.yml but the release "
+                "workflow never replaces it, so it ships verbatim"
+            )
+
+    def test_the_pinned_version_is_not_latest(self):
+        """`latest` cannot be rolled back by re-reading the file: `up -d` after
+        a bad release fetches the same bad image again."""
+        compose = RELEASE_COMPOSE.read_text(encoding="utf-8")
+        image_lines = [ln.strip() for ln in compose.splitlines() if ln.strip().startswith("image:")]
+        assert image_lines, "docker-compose.release.yml names no image"
+        for line in image_lines:
+            assert not line.endswith(":latest"), (
+                f"{line} pins `latest`; a rollback then has nothing to edit"
+            )
+
+    def test_the_dockerfile_takes_the_version_the_workflow_passes(self):
+        """`docker build --build-arg X` for an ARG the Dockerfile never declares
+        is not an error — it is a warning nobody reads, and the image ships
+        claiming to be `dev`."""
+        dockerfile = (BASE_DIR / "deploy" / "Dockerfile").read_text(encoding="utf-8")
+        workflow = RELEASE_WORKFLOW.read_text(encoding="utf-8")
+        for arg in re.findall(r"--build-arg (\w+)=", workflow):
+            assert re.search(rf"^ARG {arg}\b", dockerfile, re.M), (
+                f"the release workflow passes --build-arg {arg}, which "
+                "deploy/Dockerfile does not declare — it would be silently dropped"
+            )
+
+
+def test_the_health_check_does_not_volunteer_the_version(client, db, settings):
+    """/healthz is unauthenticated. Which build is running is exactly the sort
+    of thing an unauthenticated endpoint should not answer, and the tempting
+    place to put it is a health check nobody thinks of as a page."""
+    settings.KITCHEN_VERSION = "9.9.9"
+    body = client.get("/healthz").content.decode()
+    assert "9.9.9" not in body
+
+
+def test_the_running_version_is_shown_once_signed_in(client, db, settings):
+    """The first question after every update, and the one the NAS cannot
+    answer — a restarted container and a browser holding a cached page look
+    identical from the outside."""
+    settings.KITCHEN_VERSION = "9.9.9"
+    assert "9.9.9" in client.get("/").content.decode()
+
+
+def test_a_checkout_claims_no_version(client, db, settings):
+    """An image built from an uncommitted working copy has no version, and
+    printing one that looks official is worse than printing nothing."""
+    settings.KITCHEN_VERSION = ""
+    assert "shell-version" not in client.get("/").content.decode()
+
+
 def test_the_dialog_markup_is_present_on_every_page(client, db):
     """window.appConfirm fills a dialog base.html renders. Without it every
     confirmation on the site silently does nothing."""
@@ -415,6 +513,28 @@ class TestTheCatalogsAreComplete:
         English while the file looks translated."""
         source = path.read_text(encoding="utf-8")
         assert "#, fuzzy" not in source, f"{path.name} contains fuzzy entries"
+
+    def test_no_reference_line_was_wrapped(self, path):
+        """``makemessages`` on Windows wraps a long ``#:`` block onto a second
+        line that begins with a *space* rather than a second ``#:``.
+
+        ``msgfmt`` then refuses the whole file with "keyword unknown", no
+        ``.mo`` is written, and the app carries on serving the *previous*
+        catalog — so a session's translations look compiled and simply are not
+        there. ``tools/fix_po.py`` repairs it; this is what notices.
+        """
+        in_references = False
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if line.startswith("#:"):
+                in_references = True
+            elif in_references and line.startswith(" ") and line.strip():
+                pytest.fail(
+                    f"{path.name}:{number} continues a #: block with a leading "
+                    "space; msgfmt will refuse the file and write no .mo at "
+                    "all. Run `uv run python tools/fix_po.py`."
+                )
+            else:
+                in_references = False
 
     def test_it_is_compiled(self, path):
         """`.mo` files are committed, because nothing at runtime compiles them

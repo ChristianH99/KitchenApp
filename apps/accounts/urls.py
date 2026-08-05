@@ -11,11 +11,22 @@ up at the project level instead (config/urls.py), where no namespace applies.
 
 from django.urls import path
 
-from apps.accounts import views
+from apps.accounts import users, views
 
 app_name = "accounts"
 
 urlpatterns = [
     path("login/", views.login_view, name="login"),
     path("logout/", views.logout_view, name="logout"),
+
+    # The household's accounts. Every one of these is staff-only, enforced by
+    # the decorator on the view and checked from the outside by
+    # apps/accounts/tests.py, which walks the URLconf for `user-*` and refuses
+    # to let any of them answer an ordinary account.
+    path("users/", users.user_list, name="user-list"),
+    path("users/new/", users.user_add, name="user-add"),
+    path("users/<int:pk>/", users.user_edit, name="user-edit"),
+    path("users/<int:pk>/password/", users.user_password, name="user-password"),
+    path("users/<int:pk>/delete/", users.user_delete, name="user-delete"),
+    path("users/<int:pk>/active/", users.user_toggle_active, name="user-active"),
 ]

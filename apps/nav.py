@@ -14,8 +14,10 @@ has already resolved. Two properties make the whole class of bug go away, and
 * every pair named here exists in the URLconf, so a renamed route fails a test
   instead of quietly marking nothing.
 
-``accounts:*`` is deliberately absent: the user block sits in the sidebar
-footer, outside the nav, and is never marked.
+The sign-in pages (``accounts:login``/``logout``) are deliberately absent: the
+user block sits in the sidebar footer, outside the nav, and is never marked.
+The account *management* pages are here — being staff-only is a question for
+the template, not for this file.
 """
 
 # Sidebar entry id -> the (app_name, url_name) pairs that make it current.
@@ -25,9 +27,20 @@ ITEMS = {
 
     "recipes.list": {
         ("recipes", name)
-        for name in ("list", "detail", "add", "edit", "delete")
+        for name in ("list", "detail", "add", "edit", "delete",
+                     "cook", "cooked", "cook-log-delete")
     },
     "recipes.tags": {("recipes", "tags")},
+
+    # Staff only, and the sidebar hides it for everybody else — but it is
+    # registered here all the same, because "which entry is current" and "who
+    # may see the entry" are different questions and conflating them is how an
+    # entry ends up marked on a page nobody can reach.
+    "users": {
+        ("accounts", name)
+        for name in ("user-list", "user-add", "user-edit", "user-password",
+                     "user-delete", "user-active")
+    },
 }
 
 # Parent entry -> the entries nested under it. A parent is a link too, but never

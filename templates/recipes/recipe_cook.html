@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% load static i18n l10n %}
+{% block title %}{% blocktranslate with title=recipe.title %}Cooking {{ title }}{% endblocktranslate %} – {% translate "Kitchen" %}{% endblock %}
+{% block topbar_title %}{{ recipe.title }}{% endblock %}
+{% comment %}Not "Cooking": that msgid is already the recipe card's *cooking
+time* label ("Garzeit"), and reusing it puts a duration heading over a page that
+is a walkthrough. One English word, two German ones — which is the ordinary case
+and the reason a shared msgid is a trap rather than a saving.{% endcomment %}
+{% block topbar_sub %}{% translate "Step by step" %}{% endblock %}
+
+{% block topbar_actions %}
+  <a class="button button--secondary button--small" href="{{ recipe.get_absolute_url }}">{% translate "Back to the recipe" %}</a>
+{% endblock %}
+
+{% block content %}
+  {% comment %}The whole page is one component so the script can find its parts
+  without the template and the script agreeing on a dozen separate ids.{% endcomment %}
+  <div class="cook" data-cook data-recipe="{{ recipe.pk }}">
+
+    {% comment %}Sticky, because in a kitchen the phone is on the worktop and
+    the thing you look at from two steps away is the clock and which step you
+    are on — not whatever happens to be scrolled into view.{% endcomment %}
+    <div class="cook-bar">
+      <div class="cook-timer">
+        <span class="cook-clock" data-cook-clock aria-live="off">0:00</span>
+        <div class="cook-timer-buttons">
+          <button type="button" class="button button--secondary button--small"
+                  data-cook-toggle>{% translate "Start" %}</button>
+          <button type="button" class="link-button" data-cook-reset>{% translate "Reset" %}</button>
+        </div>
+      </div>
+
+      {% if ingredients %}
+        <div class="serving-scaler cook-servings" data-serving-scaler hidden
+             data-base-servings="{{ recipe.servings }}">
+          <div class="serving-stepper">
+            <button type="button" class="serving-step" data-serving-down
+                    aria-label="{% translate 'Fewer servings' %}">&minus;</button>
+            <span class="serving-count" data-serving-count aria-live="polite">{{ recipe.servings }}</span>
+            <button type="button" class="serving-step" data-serving-up
+                    aria-label="{% translate 'More servings' %}">+</button>
+          </div>
+          <span class="serving-label">{% translate "servings" %}</span>
+        </div>
+      {% endif %}
+
+      <span class="cook-progress" data-cook-progress aria-live="polite"></span>
+    </div>
+
+    {% if diagram %}
+      {% comment %}The step somebody is on. Rendered server-side for every step
+      and shown one at a time, rather than built in the browser: with the script
+      blocked or broken the page is still the whole recipe, in order, instead of
+      an empty box.{% endcomment %}
+      <div class="cook-steps" data-cook-steps>
+        {% for entry in diagram.order %}
+          <section class="cook-step" data-cook-step="{{ entry.step.id }}" data-cook-number="{{ entry.number }}"
+                   {% if entry.step.minutes %}data-cook-minutes="{{ entry.step.minutes }}"{% endif %}>
+            <p class="cook-step-count">{% blocktranslate with n=entry.number total=diagram.order|length %}Step {{ n }} of {{ total }}{% endblocktranslate %}</p>
+            <h2 class="cook-step-text">{{ entry.step.text }}</h2>
+            {% if entry.step.detail %}<p class="cook-step-detail">{{ entry.step.detail }}</p>{% endif %}
+
+            {% if entry.from_steps %}
+              <p class="cook-step-from">
+                {% translate "With what you made in:" %}
+                {% for from in entry.from_steps %}<span class="pill">{{ from.text }}</span>{% endfor %}
+              </p>
+            {% endif %}
+
+            {% if entry.ingredients %}
+              <ul class="cook-step-ingredients">
+                {% for item in entry.ingredients %}
+                  <li{% if item.optional %} class="is-optional"{% endif %}>
+                    <span class="ingredient-amount" data-amount="{{ item.amount|default_if_none:''|unlocalize }}">{{ item.amount_display }}</span>
+                    <span class="ingredient-name">
+                      {% if item.unit %}{{ item.unit }} {% endif %}{{ item.name }}
+                      {% if item.optional %}<span class="ingredient-flag">{% translate "optional" %}</span>{% endif %}
+                      {% if item.note %}<span class="ingredient-note">{{ item.note }}</span>{% endif %}
+                      {% for alt in item.substitutes %}
+                        <span class="ingredient-alt">
+                          {% translate "or" %}
+                          <span class="ingredient-amount" data-amount="{{ alt.amount|default_if_none:''|unlocalize }}">{{ alt.amount_display }}</span>
+                          {{ alt.unit }} {{ alt.name }}
+                        </span>
+                      {% endfor %}
+                    </span>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+
+            {% if entry.step.minutes %}
+              <div class="cook-step-timer" data-cook-step-timer>
+                <span class="cook-step-remaining" data-cook-remaining>{{ entry.step.minutes }}:00</span>
+                <button type="button" class="button button--secondary button--small" data-cook-step-start>
+                  {% blocktranslate with n=entry.step.minutes %}Start {{ n }} min{% endblocktranslate %}
+                </button>
+              </div>
+            {% endif %}
+          </section>
+        {% endfor %}
+      </div>
+
+      <div class="cook-nav" data-cook-nav hidden>
+        <button type="button" class="button button--secondary" data-cook-prev>&larr; {% translate "Back" %}</button>
+        <button type="button" class="button" data-cook-next>{% translate "Next" %} &rarr;</button>
+        <button type="button" class="button" data-cook-done hidden>{% translate "Done — record it" %}</button>
+      </div>
+
+      <h2 class="form-section">{% translate "The whole diagram" %}</h2>
+      {% include "recipes/_diagram.html" %}
+    {% else %}
+      {% comment %}No diagram: the recipe has never been broken into steps. The
+      cooking view is still useful — the timer and the portion record work the
+      same — so it falls back to the ingredients and the prose rather than
+      refusing to open.{% endcomment %}
+      <div class="cook-plain">
+        {% if ingredients %}
+          <h2>{% translate "Ingredients" %}</h2>
+          <ul class="ingredient-list" data-ingredients data-base-servings="{{ recipe.servings }}">
+            {% for item in ingredients %}
+              <li{% if item.optional %} class="is-optional"{% endif %}>
+                <span class="ingredient-amount" data-amount="{{ item.amount|default_if_none:''|unlocalize }}">{{ item.amount_display }}</span>
+                <span class="ingredient-name">
+                  {% if item.unit %}{{ item.unit }} {% endif %}{{ item.name }}
+                  {% if item.optional %}<span class="ingredient-flag">{% translate "optional" %}</span>{% endif %}
+                  {% if item.note %}<span class="ingredient-note">{{ item.note }}</span>{% endif %}
+                </span>
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        {% if recipe.instructions %}
+          <h2>{% translate "Method" %}</h2>
+          <div class="recipe-instructions">{{ recipe.instructions|linebreaks }}</div>
+        {% endif %}
+        <p class="hint">{% translate "This recipe has no diagram yet. Add steps on the edit page and the cooking view will walk you through them." %}</p>
+      </div>
+    {% endif %}
+
+    {% comment %}The finish panel. Present in the document from the start rather
+    than fetched: it is the one thing that must work when the kitchen's wifi has
+    dropped out, which on a NAS behind a house router is not a rare event.{% endcomment %}
+    <div class="cook-finish" data-cook-finish {% if not finish_open %}hidden{% endif %}>
+      <h2>{% translate "How did it go?" %}</h2>
+      <p class="help">{% translate "How far the amount you made actually went. This is what tells you next time whether “serves four” is true in this house." %}</p>
+
+      <form method="post" action="{% url 'recipes:cooked' recipe.slug %}">
+        {% csrf_token %}
+        {% if log_form.non_field_errors %}
+          <p class="notice notice--error">{{ log_form.non_field_errors|striptags }}</p>
+        {% endif %}
+
+        <div class="form-grid">
+          <p>
+            <label for="{{ log_form.servings_made.id_for_label }}">{% translate "Servings made" %}</label>
+            {{ log_form.servings_made }}
+            <span class="field-error">{{ log_form.servings_made.errors|striptags }}</span>
+          </p>
+          <p>
+            <label for="{{ log_form.minutes.id_for_label }}">{% translate "Time taken (min)" %}</label>
+            {{ log_form.minutes }}
+            <span class="help">{% translate "Filled in from the stopwatch above." %}</span>
+            <span class="field-error">{{ log_form.minutes.errors|striptags }}</span>
+          </p>
+        </div>
+
+        <h3>{% translate "Portions it made" %}</h3>
+        <div class="portion-grid">
+          {% for field in log_form.portion_fields %}
+            <p class="portion-field">
+              <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              <span class="field-error">{{ field.errors|striptags }}</span>
+            </p>
+          {% endfor %}
+        </div>
+
+        <p>
+          <label for="{{ log_form.notes.id_for_label }}">{% translate "Notes" %}</label>
+          {{ log_form.notes }}
+          <span class="help">{% translate "What you would do differently — more salt, smaller tin, half the chilli." %}</span>
+        </p>
+
+        {% if may_edit %}
+          <p class="checkbox-row">
+            {{ log_form.apply_time }}
+            <label for="{{ log_form.apply_time.id_for_label }}">{{ log_form.apply_time.label }}</label>
+          </p>
+        {% endif %}
+
+        <div class="form-actions">
+          <button type="submit" class="button">{% translate "Save this cooking" %}</button>
+          <a class="link-button" href="{{ recipe.get_absolute_url }}">{% translate "Skip" %}</a>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{% static 'js/recipe_scale.js' %}"></script>
+  <script src="{% static 'js/recipe_cook.js' %}"></script>
+{% endblock %}

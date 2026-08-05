@@ -51,6 +51,18 @@ def _env_int(name, default):
 
 DEBUG = _env_bool('DJANGO_DEBUG', default=True)
 
+# Which build this is, baked into the image by deploy/Dockerfile from the
+# release tag. Empty in a checkout, and empty is shown as nothing at all rather
+# than as "dev" or "unknown" — a version string on a page is a claim, and the
+# only honest claim a working copy can make is silence.
+#
+# Deliberately *not* part of /healthz, which is unauthenticated: the version of
+# the software you are running is exactly the sort of thing an unauthenticated
+# endpoint should not volunteer. It is shown in the sidebar, behind the login.
+KITCHEN_VERSION = os.environ.get('KITCHEN_VERSION', '').strip()
+if KITCHEN_VERSION in ('dev', 'unknown'):
+    KITCHEN_VERSION = ''
+
 DEV_SECRET_KEY_FILE = DATA_DIR / '.secret_key'
 
 
@@ -177,6 +189,10 @@ TEMPLATES = [
                 # comparing url_name in the template, which marks two entries at
                 # once as soon as two apps use the same name.
                 'apps.nav.context',
+                # Which build is running, printed in the sidebar footer. The
+                # first question after every update, and the one the NAS cannot
+                # answer — see apps/version.py.
+                'apps.version.context',
             ],
         },
     },

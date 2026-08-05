@@ -45,11 +45,33 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN groupadd --gid 1000 kitchen \
     && useradd --uid 1000 --gid 1000 --create-home kitchen
 
+# Which build this is. Supplied by .github/workflows/release.yml from the tag;
+# left as "dev" for a hand-built image, which is the honest answer — an image
+# built from an uncommitted working copy has no version, and printing one that
+# looks official is worse than printing nothing.
+#
+# It is baked as an environment variable rather than only as a label because the
+# app itself shows it (the sidebar footer): `docker inspect` answers "what did I
+# build", and the page answers "what am I actually looking at", which after a
+# failed update are different questions.
+ARG KITCHEN_VERSION=dev
+ARG BUILD_REVISION=unknown
+ARG BUILD_DATE=unknown
+
+LABEL org.opencontainers.image.title="Kitchen" \
+      org.opencontainers.image.description="A self-hosted recipe app for one household" \
+      org.opencontainers.image.source="https://github.com/ChristianH99/KitchenApp" \
+      org.opencontainers.image.version="${KITCHEN_VERSION}" \
+      org.opencontainers.image.revision="${BUILD_REVISION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.licenses="NOASSERTION"
+
 ENV PATH="/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     DJANGO_SETTINGS_MODULE=config.settings \
-    KITCHEN_DATA_DIR=/data
+    KITCHEN_DATA_DIR=/data \
+    KITCHEN_VERSION=${KITCHEN_VERSION}
 
 COPY --from=builder /venv /venv
 

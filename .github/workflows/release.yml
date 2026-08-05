@@ -1,0 +1,249 @@
+# A release tag builds the image and hangs the result off the release.
+#
+# Two ways to get the same image onto the NAS, because a household deployment
+# should not depend on a registry login working at the moment something else is
+# already broken:
+#
+#   * `ghcr.io/<owner>/kitchenapp:<version>` — `docker compose pull`, the
+#     ordinary path.
+#   * `kitchen-<version>-linux-amd64.tar.gz` attached to the release — download,
+#     `docker load`, run. No registry, no credentials, and it still works when
+#     the package is private and the NAS has never been given a token.
+#
+# Why build here rather than on the NAS, which is what DEPLOYMENT.md used to
+# say: the DS723+ is a two-core box also running DSM, Home Assistant and a
+# backup. Compiling an image on it takes minutes it does not have, and it means
+# the artifact nobody can reproduce is the one actually in use. A tag now
+# produces exactly one image, built once, and the same bytes are what run.
+#
+# linux/amd64 only. The DS723+ is an AMD Ryzen R1600; adding arm64 would mean
+# QEMU emulation in CI for an architecture this household does not own.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  # For re-cutting an artifact when an upload failed but the tag is fine.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build (e.g. v1.2.0)'
+        required: true
+
+# Never cancelled, never concurrent: two runs racing to upload assets to one
+# release is how a release ends up with half a tarball on it.
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # A tag must not publish an image the suite has not passed. Calling the CI
+  # workflow rather than repeating its steps means a release can never be
+  # verified by a stale copy of the checks.
+  verify:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    name: Build, publish and attach
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      contents: write   # create the release and upload assets to it
+      packages: write   # push to ghcr.io
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # workflow_dispatch starts from a branch, so the tag has to be named
+          # explicitly or the artifact would be built from main and labelled
+          # with a version it is not.
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Work out what is being released
+        id: meta
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          # v1.2.0 -> 1.2.0. The tag keeps its "v" because that is what people
+          # read in the releases list; the version inside the image drops it,
+          # because it ends up in an OCI label that gets compared to others.
+          version="${tag#v}"
+          # GHCR rejects an upper-case path and this repository has two capital
+          # letters in its name. Lower-cased here rather than written out, so a
+          # fork or a rename does not need this file edited.
+          image="ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+
+          {
+            echo "tag=$tag"
+            echo "version=$version"
+            echo "image=$image"
+            echo "tarball=kitchen-${version}-linux-amd64.tar.gz"
+            echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Log in to the container registry
+        run: |
+          echo '${{ secrets.GITHUB_TOKEN }}' \
+            | docker login ghcr.io --username '${{ github.actor }}' --password-stdin
+
+      - name: Build the image
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            --build-arg KITCHEN_VERSION='${{ steps.meta.outputs.version }}' \
+            --build-arg BUILD_REVISION='${{ github.sha }}' \
+            --build-arg BUILD_DATE='${{ steps.meta.outputs.built_at }}' \
+            --file deploy/Dockerfile \
+            --tag '${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}' \
+            --tag '${{ steps.meta.outputs.image }}:latest' \
+            .
+
+      # The same checks CI runs, against the image that is actually about to be
+      # published rather than one built from the same source a job earlier.
+      # They are cheap, and "the artifact we shipped was never started" is the
+      # failure this whole pipeline exists to make impossible.
+      - name: Smoke-test the image that is about to be published
+        run: |
+          docker run --detach --name kitchen-release \
+            --publish 127.0.0.1:8000:8000 \
+            --env DJANGO_DEBUG=False \
+            --env DJANGO_SECRET_KEY=release-smoke-key-not-a-real-one-0123456789 \
+            --env DJANGO_ALLOWED_HOSTS=127.0.0.1,localhost \
+            --env DJANGO_TRUST_PROXY_HEADERS=False \
+            '${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}'
+
+          healthy=no
+          for attempt in $(seq 1 45); do
+            status=$(docker inspect -f '{{.State.Health.Status}}' kitchen-release 2>/dev/null || echo missing)
+            if [ "$status" = "healthy" ]; then healthy=yes; break; fi
+            if [ "$status" = "unhealthy" ]; then break; fi
+            sleep 2
+          done
+          if [ "$healthy" != "yes" ]; then
+            docker logs kitchen-release
+            echo "::error::the image never became healthy"
+            exit 1
+          fi
+
+          test "$(curl -fsS http://127.0.0.1:8000/healthz)" = "ok" \
+            || { docker logs kitchen-release; exit 1; }
+
+          # The version really did reach the image. A release labelled 1.2.0
+          # that reports itself as something else is worse than one carrying no
+          # version at all, because it is believed.
+          reported=$(docker exec kitchen-release printenv KITCHEN_VERSION)
+          if [ "$reported" != '${{ steps.meta.outputs.version }}' ]; then
+            echo "::error::the image reports KITCHEN_VERSION=$reported"
+            exit 1
+          fi
+
+          docker rm --force kitchen-release
+
+      - name: Push to the registry
+        run: |
+          docker push '${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}'
+          docker push '${{ steps.meta.outputs.image }}:latest'
+
+      - name: Assemble the release artifacts
+        run: |
+          mkdir -p dist
+
+          # docker save + gzip, so the NAS can `docker load` without ever
+          # talking to a registry.
+          docker save '${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}' \
+            | gzip > "dist/${{ steps.meta.outputs.tarball }}"
+
+          # The run-book files, so a download is enough to deploy from — pinned
+          # to this version rather than to :latest, because a compose file that
+          # says "latest" cannot be rolled back by re-reading it.
+          sed -e 's|__IMAGE__|${{ steps.meta.outputs.image }}|g' \
+              -e 's|__VERSION__|${{ steps.meta.outputs.version }}|g' \
+              deploy/docker-compose.release.yml > dist/docker-compose.yml
+
+          # Copied *without* its leading dot, on purpose. A shell glob does not
+          # match dotfiles, so `dist/*` would have silently left the example
+          # environment file out of both the checksums and the upload — and the
+          # asset nobody notices is missing is the one explaining every setting.
+          # DEPLOYMENT.md says to rename it back on the NAS.
+          cp .env.example dist/env.example
+
+          # Named explicitly rather than globbed: the redirection creates
+          # SHA256SUMS before the glob is expanded in some shells, and a
+          # checksum file listing itself is a puzzle rather than a check.
+          ( cd dist \
+            && sha256sum -- '${{ steps.meta.outputs.tarball }}' docker-compose.yml env.example \
+               > SHA256SUMS )
+          cat dist/SHA256SUMS
+
+      - name: Write the release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # GitHub's own "what changed since the last tag" list. Fetched through
+          # the API rather than with `gh release create --generate-notes`,
+          # because that flag and `--notes` together have to be combined by gh
+          # in a particular order and a release is not the place to find out
+          # which one wins.
+          generated=$(gh api --method POST \
+            "repos/${{ github.repository }}/releases/generate-notes" \
+            -f tag_name='${{ steps.meta.outputs.tag }}' \
+            --jq .body 2>/dev/null || echo '')
+
+          # Outside dist/, or it would be uploaded as an asset of itself.
+          cat > release-notes.md <<NOTES
+          ## Deploying this release
+
+          **From the registry** — needs the package to be readable by the NAS:
+
+              sudo docker pull ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}
+
+          **From the attachment** — no registry and no credentials:
+
+              gunzip -c ${{ steps.meta.outputs.tarball }} | sudo docker load
+
+          Then put \`docker-compose.yml\` and a filled-in \`.env\` (rename
+          \`env.example\`) in the same folder and:
+
+              sudo docker compose up -d
+
+          \`SHA256SUMS\` covers every file attached here. DEPLOYMENT.md §7 is the
+          full run-book, including the roll-back.
+
+          ---
+
+          ${generated}
+          NOTES
+
+          head -40 release-notes.md
+
+      - name: Attach everything to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag='${{ steps.meta.outputs.tag }}'
+          # Create the release when the tag was pushed on its own; attach to the
+          # one somebody drafted by hand when it already exists. --clobber so a
+          # re-run after a failed upload replaces a half-written asset instead
+          # of refusing.
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/* --clobber
+          else
+            gh release create "$tag" dist/* \
+              --title "$tag" \
+              --notes-file release-notes.md
+          fi
+
+      - name: Summary
+        run: |
+          {
+            echo "### Released ${{ steps.meta.outputs.tag }}"
+            echo
+            echo '| | |'
+            echo '|---|---|'
+            echo '| Image | `${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}` |'
+            echo '| Tarball | `${{ steps.meta.outputs.tarball }}` |'
+            echo '| Revision | `${{ github.sha }}` |'
+          } >> "$GITHUB_STEP_SUMMARY"

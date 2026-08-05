@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kitchenapp 0.1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-05 07:45+0200\n"
+"POT-Creation-Date: 2026-08-05 17:42+0200\n"
 "PO-Revision-Date: 2026-08-05 12:00+0200\n"
 "Last-Translator: KitchenApp\n"
 "Language-Team: German\n"
@@ -17,26 +17,115 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: .\apps\recipes\forms.py:24 .\apps\recipes\models.py:45
-#: .\apps\recipes\models.py:89
+#: .\apps\accounts\forms.py:47 .\templates\accounts\login.html:63
+#: .\templates\accounts\user_form.html:52
+#: .\templates\accounts\user_form.html:55
+#: .\templates\accounts\user_list.html:56
+#: .\templates\accounts\user_list.html:76
+#: .\templates\accounts\user_password.html:20
+msgid "Password"
+msgstr "Passwort"
+
+#: .\apps\accounts\forms.py:50 .\templates\accounts\user_form.html:60
+#: .\templates\accounts\user_password.html:25
+msgid "Repeat password"
+msgstr "Passwort wiederholen"
+
+#: .\apps\accounts\forms.py:58
+msgid "The two passwords do not match."
+msgstr "Die beiden Passwörter stimmen nicht überein."
+
+#: .\apps\accounts\forms.py:87
+msgid "What they type to sign in. Letters, digits and . @ + - _"
+msgstr "Womit sich die Person anmeldet. Buchstaben, Ziffern und . @ + - _"
+
+#: .\apps\accounts\forms.py:143
+msgid "Managed by Synology DSM."
+msgstr "Wird von Synology DSM verwaltet."
+
+#: .\apps\accounts\forms.py:151 .\apps\accounts\users.py:209
+msgid "You cannot switch off your own account."
+msgstr "Das eigene Konto lässt sich nicht abschalten."
+
+#: .\apps\accounts\forms.py:160
+msgid "You cannot take the administrator right off your own account."
+msgstr "Das Administrationsrecht lässt sich dem eigenen Konto nicht entziehen."
+
+#: .\apps\accounts\forms.py:167 .\apps\accounts\users.py:184
+#: .\apps\accounts\users.py:216
+msgid "This is the last active administrator. Give somebody else the right first."
+msgstr "Das ist die letzte aktive Administration. Erst jemand anderem das Recht geben."
+
+#: .\apps\accounts\users.py:92
+#, python-format
+msgid "The account “%(name)s” was created."
+msgstr "Das Konto „%(name)s“ wurde angelegt."
+
+#: .\apps\accounts\users.py:112
+#, python-format
+msgid "“%(name)s” was saved."
+msgstr "„%(name)s“ wurde gespeichert."
+
+#: .\apps\accounts\users.py:147
+#, python-format
+msgid "The password for “%(name)s” was changed."
+msgstr "Das Passwort für „%(name)s“ wurde geändert."
+
+#: .\apps\accounts\users.py:174
+msgid "You cannot delete your own account."
+msgstr "Das eigene Konto lässt sich nicht löschen."
+
+#: .\apps\accounts\users.py:191
+#, python-format
+msgid "“%(name)s” was deleted."
+msgstr "„%(name)s“ wurde gelöscht."
+
+#: .\apps\accounts\users.py:224
+#, python-format
+msgid "“%(name)s” can sign in again."
+msgstr "„%(name)s“ kann sich wieder anmelden."
+
+#: .\apps\accounts\users.py:225
+#, python-format
+msgid "“%(name)s” can no longer sign in."
+msgstr "„%(name)s“ kann sich nicht mehr anmelden."
+
+#: .\apps\recipes\forms.py:44 .\apps\recipes\models.py:52
+#: .\apps\recipes\models.py:96
 msgid "tags"
 msgstr "Tags"
 
-#: .\apps\recipes\forms.py:25
+#: .\apps\recipes\forms.py:45
 msgid "Separated by commas, e.g. “soup, vegetarian, quick”."
 msgstr "Durch Kommas getrennt, z. B. „Suppe, vegetarisch, schnell“."
 
-#: .\apps\recipes\forms.py:59
+#: .\apps\recipes\forms.py:79
 msgid "A recipe is for at least one serving."
 msgstr "Ein Rezept ist für mindestens eine Portion."
 
-#: .\apps\recipes\forms.py:128
+#: .\apps\recipes\forms.py:171
 msgid "Give this line an ingredient, or clear it."
 msgstr "Dieser Zeile eine Zutat geben oder sie leeren."
 
-#: .\apps\recipes\forms.py:131
+#: .\apps\recipes\forms.py:174
 msgid "An amount cannot be negative."
 msgstr "Eine Menge kann nicht negativ sein."
+
+#: .\apps\recipes\forms.py:204
+msgid "Give this step a name, or clear it."
+msgstr "Diesem Schritt einen Namen geben oder ihn leeren."
+
+#: .\apps\recipes\forms.py:415
+msgid "Use this as the recipe’s cooking time"
+msgstr "Als Garzeit des Rezepts übernehmen"
+
+#: .\apps\recipes\forms.py:453
+msgid "A cooking is for at least one serving."
+msgstr "Eine Zubereitung ist für mindestens eine Portion."
+
+#: .\apps\recipes\forms.py:463
+msgid "Record how long it took, how far it went, or both."
+msgstr "Eintragen, wie lange es gedauert hat, wie weit es gereicht hat — oder beides."
 
 #: .\apps\recipes\images.py:65
 #, python-format
@@ -47,121 +136,239 @@ msgstr "Dieses Foto ist zu groß (höchstens %(mb)s MB)."
 msgid "That file could not be read as an image."
 msgstr "Diese Datei konnte nicht als Bild gelesen werden."
 
-#: .\apps\recipes\models.py:40
+#: .\apps\recipes\models.py:47
 msgid "name"
 msgstr "Name"
 
-#: .\apps\recipes\models.py:44
+#: .\apps\recipes\models.py:51
 msgid "tag"
 msgstr "Tag"
 
-#: .\apps\recipes\models.py:58
+#: .\apps\recipes\models.py:65
 msgid "title"
 msgstr "Titel"
 
-#: .\apps\recipes\models.py:61
+#: .\apps\recipes\models.py:68
 msgid "description"
 msgstr "Beschreibung"
 
-#: .\apps\recipes\models.py:62
+#: .\apps\recipes\models.py:69
 msgid "One or two sentences — what this is, and when you would make it."
 msgstr "Ein, zwei Sätze — was das ist und wann man es macht."
 
-#: .\apps\recipes\models.py:68 .\templates\recipes\_recipe_grid.html:32
-#: .\templates\recipes\recipe_detail.html:81
+#: .\apps\recipes\models.py:75 .\templates\recipes\_recipe_grid.html:32
+#: .\templates\recipes\recipe_cook.html:46
+#: .\templates\recipes\recipe_detail.html:95
 msgid "servings"
 msgstr "Portionen"
 
-#: .\apps\recipes\models.py:70
+#: .\apps\recipes\models.py:77
 msgid "preparation time"
 msgstr "Vorbereitungszeit"
 
-#: .\apps\recipes\models.py:71 .\apps\recipes\models.py:73
+#: .\apps\recipes\models.py:78 .\apps\recipes\models.py:80
 msgid "In minutes."
 msgstr "In Minuten."
 
-#: .\apps\recipes\models.py:72
+#: .\apps\recipes\models.py:79
 msgid "cooking time"
 msgstr "Garzeit"
 
-#: .\apps\recipes\models.py:75
+#: .\apps\recipes\models.py:82
 msgid "instructions"
 msgstr "Zubereitung"
 
-#: .\apps\recipes\models.py:77
+#: .\apps\recipes\models.py:84
 msgid "photograph"
 msgstr "Foto"
 
-#: .\apps\recipes\models.py:82
+#: .\apps\recipes\models.py:89
 msgid "source"
 msgstr "Quelle"
 
-#: .\apps\recipes\models.py:83
+#: .\apps\recipes\models.py:90
 msgid "A person, a cookbook, a magazine."
 msgstr "Eine Person, ein Kochbuch, eine Zeitschrift."
 
-#: .\apps\recipes\models.py:84
+#: .\apps\recipes\models.py:91
 msgid "link"
 msgstr "Link"
 
-#: .\apps\recipes\models.py:86
+#: .\apps\recipes\models.py:93 .\apps\recipes\models.py:323
 msgid "notes"
 msgstr "Notizen"
 
-#: .\apps\recipes\models.py:87
+#: .\apps\recipes\models.py:94
 msgid "What you would do differently next time."
 msgstr "Was man beim nächsten Mal anders machen würde."
 
-#: .\apps\recipes\models.py:94
+#: .\apps\recipes\models.py:101
 msgid "added by"
 msgstr "hinzugefügt von"
 
-#: .\apps\recipes\models.py:101
+#: .\apps\recipes\models.py:108
 msgid "recipe"
 msgstr "Rezept"
 
-#: .\apps\recipes\models.py:102
+#: .\apps\recipes\models.py:109
 msgid "recipes"
 msgstr "Rezepte"
 
-#: .\apps\recipes\models.py:149
+#: .\apps\recipes\models.py:157
+msgid "feeds into"
+msgstr "geht ein in"
+
+#: .\apps\recipes\models.py:169 .\apps\recipes\models.py:181
+msgid "step"
+msgstr "Schritt"
+
+#: .\apps\recipes\models.py:171
+msgid "detail"
+msgstr "Erläuterung"
+
+#: .\apps\recipes\models.py:172
+msgid "Shown in the cooking view when this step is the current one."
+msgstr "Wird in der Kochansicht gezeigt, wenn dieser Schritt an der Reihe ist."
+
+#: .\apps\recipes\models.py:177
+msgid "duration"
+msgstr "Dauer"
+
+#: .\apps\recipes\models.py:178
+msgid "In minutes. Offers a timer while cooking."
+msgstr "In Minuten. Beim Kochen wird dafür ein Timer angeboten."
+
+#: .\apps\recipes\models.py:182
+msgid "steps"
+msgstr "Schritte"
+
+#: .\apps\recipes\models.py:212
+msgid "used in"
+msgstr "verwendet in"
+
+#: .\apps\recipes\models.py:224
 msgid "amount"
 msgstr "Menge"
 
-#: .\apps\recipes\models.py:151
+#: .\apps\recipes\models.py:226
 msgid "unit"
 msgstr "Einheit"
 
-#: .\apps\recipes\models.py:152 .\apps\recipes\models.py:157
+#: .\apps\recipes\models.py:227 .\apps\recipes\models.py:245
 msgid "ingredient"
 msgstr "Zutat"
 
-#: .\apps\recipes\models.py:153
+#: .\apps\recipes\models.py:228
 msgid "note"
 msgstr "Anmerkung"
 
-#: .\apps\recipes\models.py:154
+#: .\apps\recipes\models.py:229
 msgid "e.g. “finely chopped”, “at room temperature”."
 msgstr "z. B. „fein gehackt“, „zimmerwarm“."
 
-#: .\apps\recipes\models.py:158 .\templates\recipes\_recipe_grid.html:34
+#: .\apps\recipes\models.py:232 .\templates\recipes\_diagram.html:34
+#: .\templates\recipes\recipe_cook.html:81
+#: .\templates\recipes\recipe_cook.html:131
+#: .\templates\recipes\recipe_detail.html:116
+#: .\templates\recipes\recipe_form.html:106
+msgid "optional"
+msgstr "optional"
+
+#: .\apps\recipes\models.py:233
+msgid "The recipe works without it."
+msgstr "Das Rezept funktioniert auch ohne."
+
+#: .\apps\recipes\models.py:240
+msgid "alternative for"
+msgstr "Alternative zu"
+
+#: .\apps\recipes\models.py:246 .\templates\recipes\_recipe_grid.html:34
 msgid "ingredients"
 msgstr "Zutaten"
 
-#: .\apps\recipes\views.py:139
+#: .\apps\recipes\models.py:277
+msgid "large portion"
+msgstr "große Portion"
+
+#: .\apps\recipes\models.py:278 .\apps\recipes\models.py:365
+msgid "portion"
+msgstr "Portion"
+
+#: .\apps\recipes\models.py:279
+msgid "small portion"
+msgstr "kleine Portion"
+
+#: .\apps\recipes\models.py:280
+msgid "child’s portion"
+msgstr "Kinderportion"
+
+#: .\apps\recipes\models.py:281
+msgid "portion to take away"
+msgstr "Portion zum Mitnehmen"
+
+#: .\apps\recipes\models.py:309
+msgid "cooked by"
+msgstr "gekocht von"
+
+#: .\apps\recipes\models.py:312
+msgid "cooked on"
+msgstr "gekocht am"
+
+#: .\apps\recipes\models.py:317
+msgid "servings made"
+msgstr "zubereitete Portionen"
+
+#: .\apps\recipes\models.py:320
+msgid "time taken"
+msgstr "gebrauchte Zeit"
+
+#: .\apps\recipes\models.py:321
+msgid "In minutes. Measured by the cooking view, or typed in."
+msgstr "In Minuten. Von der Kochansicht gemessen oder von Hand eingetragen."
+
+#: .\apps\recipes\models.py:326
+msgid "cooking"
+msgstr "Zubereitung"
+
+#: .\apps\recipes\models.py:327
+msgid "cookings"
+msgstr "Zubereitungen"
+
+#: .\apps\recipes\models.py:361
+msgid "size"
+msgstr "Größe"
+
+#: .\apps\recipes\models.py:362
+msgid "how many"
+msgstr "wie viele"
+
+#: .\apps\recipes\models.py:366
+msgid "portions"
+msgstr "Portionen"
+
+#: .\apps\recipes\views.py:208
 #, python-format
 msgid "“%(title)s” was added."
 msgstr "„%(title)s“ wurde hinzugefügt."
 
-#: .\apps\recipes\views.py:166
+#: .\apps\recipes\views.py:241
 #, python-format
 msgid "“%(title)s” was saved."
 msgstr "„%(title)s“ wurde gespeichert."
 
-#: .\apps\recipes\views.py:185
+#: .\apps\recipes\views.py:262
 #, python-format
 msgid "“%(title)s” was deleted."
 msgstr "„%(title)s“ wurde gelöscht."
+
+#: .\apps\recipes\views.py:332
+#, python-format
+msgid "Noted — “%(title)s” cooked."
+msgstr "Notiert — „%(title)s“ gekocht."
+
+#: .\apps\recipes\views.py:358
+msgid "The entry was removed."
+msgstr "Der Eintrag wurde entfernt."
 
 #: .\config\settings.py:354
 msgid "German"
@@ -181,8 +388,11 @@ msgid "Sign in"
 msgstr "Anmelden"
 
 #: .\templates\accounts\login.html:6 .\templates\accounts\login.html:15
-#: .\templates\base.html:6 .\templates\base.html:27 .\templates\base.html:82
-#: .\templates\recipes\home.html:3 .\templates\recipes\recipe_detail.html:3
+#: .\templates\accounts\user_form.html:3 .\templates\accounts\user_list.html:3
+#: .\templates\accounts\user_password.html:3 .\templates\base.html:6
+#: .\templates\base.html:27 .\templates\base.html:91
+#: .\templates\recipes\home.html:3 .\templates\recipes\recipe_cook.html:3
+#: .\templates\recipes\recipe_detail.html:3
 #: .\templates\recipes\recipe_form.html:3
 #: .\templates\recipes\recipe_list.html:3 .\templates\recipes\tag_list.html:3
 msgid "Kitchen"
@@ -191,8 +401,7 @@ msgstr "Küche"
 #: .\templates\accounts\login.html:21
 #, python-format
 msgid "Too many failed attempts. Please wait a minute and try again."
-msgid_plural ""
-"Too many failed attempts. Please wait %(minutes)s minutes and try again."
+msgid_plural "Too many failed attempts. Please wait %(minutes)s minutes and try again."
 msgstr[0] "Zu viele Fehlversuche. Bitte eine Minute warten und noch einmal versuchen."
 msgstr[1] "Zu viele Fehlversuche. Bitte %(minutes)s Minuten warten und noch einmal versuchen."
 
@@ -205,6 +414,9 @@ msgid "Sign in with Synology"
 msgstr "Mit Synology anmelden"
 
 #: .\templates\accounts\login.html:40 .\templates\accounts\login.html:54
+#: .\templates\recipes\_diagram.html:37
+#: .\templates\recipes\recipe_cook.html:85
+#: .\templates\recipes\recipe_detail.html:120
 msgid "or"
 msgstr "oder"
 
@@ -212,84 +424,337 @@ msgstr "oder"
 msgid "Sign in with a local account"
 msgstr "Mit lokalem Konto anmelden"
 
-#: .\templates\accounts\login.html:59
+#: .\templates\accounts\login.html:59 .\templates\accounts\user_form.html:24
 msgid "Username"
 msgstr "Benutzername"
-
-#: .\templates\accounts\login.html:63
-msgid "Password"
-msgstr "Passwort"
 
 #: .\templates\accounts\login.html:67
 msgid "Show password (hold)"
 msgstr "Passwort anzeigen (gedrückt halten)"
+
+#: .\templates\accounts\user_form.html:3 .\templates\accounts\user_form.html:4
+#: .\templates\accounts\user_form.html:9
+msgid "New account"
+msgstr "Neues Konto"
+
+#: .\templates\accounts\user_form.html:4
+msgid "Edit account"
+msgstr "Konto bearbeiten"
+
+#: .\templates\accounts\user_form.html:7
+#: .\templates\accounts\user_password.html:8
+msgid "All people"
+msgstr "Alle Personen"
+
+#: .\templates\accounts\user_form.html:12
+msgid "This account signs in through Synology. Its name and e-mail address come from DSM and are refreshed at every sign-in, so they cannot be changed here. What this page can change is whether they may sign in at all, and what they may do once they are in."
+msgstr "Dieses Konto meldet sich über Synology an. Name und E-Mail-Adresse kommen aus DSM und werden bei jeder Anmeldung neu übernommen, lassen sich hier also nicht ändern. Was diese Seite ändern kann: ob die Person sich überhaupt anmelden darf und was sie danach tun darf."
+
+#: .\templates\accounts\user_form.html:33
+msgid "First name"
+msgstr "Vorname"
+
+#: .\templates\accounts\user_form.html:38
+msgid "Surname"
+msgstr "Nachname"
+
+#: .\templates\accounts\user_form.html:45
+msgid "E-mail"
+msgstr "E-Mail"
+
+#: .\templates\accounts\user_form.html:67
+msgid "What they may do"
+msgstr "Was die Person darf"
+
+#: .\templates\accounts\user_form.html:70
+msgid "May sign in"
+msgstr "Darf sich anmelden"
+
+#: .\templates\accounts\user_form.html:76
+msgid "May manage people"
+msgstr "Darf Personen verwalten"
+
+#: .\templates\accounts\user_form.html:78
+msgid "Gives access to this page, and to the Django administration behind it."
+msgstr "Gibt Zugang zu dieser Seite und zur Django-Verwaltung dahinter."
+
+#: .\templates\accounts\user_form.html:84
+#: .\templates\accounts\user_list.html:61
+msgid "Administrator"
+msgstr "Administration"
+
+#: .\templates\accounts\user_form.html:86
+msgid "Full rights, including the recovery path when something is wrong. There must always be one active."
+msgstr "Alle Rechte, einschließlich des Wegs zurück, wenn etwas kaputt ist. Mindestens eines dieser Konten muss immer aktiv sein."
+
+#: .\templates\accounts\user_form.html:90
+msgid "If a Synology group is configured as the administrator group, DSM decides this at every sign-in and anything set here is replaced."
+msgstr "Wenn eine Synology-Gruppe als Administrationsgruppe eingetragen ist, entscheidet DSM das bei jeder Anmeldung neu und überschreibt, was hier gesetzt wurde."
+
+#: .\templates\accounts\user_form.html:94 .\templates\base.html:147
+#: .\templates\recipes\recipe_form.html:209
+msgid "Save changes"
+msgstr "Änderungen speichern"
+
+#: .\templates\accounts\user_form.html:94
+msgid "Create the account"
+msgstr "Konto anlegen"
+
+#: .\templates\accounts\user_form.html:95
+#: .\templates\accounts\user_password.html:31 .\templates\base.html:133
+#: .\templates\base.html:149 .\templates\recipes\recipe_form.html:210
+msgid "Cancel"
+msgstr "Abbrechen"
+
+#: .\templates\accounts\user_form.html:97
+msgid "Set a new password"
+msgstr "Neues Passwort setzen"
+
+#: .\templates\accounts\user_list.html:3 .\templates\accounts\user_list.html:4
+#: .\templates\accounts\user_list.html:14 .\templates\base.html:55
+msgid "People"
+msgstr "Personen"
+
+#: .\templates\accounts\user_list.html:5
+#, python-format
+msgid "%(n)s account can sign in"
+msgid_plural "%(n)s accounts can sign in"
+msgstr[0] "%(n)s Konto kann sich anmelden"
+msgstr[1] "%(n)s Konten können sich anmelden"
+
+#: .\templates\accounts\user_list.html:9
+#: .\templates\recipes\recipe_form.html:8
+msgid "Help for this page"
+msgstr "Hilfe zu dieser Seite"
+
+#: .\templates\accounts\user_list.html:15
+msgid "Add an account"
+msgstr "Konto hinzufügen"
+
+#: .\templates\accounts\user_list.html:19
+#, python-format
+msgid "%(n)s of these signs in through Synology. Their name and e-mail come from DSM and are refreshed at every sign-in."
+msgid_plural "%(n)s of these sign in through Synology. Their names and e-mail addresses come from DSM and are refreshed at every sign-in."
+msgstr[0] "Eines davon meldet sich über Synology an. Name und E-Mail kommen aus DSM und werden bei jeder Anmeldung aufgefrischt."
+msgstr[1] "%(n)s davon melden sich über Synology an. Namen und E-Mail-Adressen kommen aus DSM und werden bei jeder Anmeldung aufgefrischt."
+
+#: .\templates\accounts\user_list.html:26
+msgid "Name"
+msgstr "Name"
+
+#: .\templates\accounts\user_list.html:27
+msgid "Signs in with"
+msgstr "Anmeldung über"
+
+#: .\templates\accounts\user_list.html:28
+msgid "Rights"
+msgstr "Rechte"
+
+#: .\templates\accounts\user_list.html:29 .\templates\base.html:41
+#: .\templates\recipes\home.html:11 .\templates\recipes\recipe_list.html:3
+#: .\templates\recipes\recipe_list.html:4
+msgid "Recipes"
+msgstr "Rezepte"
+
+#: .\templates\accounts\user_list.html:30
+#: .\templates\recipes\recipe_detail.html:173
+msgid "Cooked"
+msgstr "Gekocht"
+
+#: .\templates\accounts\user_list.html:31
+msgid "Last seen"
+msgstr "Zuletzt gesehen"
+
+#: .\templates\accounts\user_list.html:32
+msgid "Actions"
+msgstr "Aktionen"
+
+#: .\templates\accounts\user_list.html:46
+msgid "Synology identity"
+msgstr "Synology-Identität"
+
+#: .\templates\accounts\user_list.html:54
+msgid "Synology"
+msgstr "Synology"
+
+#: .\templates\accounts\user_list.html:63
+msgid "Manages people"
+msgstr "Verwaltet Personen"
+
+#: .\templates\accounts\user_list.html:65
+msgid "Cooks"
+msgstr "Kocht"
+
+#: .\templates\accounts\user_list.html:67
+msgid "switched off"
+msgstr "abgeschaltet"
+
+#: .\templates\accounts\user_list.html:71
+msgid "never"
+msgstr "nie"
+
+#: .\templates\accounts\user_list.html:74
+#: .\templates\recipes\recipe_detail.html:16
+msgid "Edit"
+msgstr "Bearbeiten"
+
+#: .\templates\accounts\user_list.html:80
+msgid "Switch this account off?"
+msgstr "Dieses Konto abschalten?"
+
+#: .\templates\accounts\user_list.html:80
+msgid "Switch this account on?"
+msgstr "Dieses Konto wieder einschalten?"
+
+#: .\templates\accounts\user_list.html:81
+msgid "They will not be able to sign in. Their recipes keep their name and nothing is deleted."
+msgstr "Die Person kann sich dann nicht mehr anmelden. Ihre Rezepte behalten ihren Namen, gelöscht wird nichts."
+
+#: .\templates\accounts\user_list.html:81
+msgid "They will be able to sign in again."
+msgstr "Die Person kann sich wieder anmelden."
+
+#: .\templates\accounts\user_list.html:82
+#: .\templates\accounts\user_list.html:84
+msgid "Switch off"
+msgstr "Abschalten"
+
+#: .\templates\accounts\user_list.html:82
+#: .\templates\accounts\user_list.html:84
+msgid "Switch on"
+msgstr "Einschalten"
+
+#: .\templates\accounts\user_list.html:87
+msgid "Delete this account?"
+msgstr "Dieses Konto löschen?"
+
+#: .\templates\accounts\user_list.html:88
+msgid "The account is removed for good. Recipes they added stay in the collection but lose their name. Switching the account off is the reversible version of this."
+msgstr "Das Konto wird endgültig entfernt. Die eingetragenen Rezepte bleiben in der Sammlung, verlieren aber den Namen. Das Abschalten ist die umkehrbare Variante davon."
+
+#: .\templates\accounts\user_list.html:89
+#: .\templates\accounts\user_list.html:92
+#: .\templates\recipes\recipe_detail.html:239
+msgid "Delete"
+msgstr "Löschen"
+
+#: .\templates\accounts\user_list.html:99
+msgid "Nobody yet."
+msgstr "Noch niemand."
+
+#: .\templates\accounts\user_list.html:109
+#: .\templates\recipes\recipe_form.html:222
+msgid "Close"
+msgstr "Schließen"
+
+#: .\templates\accounts\user_list.html:110
+msgid "Accounts in this app"
+msgstr "Konten in dieser App"
+
+#: .\templates\accounts\user_list.html:112
+msgid "Two kinds"
+msgstr "Zwei Arten"
+
+#: .\templates\accounts\user_list.html:113
+msgid "An account marked “Synology” is the local end of a DSM identity. Its name and e-mail are copied from DSM at every sign-in, so changing them here would be undone; its password lives in DSM and cannot be set from this app at all."
+msgstr "Ein Konto mit der Kennzeichnung „Synology“ ist das lokale Ende einer DSM-Identität. Name und E-Mail werden bei jeder Anmeldung aus DSM übernommen — eine Änderung hier wäre also wieder weg; das Passwort liegt in DSM und lässt sich aus dieser App überhaupt nicht setzen."
+
+#: .\templates\accounts\user_list.html:114
+msgid "An account marked “Password” was created here. Use one for somebody who cooks in this house but has no DSM account — and keep one as the way back in when SSO is the thing that is broken."
+msgstr "Ein Konto mit der Kennzeichnung „Passwort“ wurde hier angelegt. Gedacht für jemanden, der in diesem Haushalt kocht, aber kein DSM-Konto hat — und als Weg zurück, wenn ausgerechnet SSO nicht funktioniert."
+
+#: .\templates\accounts\user_list.html:115
+msgid "Why somebody is missing"
+msgstr "Warum jemand fehlt"
+
+#: .\templates\accounts\user_list.html:116
+msgid "This app has no way to read the list of DSM accounts. A Synology account appears here the first time it signs in, and not before."
+msgstr "Diese App kann die Liste der DSM-Konten nicht lesen. Ein Synology-Konto erscheint hier bei seiner ersten Anmeldung — vorher nicht."
+
+#: .\templates\accounts\user_list.html:117
+msgid "Switching off, or deleting"
+msgstr "Abschalten oder löschen"
+
+#: .\templates\accounts\user_list.html:118
+msgid "Switching an account off is reversible and keeps their name on the recipes they added. Deleting is not: the recipes stay in the collection but no longer say who contributed them."
+msgstr "Das Abschalten ist umkehrbar und lässt den Namen auf den eingetragenen Rezepten stehen. Das Löschen nicht: Die Rezepte bleiben in der Sammlung, sagen aber nicht mehr, von wem sie stammen."
+
+#: .\templates\accounts\user_password.html:3
+#: .\templates\accounts\user_password.html:4
+msgid "New password"
+msgstr "Neues Passwort"
+
+#: .\templates\accounts\user_password.html:10
+#, python-format
+msgid "A new password for %(name)s"
+msgstr "Ein neues Passwort für %(name)s"
+
+#: .\templates\accounts\user_password.html:11
+msgid "There is no “old password” box: this is the household’s way back in when somebody has forgotten theirs, and asking for the old one would make it useless for the only case it exists for."
+msgstr "Es gibt kein Feld für das alte Passwort: Das hier ist der Weg zurück, wenn jemand seines vergessen hat — nach dem alten zu fragen würde die Seite genau für den einzigen Fall unbrauchbar machen, für den es sie gibt."
+
+#: .\templates\accounts\user_password.html:30
+msgid "Set the password"
+msgstr "Passwort setzen"
 
 #: .\templates\base.html:21
 msgid "Skip to content"
 msgstr "Zum Inhalt springen"
 
 #: .\templates\base.html:38 .\templates\recipes\home.html:4
+#: .\templates\recipes\recipe_cook.html:31
 msgid "Start"
 msgstr "Start"
 
-#: .\templates\base.html:41 .\templates\recipes\home.html:11
-#: .\templates\recipes\recipe_list.html:3
-#: .\templates\recipes\recipe_list.html:4
-msgid "Recipes"
-msgstr "Rezepte"
-
 #: .\templates\base.html:44 .\templates\recipes\home.html:33
-#: .\templates\recipes\recipe_detail.html:19
+#: .\templates\recipes\recipe_detail.html:21
 msgid "All recipes"
 msgstr "Alle Rezepte"
 
 #: .\templates\base.html:46 .\templates\recipes\home.html:15
-#: .\templates\recipes\recipe_form.html:121
-#: .\templates\recipes\recipe_form.html:163
+#: .\templates\recipes\recipe_form.html:186
+#: .\templates\recipes\recipe_form.html:233
 #: .\templates\recipes\tag_list.html:3
 #: .\templates\recipes\tag_list.html:4
 msgid "Tags"
 msgstr "Tags"
 
-#: .\templates\base.html:51
+#: .\templates\base.html:60
 msgid "Administration"
 msgstr "Verwaltung"
 
-#: .\templates\base.html:63
+#: .\templates\base.html:72
 msgid "Sign out"
 msgstr "Abmelden"
 
-#: .\templates\base.html:78
+#: .\templates\base.html:87
 msgid "Toggle navigation"
 msgstr "Navigation ein- und ausblenden"
 
-#: .\templates\base.html:124 .\templates\base.html:140
-#: .\templates\recipes\recipe_form.html:145
-msgid "Cancel"
-msgstr "Abbrechen"
-
-#: .\templates\base.html:135
+#: .\templates\base.html:144
 msgid "Unsaved changes"
 msgstr "Nicht gespeicherte Änderungen"
 
-#: .\templates\base.html:136
-msgid ""
-"You have unsaved changes on this page. Do you want to save them before "
-"leaving?"
+#: .\templates\base.html:145
+msgid "You have unsaved changes on this page. Do you want to save them before leaving?"
 msgstr "Auf dieser Seite gibt es nicht gespeicherte Änderungen. Vor dem Verlassen speichern?"
 
-#: .\templates\base.html:138 .\templates\recipes\recipe_form.html:144
-msgid "Save changes"
-msgstr "Änderungen speichern"
-
-#: .\templates\base.html:139
+#: .\templates\base.html:148
 msgid "Discard"
 msgstr "Verwerfen"
 
+#: .\templates\recipes\_diagram.html:20
+#, python-format
+msgid "Method for %(title)s as a diagram"
+msgstr "Zubereitung von %(title)s als Diagramm"
+
+#: .\templates\recipes\_diagram.html:47
 #: .\templates\recipes\_recipe_grid.html:30
-#: .\templates\recipes\recipe_detail.html:42
-#: .\templates\recipes\recipe_detail.html:48
-#: .\templates\recipes\recipe_detail.html:54
+#: .\templates\recipes\recipe_detail.html:44
+#: .\templates\recipes\recipe_detail.html:50
+#: .\templates\recipes\recipe_detail.html:56
+#: .\templates\recipes\recipe_detail.html:70
+#: .\templates\recipes\recipe_detail.html:185
 msgid "min"
 msgstr "Min."
 
@@ -310,14 +775,129 @@ msgid "No recipes yet"
 msgstr "Noch keine Rezepte"
 
 #: .\templates\recipes\home.html:43 .\templates\recipes\recipe_list.html:63
-msgid ""
-"This is where the household’s recipes live. Add the first one and it will "
-"show up here, searchable by name, tag or ingredient."
+msgid "This is where the household’s recipes live. Add the first one and it will show up here, searchable by name, tag or ingredient."
 msgstr "Hier wohnen die Rezepte des Haushalts. Das erste anlegen — es erscheint dann hier und ist über Name, Tag oder Zutat zu finden."
 
 #: .\templates\recipes\home.html:44 .\templates\recipes\recipe_list.html:64
 msgid "Add the first recipe"
 msgstr "Erstes Rezept anlegen"
+
+#: .\templates\recipes\recipe_cook.html:3
+#, python-format
+msgid "Cooking %(title)s"
+msgstr "%(title)s kochen"
+
+#: .\templates\recipes\recipe_cook.html:10
+msgid "Step by step"
+msgstr "Schritt für Schritt"
+
+#: .\templates\recipes\recipe_cook.html:13
+msgid "Back to the recipe"
+msgstr "Zurück zum Rezept"
+
+#: .\templates\recipes\recipe_cook.html:32
+msgid "Reset"
+msgstr "Zurücksetzen"
+
+#: .\templates\recipes\recipe_cook.html:41
+#: .\templates\recipes\recipe_detail.html:89
+msgid "Fewer servings"
+msgstr "Weniger Portionen"
+
+#: .\templates\recipes\recipe_cook.html:44
+#: .\templates\recipes\recipe_detail.html:93
+msgid "More servings"
+msgstr "Mehr Portionen"
+
+#: .\templates\recipes\recipe_cook.html:63
+#, python-format
+msgid "Step %(n)s of %(total)s"
+msgstr "Schritt %(n)s von %(total)s"
+
+#: .\templates\recipes\recipe_cook.html:69
+msgid "With what you made in:"
+msgstr "Zusammen mit dem aus:"
+
+#: .\templates\recipes\recipe_cook.html:100
+#, python-format
+msgid "Start %(n)s min"
+msgstr "%(n)s Min. starten"
+
+#: .\templates\recipes\recipe_cook.html:109
+#: .\templates\recipes\recipe_form.html:12
+msgid "Back"
+msgstr "Zurück"
+
+#: .\templates\recipes\recipe_cook.html:110
+msgid "Next"
+msgstr "Weiter"
+
+#: .\templates\recipes\recipe_cook.html:111
+msgid "Done — record it"
+msgstr "Fertig — eintragen"
+
+#: .\templates\recipes\recipe_cook.html:114
+msgid "The whole diagram"
+msgstr "Das ganze Diagramm"
+
+#: .\templates\recipes\recipe_cook.html:124
+#: .\templates\recipes\recipe_detail.html:77
+#: .\templates\recipes\recipe_form.html:54
+msgid "Ingredients"
+msgstr "Zutaten"
+
+#: .\templates\recipes\recipe_cook.html:139
+#: .\templates\recipes\recipe_detail.html:142
+#: .\templates\recipes\recipe_detail.html:148
+#: .\templates\recipes\recipe_detail.html:155
+msgid "Method"
+msgstr "Zubereitung"
+
+#: .\templates\recipes\recipe_cook.html:142
+msgid "This recipe has no diagram yet. Add steps on the edit page and the cooking view will walk you through them."
+msgstr "Für dieses Rezept gibt es noch kein Diagramm. Auf der Bearbeitungsseite Schritte anlegen — die Kochansicht führt dann durch sie hindurch."
+
+#: .\templates\recipes\recipe_cook.html:151
+msgid "How did it go?"
+msgstr "Wie ist es geworden?"
+
+#: .\templates\recipes\recipe_cook.html:152
+msgid "How far the amount you made actually went. This is what tells you next time whether “serves four” is true in this house."
+msgstr "Wie weit die zubereitete Menge tatsächlich gereicht hat. Genau das sagt beim nächsten Mal, ob „für vier Personen“ in diesem Haushalt stimmt."
+
+#: .\templates\recipes\recipe_cook.html:162
+msgid "Servings made"
+msgstr "Zubereitete Portionen"
+
+#: .\templates\recipes\recipe_cook.html:167
+msgid "Time taken (min)"
+msgstr "Gebrauchte Zeit (Min.)"
+
+#: .\templates\recipes\recipe_cook.html:169
+msgid "Filled in from the stopwatch above."
+msgstr "Kommt aus der Stoppuhr oben."
+
+#: .\templates\recipes\recipe_cook.html:174
+msgid "Portions it made"
+msgstr "Portionen, die dabei herauskamen"
+
+#: .\templates\recipes\recipe_cook.html:186
+#: .\templates\recipes\recipe_detail.html:161
+#: .\templates\recipes\recipe_form.html:203
+msgid "Notes"
+msgstr "Notizen"
+
+#: .\templates\recipes\recipe_cook.html:188
+msgid "What you would do differently — more salt, smaller tin, half the chilli."
+msgstr "Was man anders machen würde — mehr Salz, kleinere Form, halb so viel Chili."
+
+#: .\templates\recipes\recipe_cook.html:199
+msgid "Save this cooking"
+msgstr "Zubereitung speichern"
+
+#: .\templates\recipes\recipe_cook.html:200
+msgid "Skip"
+msgstr "Überspringen"
 
 #: .\templates\recipes\recipe_detail.html:5
 #, python-format
@@ -325,81 +905,100 @@ msgid "added by %(who)s"
 msgstr "hinzugefügt von %(who)s"
 
 #: .\templates\recipes\recipe_detail.html:14
-msgid "Edit"
-msgstr "Bearbeiten"
+msgid "Cook"
+msgstr "Kochen"
 
-#: .\templates\recipes\recipe_detail.html:41
+#: .\templates\recipes\recipe_detail.html:43
 msgid "Preparation"
 msgstr "Vorbereitung"
 
-#: .\templates\recipes\recipe_detail.html:47
+#: .\templates\recipes\recipe_detail.html:49
 msgid "Cooking"
 msgstr "Garzeit"
 
-#: .\templates\recipes\recipe_detail.html:53
+#: .\templates\recipes\recipe_detail.html:55
 msgid "Total"
 msgstr "Gesamt"
 
-#: .\templates\recipes\recipe_detail.html:58
+#: .\templates\recipes\recipe_detail.html:60
 #: .\templates\recipes\recipe_form.html:40
 msgid "Servings"
 msgstr "Portionen"
 
-#: .\templates\recipes\recipe_detail.html:65
-#: .\templates\recipes\recipe_form.html:54
-msgid "Ingredients"
-msgstr "Zutaten"
+#: .\templates\recipes\recipe_detail.html:69
+msgid "Measured"
+msgstr "Gemessen"
 
-#: .\templates\recipes\recipe_detail.html:75
-msgid "Fewer servings"
-msgstr "Weniger Portionen"
-
-#: .\templates\recipes\recipe_detail.html:79
-msgid "More servings"
-msgstr "Mehr Portionen"
-
-#: .\templates\recipes\recipe_detail.html:82
+#: .\templates\recipes\recipe_detail.html:96
 msgid "scaled"
 msgstr "umgerechnet"
 
-#: .\templates\recipes\recipe_detail.html:108
+#: .\templates\recipes\recipe_detail.html:130
 msgid "No ingredients recorded."
 msgstr "Keine Zutaten erfasst."
 
-#: .\templates\recipes\recipe_detail.html:113
-#: .\templates\recipes\recipe_form.html:106
-msgid "Method"
-msgstr "Zubereitung"
+#: .\templates\recipes\recipe_detail.html:144
+msgid "Read left to right: everything in a row joins the box beside it."
+msgstr "Von links nach rechts lesen: Alles in einer Zeile geht in das Kästchen daneben ein."
 
-#: .\templates\recipes\recipe_detail.html:121
+#: .\templates\recipes\recipe_detail.html:148
+msgid "In detail"
+msgstr "Ausführlich"
+
+#: .\templates\recipes\recipe_detail.html:156
 msgid "No method recorded."
 msgstr "Keine Zubereitung erfasst."
 
-#: .\templates\recipes\recipe_detail.html:126
-#: .\templates\recipes\recipe_form.html:138
-msgid "Notes"
-msgstr "Notizen"
+#: .\templates\recipes\recipe_detail.html:174
+msgid "Cook this now"
+msgstr "Jetzt kochen"
 
-#: .\templates\recipes\recipe_detail.html:133
-#: .\templates\recipes\recipe_form.html:127
+#: .\templates\recipes\recipe_detail.html:186
+#, python-format
+msgid "%(n)s serving"
+msgid_plural "%(n)s servings"
+msgstr[0] "%(n)s Portion"
+msgstr[1] "%(n)s Portionen"
+
+#: .\templates\recipes\recipe_detail.html:199
+msgid "Remove this entry?"
+msgstr "Diesen Eintrag entfernen?"
+
+#: .\templates\recipes\recipe_detail.html:200
+msgid "The record of this cooking will be removed. The recipe itself is untouched."
+msgstr "Der Eintrag zu dieser Zubereitung wird entfernt. Am Rezept selbst ändert sich nichts."
+
+#: .\templates\recipes\recipe_detail.html:201
+#: .\templates\recipes\recipe_detail.html:204
+msgid "Remove"
+msgstr "Entfernen"
+
+#: .\templates\recipes\recipe_detail.html:211
+#, python-format
+msgid "and %(n)s earlier cooking"
+msgid_plural "and %(n)s earlier cookings"
+msgstr[0] "und %(n)s frühere Zubereitung"
+msgstr[1] "und %(n)s frühere Zubereitungen"
+
+#: .\templates\recipes\recipe_detail.html:214
+msgid "Nobody has recorded cooking this yet."
+msgstr "Bisher hat niemand eingetragen, dass er das gekocht hat."
+
+#: .\templates\recipes\recipe_detail.html:220
+#: .\templates\recipes\recipe_form.html:192
 msgid "Source"
 msgstr "Quelle"
 
-#: .\templates\recipes\recipe_detail.html:150
+#: .\templates\recipes\recipe_detail.html:237
 msgid "Delete this recipe?"
 msgstr "Dieses Rezept löschen?"
 
-#: .\templates\recipes\recipe_detail.html:151
+#: .\templates\recipes\recipe_detail.html:238
 #, python-format
-msgid ""
-"“%(title)s” and its ingredient list will be removed. This cannot be undone."
+msgid "“%(title)s” and its ingredient list will be removed. This cannot be undone."
 msgstr "„%(title)s“ und die Zutatenliste werden entfernt. Das lässt sich nicht rückgängig machen."
 
-#: .\templates\recipes\recipe_detail.html:152
-msgid "Delete"
-msgstr "Löschen"
-
-#: .\templates\recipes\recipe_detail.html:155
+#: .\templates\recipes\recipe_detail.html:242
 msgid "Delete recipe"
 msgstr "Rezept löschen"
 
@@ -412,18 +1011,8 @@ msgstr "Neues Rezept"
 msgid "Edit recipe"
 msgstr "Rezept bearbeiten"
 
-#: .\templates\recipes\recipe_form.html:8
-msgid "Help for this page"
-msgstr "Hilfe zu dieser Seite"
-
-#: .\templates\recipes\recipe_form.html:12
-msgid "Back"
-msgstr "Zurück"
-
 #: .\templates\recipes\recipe_form.html:15
-msgid ""
-"Something on this page needs another look — the fields concerned are marked "
-"below."
+msgid "Something on this page needs another look — the fields concerned are marked below."
 msgstr "Etwas auf dieser Seite braucht noch einen Blick — die betroffenen Felder sind unten markiert."
 
 #: .\templates\recipes\recipe_form.html:27
@@ -443,97 +1032,163 @@ msgid "Cooking (min)"
 msgstr "Garzeit (Min.)"
 
 #: .\templates\recipes\recipe_form.html:55
-msgid ""
-"For the number of servings above. Amount and unit are separate so the recipe "
-"can be scaled — leave the amount blank for “salt” or “a little oil”."
+msgid "For the number of servings above. Amount and unit are separate so the recipe can be scaled — leave the amount blank for “salt” or “a little oil”."
 msgstr "Für die Portionszahl oben. Menge und Einheit stehen getrennt, damit das Rezept umgerechnet werden kann — bei „Salz“ oder „etwas Öl“ die Menge einfach leer lassen."
 
 #: .\templates\recipes\recipe_form.html:61
-#: .\templates\recipes\recipe_form.html:78
+#: .\templates\recipes\recipe_form.html:83
 msgid "Amount"
 msgstr "Menge"
 
 #: .\templates\recipes\recipe_form.html:62
-#: .\templates\recipes\recipe_form.html:82
+#: .\templates\recipes\recipe_form.html:87
 msgid "Unit"
 msgstr "Einheit"
 
 #: .\templates\recipes\recipe_form.html:63
-#: .\templates\recipes\recipe_form.html:86
+#: .\templates\recipes\recipe_form.html:91
 msgid "Ingredient"
 msgstr "Zutat"
 
 #: .\templates\recipes\recipe_form.html:64
-#: .\templates\recipes\recipe_form.html:91
+#: .\templates\recipes\recipe_form.html:96
 msgid "Note"
 msgstr "Anmerkung"
 
-#: .\templates\recipes\recipe_form.html:96
+#: .\templates\recipes\recipe_form.html:101
 msgid "Remove this line"
 msgstr "Diese Zeile entfernen"
 
-#: .\templates\recipes\recipe_form.html:102
+#: .\templates\recipes\recipe_form.html:109
+msgid "Used in"
+msgstr "Verwendet in"
+
+#: .\templates\recipes\recipe_form.html:109
+msgid "not in a step"
+msgstr "in keinem Schritt"
+
+#: .\templates\recipes\recipe_form.html:111
+msgid "Alternative for"
+msgstr "Alternative zu"
+
+#: .\templates\recipes\recipe_form.html:111
+msgid "a line of its own"
+msgstr "eine eigene Zeile"
+
+#: .\templates\recipes\recipe_form.html:118
 msgid "+ Another line"
 msgstr "+ Weitere Zeile"
 
-#: .\templates\recipes\recipe_form.html:108
+#: .\templates\recipes\recipe_form.html:122
+msgid "Method as a diagram"
+msgstr "Zubereitung als Diagramm"
+
+#: .\templates\recipes\recipe_form.html:123
+msgid "Each step is one box. Say which step a box feeds into and which step uses each ingredient, and the recipe draws itself as a diagram — the kind with the ingredients down the left and the operations merging to the right. Leave it empty and the recipe is simply the ingredients and the text below."
+msgstr "Jeder Schritt ist ein Kästchen. Eintragen, in welchen Schritt ein Kästchen eingeht und welcher Schritt welche Zutat verwendet — dann zeichnet sich das Rezept selbst als Diagramm: Zutaten links untereinander, die Arbeitsgänge nach rechts zusammenlaufend. Leer gelassen bleibt das Rezept einfach die Zutaten und der Text darunter."
+
+#: .\templates\recipes\recipe_form.html:133
+msgid "Step"
+msgstr "Schritt"
+
+#: .\templates\recipes\recipe_form.html:138
+msgid "Duration (min)"
+msgstr "Dauer (Min.)"
+
+#: .\templates\recipes\recipe_form.html:142
+msgid "Detail"
+msgstr "Erläuterung"
+
+#: .\templates\recipes\recipe_form.html:147
+msgid "Remove this step"
+msgstr "Diesen Schritt entfernen"
+
+#: .\templates\recipes\recipe_form.html:150
+msgid "Feeds into"
+msgstr "Geht ein in"
+
+#: .\templates\recipes\recipe_form.html:150
+msgid "the finished dish"
+msgstr "das fertige Gericht"
+
+#: .\templates\recipes\recipe_form.html:157
+msgid "+ Another step"
+msgstr "+ Weiterer Schritt"
+
+#: .\templates\recipes\recipe_form.html:167
+msgid "Preview"
+msgstr "Vorschau"
+
+#: .\templates\recipes\recipe_form.html:171
+msgid "Method in words"
+msgstr "Zubereitung in Worten"
+
+#: .\templates\recipes\recipe_form.html:173
 msgid "Instructions"
 msgstr "Zubereitung"
 
-#: .\templates\recipes\recipe_form.html:110
-msgid "One step per paragraph. Blank lines separate them."
-msgstr "Ein Schritt pro Absatz. Leerzeilen trennen sie."
+#: .\templates\recipes\recipe_form.html:175
+msgid "One step per paragraph. Blank lines separate them. Kept alongside the diagram, not replaced by it — the diagram says what combines with what, this says how."
+msgstr "Ein Schritt pro Absatz, getrennt durch Leerzeilen. Bleibt neben dem Diagramm bestehen und wird nicht durch es ersetzt — das Diagramm sagt, was womit zusammenkommt, dieser Text sagt, wie."
 
-#: .\templates\recipes\recipe_form.html:113
+#: .\templates\recipes\recipe_form.html:178
 msgid "Photograph, tags and source"
 msgstr "Foto, Tags und Quelle"
 
-#: .\templates\recipes\recipe_form.html:115
+#: .\templates\recipes\recipe_form.html:180
 msgid "Photograph"
 msgstr "Foto"
 
-#: .\templates\recipes\recipe_form.html:118
+#: .\templates\recipes\recipe_form.html:183
 msgid "Resized automatically. JPEG, PNG or WebP."
 msgstr "Wird automatisch verkleinert. JPEG, PNG oder WebP."
 
-#: .\templates\recipes\recipe_form.html:132
+#: .\templates\recipes\recipe_form.html:197
 msgid "Link"
 msgstr "Link"
 
-#: .\templates\recipes\recipe_form.html:144
+#: .\templates\recipes\recipe_form.html:209
 msgid "Add recipe"
 msgstr "Rezept anlegen"
 
-#: .\templates\recipes\recipe_form.html:157
-msgid "Close"
-msgstr "Schließen"
-
-#: .\templates\recipes\recipe_form.html:158
+#: .\templates\recipes\recipe_form.html:223
 msgid "Writing a recipe"
 msgstr "Ein Rezept schreiben"
 
-#: .\templates\recipes\recipe_form.html:160
-msgid ""
-"Only a title and a number of servings are required. Everything else can be "
-"filled in later — a recipe that is just a title and three ingredients is "
-"still worth keeping."
+#: .\templates\recipes\recipe_form.html:225
+msgid "Only a title and a number of servings are required. Everything else can be filled in later — a recipe that is just a title and three ingredients is still worth keeping."
 msgstr "Nötig sind nur ein Titel und eine Portionszahl. Alles andere lässt sich später ergänzen — ein Rezept aus einem Titel und drei Zutaten ist immer noch eines, das man behalten will."
 
-#: .\templates\recipes\recipe_form.html:161
+#: .\templates\recipes\recipe_form.html:226
 msgid "Why the ingredients are in columns"
 msgstr "Warum die Zutaten in Spalten stehen"
 
-#: .\templates\recipes\recipe_form.html:162
-msgid ""
-"Amount, unit and ingredient are separate fields so the recipe page can scale "
-"them: change the servings there and every amount follows. A line with no "
-"amount — salt, pepper — simply stays as it is."
+#: .\templates\recipes\recipe_form.html:227
+msgid "Amount, unit and ingredient are separate fields so the recipe page can scale them: change the servings there and every amount follows. A line with no amount — salt, pepper — simply stays as it is."
 msgstr "Menge, Einheit und Zutat sind getrennte Felder, damit die Rezeptseite umrechnen kann: dort die Portionszahl ändern und alle Mengen folgen. Eine Zeile ohne Menge — Salz, Pfeffer — bleibt einfach stehen."
 
-#: .\templates\recipes\recipe_form.html:164
-msgid ""
-"Type them separated by commas. Tags that do not exist yet are created; "
-"existing ones are matched regardless of capitalisation."
+#: .\templates\recipes\recipe_form.html:228
+msgid "The diagram"
+msgstr "Das Diagramm"
+
+#: .\templates\recipes\recipe_form.html:229
+msgid "Write the operations as steps — “melt”, “mix”, “bake 45 min” — then say which step each one feeds into. A step that feeds into nothing is the finished dish; a step with nothing going into it becomes a full-width line across the top, which is where “heat the oven” belongs."
+msgstr "Die Arbeitsgänge als Schritte eintragen — „schmelzen“, „verrühren“, „45 Min. backen“ — und dann sagen, in welchen Schritt jeder eingeht. Ein Schritt, der in nichts eingeht, ist das fertige Gericht; ein Schritt, in den nichts eingeht, wird zur durchgehenden Zeile ganz oben — dorthin gehört „Ofen vorheizen“."
+
+#: .\templates\recipes\recipe_form.html:230
+msgid "Each ingredient then says which step uses it. Anything you leave unassigned still appears in the list; it simply has no box beside it."
+msgstr "Jede Zutat sagt dann, welcher Schritt sie verwendet. Was ohne Zuordnung bleibt, steht trotzdem in der Liste — es hat nur kein Kästchen daneben."
+
+#: .\templates\recipes\recipe_form.html:231
+msgid "Optional lines and alternatives"
+msgstr "Optionale Zeilen und Alternativen"
+
+#: .\templates\recipes\recipe_form.html:232
+msgid "Tick “optional” for something the recipe works without. To record a substitute, add it as its own line and set “alternative for” to the line it replaces — it is then shown under that line with its own amount rather than as a note."
+msgstr "„optional“ ankreuzen bei allem, ohne das das Rezept auch funktioniert. Einen Ersatz trägt man als eigene Zeile ein und setzt „Alternative zu“ auf die Zeile, die er ersetzt — er erscheint dann mit eigener Menge unter dieser Zeile statt als Anmerkung."
+
+#: .\templates\recipes\recipe_form.html:234
+msgid "Type them separated by commas. Tags that do not exist yet are created; existing ones are matched regardless of capitalisation."
 msgstr "Durch Kommas getrennt eintippen. Noch nicht vorhandene Tags werden angelegt; vorhandene werden unabhängig von der Groß- und Kleinschreibung erkannt."
 
 #: .\templates\recipes\recipe_list.html:5
@@ -599,9 +1254,7 @@ msgid "Nothing found"
 msgstr "Nichts gefunden"
 
 #: .\templates\recipes\recipe_list.html:59
-msgid ""
-"No recipe matches that. Try a single ingredient — the search looks inside "
-"ingredient lists, not only titles."
+msgid "No recipe matches that. Try a single ingredient — the search looks inside ingredient lists, not only titles."
 msgstr "Dazu passt kein Rezept. Am besten eine einzelne Zutat versuchen — gesucht wird auch in den Zutatenlisten, nicht nur in den Titeln."
 
 #: .\templates\recipes\recipe_list.html:60
@@ -609,9 +1262,7 @@ msgid "Show all recipes"
 msgstr "Alle Rezepte anzeigen"
 
 #: .\templates\recipes\tag_list.html:8
-msgid ""
-"Every tag in use, and what is filed under it. Tags are created by typing "
-"them on a recipe — there is nothing to set up here."
+msgid "Every tag in use, and what is filed under it. Tags are created by typing them on a recipe — there is nothing to set up here."
 msgstr "Alle verwendeten Tags und was darunter abgelegt ist. Tags entstehen dadurch, dass sie in einem Rezept eingetippt werden — hier gibt es nichts einzurichten."
 
 #: .\templates\recipes\tag_list.html:25
@@ -626,9 +1277,7 @@ msgid "No tags yet"
 msgstr "Noch keine Tags"
 
 #: .\templates\recipes\tag_list.html:34
-msgid ""
-"Tags appear here once recipes carry them. Add “soup”, “vegetarian” or "
-"“Sunday” to a recipe and it becomes a way to find it again."
+msgid "Tags appear here once recipes carry them. Add “soup”, “vegetarian” or “Sunday” to a recipe and it becomes a way to find it again."
 msgstr "Tags erscheinen hier, sobald Rezepte welche tragen. „Suppe“, „vegetarisch“ oder „Sonntag“ an ein Rezept hängen — schon ist es darüber wiederzufinden."
 
 #: .\templates\recipes\tag_list.html:35

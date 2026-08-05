@@ -69,9 +69,14 @@
         and the DELETE box included. A field rendered beside the row is one that
         removing (or later reordering) the row leaves behind, and a formset is
         an index range rather than a list: a form missing from the POST is a
-        hole Django validates against its own defaults.{% endcomment %}
+        hole Django validates against its own defaults.
+
+        The two hidden index fields are how this row says which step uses it and
+        which line it substitutes for. They are hidden because the control
+        somebody uses is a <select> built in the browser from the rows that
+        exist at that moment — see apps/recipes/forms.py.{% endcomment %}
         <div class="ingredient-row" data-ingredient-row>
-          {{ row.id }}
+          {{ row.id }}{{ row.step_index }}{{ row.alt_index }}
           <p>
             <label class="sr-only" for="{{ row.amount.id_for_label }}">{% translate "Amount" %}</label>
             {{ row.amount }}
@@ -92,6 +97,17 @@
           <p class="ingredient-delete-box">{{ row.DELETE }}</p>
           <button type="button" class="ingredient-remove" data-ingredient-remove
                   aria-label="{% translate 'Remove this line' %}" title="{% translate 'Remove this line' %}">&times;</button>
+
+          <div class="row-extras">
+            <label class="checkbox-inline">
+              {{ row.optional }}
+              <span>{% translate "optional" %}</span>
+            </label>
+            <span class="row-extra" data-step-slot
+                  data-label="{% translate 'Used in' %}" data-empty="{% translate 'not in a step' %}"></span>
+            <span class="row-extra" data-alt-slot
+                  data-label="{% translate 'Alternative for' %}" data-empty="{% translate 'a line of its own' %}"></span>
+          </div>
         </div>
       {% endfor %}
     </div>
@@ -101,11 +117,59 @@
       </button>
     </p>
 
-    <h2 class="form-section">{% translate "Method" %}</h2>
+    <h2 class="form-section">{% translate "Method as a diagram" %}</h2>
+    <p class="help">{% blocktranslate %}Each step is one box. Say which step a box feeds into and which step uses each ingredient, and the recipe draws itself as a diagram — the kind with the ingredients down the left and the operations merging to the right. Leave it empty and the recipe is simply the ingredients and the text below.{% endblocktranslate %}</p>
+
+    {{ steps.management_form }}
+    {% if steps.non_form_errors %}<p class="field-error">{{ steps.non_form_errors|striptags }}</p>{% endif %}
+
+    <div class="step-rows" data-step-rows>
+      {% for row in steps %}
+        <div class="step-row" data-step-row>
+          {{ row.id }}{{ row.parent_index }}
+          <p class="step-field-text">
+            <label class="sr-only" for="{{ row.text.id_for_label }}">{% translate "Step" %}</label>
+            {{ row.text }}
+            <span class="field-error">{{ row.non_field_errors|striptags }}{{ row.text.errors|striptags }}</span>
+          </p>
+          <p class="step-field-minutes">
+            <label class="sr-only" for="{{ row.minutes.id_for_label }}">{% translate "Duration (min)" %}</label>
+            {{ row.minutes }}
+          </p>
+          <p class="step-field-detail">
+            <label class="sr-only" for="{{ row.detail.id_for_label }}">{% translate "Detail" %}</label>
+            {{ row.detail }}
+          </p>
+          <p class="step-delete-box">{{ row.DELETE }}</p>
+          <button type="button" class="ingredient-remove" data-step-remove
+                  aria-label="{% translate 'Remove this step' %}" title="{% translate 'Remove this step' %}">&times;</button>
+          <div class="row-extras">
+            <span class="row-extra" data-parent-slot
+                  data-label="{% translate 'Feeds into' %}" data-empty="{% translate 'the finished dish' %}"></span>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+    <p>
+      <button type="button" class="button button--secondary button--small" data-step-add>
+        {% translate "+ Another step" %}
+      </button>
+    </p>
+
+    {% comment %}A live picture of what the selects above add up to, redrawn on
+    every change. Without it the diagram is a set of dropdowns somebody has to
+    hold in their head; with it, a wrong answer is visible immediately. Marked
+    data-no-dirty so looking at it does not arm the unsaved-changes guard.{% endcomment %}
+    <div class="diagram-preview" data-diagram-preview data-no-dirty hidden>
+      <h3>{% translate "Preview" %}</h3>
+      <div class="preview-scroll" data-diagram-preview-body></div>
+    </div>
+
+    <h2 class="form-section">{% translate "Method in words" %}</h2>
     <p>
       <label for="{{ form.instructions.id_for_label }}">{% translate "Instructions" %}</label>
       {{ form.instructions }}
-      <span class="help">{% translate "One step per paragraph. Blank lines separate them." %}</span>
+      <span class="help">{% translate "One step per paragraph. Blank lines separate them. Kept alongside the diagram, not replaced by it — the diagram says what combines with what, this says how." %}</span>
     </p>
 
     <h2 class="form-section">{% translate "Photograph, tags and source" %}</h2>
@@ -157,6 +221,11 @@ fail; it renders the help text onto the page under a stray heading.{% endcomment
         <p>{% translate "Only a title and a number of servings are required. Everything else can be filled in later — a recipe that is just a title and three ingredients is still worth keeping." %}</p>
         <h3>{% translate "Why the ingredients are in columns" %}</h3>
         <p>{% translate "Amount, unit and ingredient are separate fields so the recipe page can scale them: change the servings there and every amount follows. A line with no amount — salt, pepper — simply stays as it is." %}</p>
+        <h3>{% translate "The diagram" %}</h3>
+        <p>{% translate "Write the operations as steps — “melt”, “mix”, “bake 45 min” — then say which step each one feeds into. A step that feeds into nothing is the finished dish; a step with nothing going into it becomes a full-width line across the top, which is where “heat the oven” belongs." %}</p>
+        <p>{% translate "Each ingredient then says which step uses it. Anything you leave unassigned still appears in the list; it simply has no box beside it." %}</p>
+        <h3>{% translate "Optional lines and alternatives" %}</h3>
+        <p>{% translate "Tick “optional” for something the recipe works without. To record a substitute, add it as its own line and set “alternative for” to the line it replaces — it is then shown under that line with its own amount rather than as a note." %}</p>
         <h3>{% translate "Tags" %}</h3>
         <p>{% translate "Type them separated by commas. Tags that do not exist yet are created; existing ones are matched regardless of capitalisation." %}</p>
       </div>
@@ -166,4 +235,5 @@ fail; it renders the help text onto the page under a stray heading.{% endcomment
 
 {% block scripts %}
   <script src="{% static 'js/recipe_form.js' %}"></script>
+  <script src="{% static 'js/recipe_diagram.js' %}"></script>
 {% endblock %}
