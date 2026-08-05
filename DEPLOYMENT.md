@@ -382,13 +382,17 @@ Nothing here needs a secret to be configured: the workflow uses the
 and `contents: write` for the release. There is no long-lived credential to
 rotate, and nothing to leak.
 
-**The package is private until you say otherwise.** GHCR inherits nothing from
-the repository's visibility — a newly published package is private, and the NAS
-will get a 403 from `docker compose pull` that reads like a wrong image name.
-Either make it public (GitHub → your profile → Packages → *kitchenapp* →
-Package settings → Change visibility) or give the NAS a read-only token, or
-ignore the registry entirely and use the release attachment, which is path (b)
-in §4.3 and needs neither.
+**The package came out public**, because this repository is public and GitHub
+gave the package the repository's visibility. Checked, not assumed: after
+`docker logout ghcr.io`, `docker pull ghcr.io/christianh99/kitchenapp:0.1.0`
+succeeds. So path (a) in §4.3 needs no credentials on the NAS at all.
+
+If this repository is ever made private, the package follows and the NAS starts
+getting a 403 from `docker compose pull` that reads like a wrong image name.
+Then either change the package's visibility back (GitHub → your profile →
+Packages → *kitchenapp* → Package settings), give the NAS a read-only token, or
+use the release attachment — path (b), which needs neither and is why it is
+there.
 
 ---
 
@@ -399,7 +403,7 @@ in §4.3 and needs neither.
 | Redirect loop at sign-in, no error | `X-Forwarded-Proto` missing from the proxy rule (§2). This is the common one. |
 | "Sign in with Synology" ends in a connection error | Hairpin DNS — the container cannot reach `sso.haeusslerr.de` (§3.3). |
 | CSRF failure on every form | `DJANGO_CSRF_TRUSTED_ORIGINS` missing the `https://` scheme. |
-| `docker compose pull` says denied / 403 | The GHCR package is private (§8). Make it public, give the NAS a read-only token, or use the release attachment instead. |
+| `docker compose pull` says denied / 403 | The GHCR package has gone private — it follows the repository's visibility (§8). Change it back, give the NAS a read-only token, or use the release attachment instead. |
 | The app still shows the old version after an update | The sidebar is telling the truth and something else is not: check you edited the compose file in the folder you are running `up -d` from, and that `docker compose ps` shows a container created just now. |
 | The release ran but the assets are missing | Re-run **Release → Run workflow** with the tag. Uploads use `--clobber`, so a re-run replaces a half-written asset instead of failing on it. |
 | `DisallowedHost` on every request | `DJANGO_ALLOWED_HOSTS` does not include the hostname the proxy forwards. |

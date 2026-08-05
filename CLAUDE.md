@@ -155,8 +155,8 @@ OPEN-ITEMS.md §1 and §2 are the current line between the two.
 
 ## The build pipeline
 
-Two workflows. Their substance has been run by hand; the Actions plumbing around
-it has not (OPEN-ITEMS.md §2).
+Two workflows, both now run for real: CI is green on GitHub and `v0.1.0` was
+built, published and installed from its own release attachment end to end.
 
 - `.github/workflows/ci.yml` — push and pull request. Test suite, then a
   **build of the image and a smoke test that starts it**. That second job is the
@@ -182,6 +182,13 @@ Things to keep in mind when touching them:
 - **A release asset must not be a dotfile.** `.env.example` is shipped as
   `env.example`, because a shell glob does not match dotfiles and `dist/*` would
   silently leave it out of both the checksums and the upload.
+- **A script's executable bit does not survive this machine.** `core.filemode`
+  is false on Windows, so git records nothing, and Docker Desktop hands
+  everything 0755 when it copies from NTFS — so a broken mode is invisible here
+  and fatal on Linux (`permission denied`, exit 126, no application log). This
+  is what the first CI run caught. `deploy/entrypoint.sh` is now 0755 in git
+  *and* chmodded in the Dockerfile; check `git ls-files -s` before adding
+  another script.
 - **`KITCHEN_VERSION` is baked in and shown in the sidebar** (`apps/version.py`).
   It exists for the question asked after every update — *did it take?* — which
   the NAS cannot answer: a container kept alive by `restart: unless-stopped` and

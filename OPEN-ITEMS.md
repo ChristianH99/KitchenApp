@@ -40,7 +40,14 @@ Everything below was observed working, not merely written.
 | **The release attachment path, end to end** | `docker save \| gzip` → 73 MB; then the image was **deleted outright** and restored from the tarball alone with `docker load`; `docker compose up -d` found it locally without touching a registry, came up healthy, and wrote its database into the bind-mounted folder |
 | The generated compose file and checksums | `sed` substitution produces `image: ghcr.io/christianh99/kitchenapp:<version>`; `sha256sum -c` verifies all three assets; `dist/*` picks up all four files including `env.example` |
 | The workflows parse | YAML loads, and all 21 `run:` blocks pass `bash -n` with the GitHub expressions stubbed out |
-| The release notes | The heredoc was dry-run with the expressions filled in by hand — see §2 for what that does *not* cover |
+| **CI runs green on GitHub** | Both jobs, on a runner. The *first* run failed — see the entrypoint note in §6, which is the bug the pipeline was worth building for — and everything since is green with no annotations |
+| **The release workflow ran end to end** | `v0.1.0`: verify → build → smoke-test the image about to be published → push to GHCR → assemble → attach. First attempt, no fixes needed |
+| **The published release carries all four assets** | `kitchen-0.1.0-linux-amd64.tar.gz` (75.6 MB), `docker-compose.yml`, `env.example`, `SHA256SUMS` — and the notes rendered with the deployment instructions above GitHub's generated changelog |
+| **The whole consumer path, as the NAS would do it** | In a clean directory: `gh release download` → `sha256sum -c` all three → `docker load` from the tarball → rename `env.example` to `.env` and fill it in → `docker compose up -d`. Container healthy, `/healthz` → `ok`, `/` → 302 to the login, the database written into the bind mount |
+| The registry path | `docker logout ghcr.io`, then an anonymous `docker pull ghcr.io/christianh99/kitchenapp:0.1.0` — **succeeds**. The package took the repository's public visibility, so the NAS needs no credentials. DEPLOYMENT.md §8 had guessed the opposite and has been corrected |
+| The version really is end to end | Git tag `v0.1.0` → build arg → env var → OCI label (`0.1.0`, revision `fa59ab0`) → **printed in the sidebar of the released container**, seen in a browser |
+| The released image is usable | Signed in to it, added a recipe with a two-step diagram through the real form, and the diagram rendered on the detail page |
+| `seed_demo` refuses in a release | `CommandError` inside the released container, as designed — it creates an account with a known password |
 | `deploy/entrypoint.sh` parses | `sh -n`, and now also runs for real |
 
 **One caveat on the responsive work.** Chrome's `resize_window` had no effect in
@@ -56,20 +63,20 @@ This is the important half. None of it is known to be broken; none of it is
 known to work either, and the difference matters when somebody is standing at
 the NAS.
 
-- **Neither GitHub workflow has ever run on a runner.** `.github/workflows/ci.yml`
-  and `release.yml` are written, their YAML parses, and every one of their 21
-  `run:` blocks passes `bash -n` — but no push has happened since they were
-  written. What *has* been done is run their substance by hand on the
-  development machine (see §1), so what is untested is the Actions plumbing:
-  the reusable-workflow call, `GITHUB_TOKEN` permissions, `gh release
-  create`/`upload`, the GHCR push. **Expect the first run to need a fix or
-  two**; that is what a first run is for.
-- **Nothing has been pushed to GHCR and no release has been cut.** So the
-  registry path in DEPLOYMENT.md §4.3(a) — including whether the package comes
-  out private, which it should — is reasoned about rather than seen. The
-  *attachment* path, §4.3(b), has been done end to end locally.
 - **`OIDC_ALLOWED_GROUPS` / `OIDC_STAFF_GROUP` against a real token.** The claim
   handling is unit-tested but no DSM has ever supplied the claims.
+- **A migration on a database that already has recipes in it.** Every migration
+  so far has run against an empty or development database. The first update that
+  carries a schema change to a `/data` with the household's real collection in
+  it is the one to take a copy before — see DEPLOYMENT.md §7.
+- **A second release, and therefore an *update*.** v0.1.0 was installed from
+  nothing. Replacing a running container with a newer image — the path in §7,
+  including whether the version in the sidebar actually changes — has not been
+  done.
+- **Anything on the DS723+ itself.** Everything below §1's container rows was
+  observed on the development machine with Docker Desktop, not on the NAS: the
+  bind mount at `/volume1/docker/kitchen/data`, the uid-1000 ownership rule, the
+  reverse proxy, the certificate, DSM's Container Manager.
 - **The OIDC flow has never touched a real Synology SSO Server.** The claim
   handling is unit-tested by handing the backend dictionaries — which is the
   only way to test the DSM version that omits the group claim — but no browser
@@ -155,15 +162,15 @@ list exists so it is re-opened knowingly.
 
 ## 5. Worth doing next, roughly in order
 
-1. **Push, and watch the first CI run.** The image and the container are known
-   good (§1); what is not is the Actions plumbing around them. Expect to
-   iterate. Then cut `v0.1.0` and check the release really carries its four
-   attachments and that the GHCR package appeared — and set its visibility,
-   which is the step that otherwise shows up later as a 403 on the NAS that
-   reads like a typo in the image name.
+1. **Put v0.1.0 on the actual NAS.** Everything up to the container is now
+   known good (§1) and nothing past it is. DEPLOYMENT.md §1–§5 in order: the
+   data folder and its uid-1000 ownership, the reverse-proxy rule with its two
+   custom headers (§2 — this is the step that breaks the login), the SSO client
+   read off the real discovery document rather than trusted from `settings.py`,
+   then the local fallback administrator *before* switching OIDC on.
 
-   Then delete the §2 bullets it has disproved. Leaving them there once they
-   are false is the specific way this document becomes a liability.
+   Correct DEPLOYMENT.md as you go, in the file rather than in your terminal
+   history, and move what you observed into §1 here.
 2. **Complete one OIDC round trip against the real SSO server**, then correct
    the endpoint defaults in `settings.py` and DEPLOYMENT.md §3.1 to what was
    actually found. Note the DSM version in the commit message — the next person
