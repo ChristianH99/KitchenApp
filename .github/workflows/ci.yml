@@ -31,7 +31,7 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
@@ -71,7 +71,7 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Plain `docker build` rather than the buildx actions. This runs a handful
       # of times a day at most, the whole build is about four minutes cold, and
