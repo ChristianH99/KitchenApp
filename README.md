@@ -68,7 +68,13 @@ the food actually went — "2 portions and one for the lunchbox" — so the reci
 page can eventually say what "serves four" means in *this* house.
 
 A **People** page manages the household's accounts, both the local ones and the
-Synology identities, without sending anybody to the Django admin.
+Synology identities, without sending anybody to the Django admin. A second page
+beside it configures **Synology SSO itself** — endpoints, client ID and secret,
+the group rules and the on/off switch — so setting up single sign-on needs no
+`.env` edit and no container restart. That page is superuser-only, reads the
+discovery document from inside the container, and will tell you whether the
+container can actually reach the SSO server, which is the failure that otherwise
+eats an evening.
 
 Beyond that: photographs (resized on upload), free tags, search that looks
 inside ingredient lists as well as titles, and a note field for what you would
@@ -201,6 +207,21 @@ apps/accounts/         Getting in.
                        `set_unusable_password()` precisely so a DSM-managed
                        identity can never also be reachable through the local
                        form.
+  models.py            The SSO connection, stored so it can be edited from a
+                       page. The docstring is the one to read: it states what
+                       moving the client secret out of the environment costs
+                       and what bounds the damage, rather than pretending the
+                       trade was free.
+  sso.py               Where mozilla-django-oidc gets its settings from. The
+                       library reads `getattr(settings, ...)`, which is fixed
+                       for the life of the process; this answers for the handful
+                       of names that are editable and passes the rest through.
+  secrets.py           Encrypting that one secret at rest, and being precise
+                       about what it buys: a copy of the database is not enough,
+                       a copy taken with the environment is.
+  sso_views.py         The settings page, plus "read the endpoints off the
+                       server" and "can this container reach it" — the two
+                       manual steps DEPLOYMENT.md §3 used to ask for.
 
 apps/recipes/          The collection.
   models.py            Recipe, RecipeStep, RecipeIngredient, Tag, CookLog,

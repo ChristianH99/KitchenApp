@@ -22,7 +22,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
-from apps.accounts import throttle
+from apps.accounts import sso, throttle
 
 log = logging.getLogger(__name__)
 
@@ -73,18 +73,24 @@ def login_view(request):
                 return redirect(next_url)
             throttle.note_failure(username, ip)
 
+    oidc_enabled = sso.is_enabled()
     return render(request, "accounts/login.html", {
         "form": form,
         "next": next_url,
         "locked_out": locked_out,
         "lockout_minutes": max(1, settings.LOGIN_LOCKOUT_SECONDS // 60),
-        "oidc_enabled": settings.OIDC_ENABLED,
+        # `is_enabled`, not the raw switch: it also asks whether the
+        # configuration could conceivably complete a login. A button that leads
+        # to the provider's error page reads as the provider being broken, when
+        # what happened is that somebody ticked the box before filling the form
+        # in — and this page is where they will come back to fix it.
+        "oidc_enabled": oidc_enabled,
         # Open the local form when it is the only way in, when somebody asked
         # for it (?local=1), or when they have just been refused by it — coming
         # back to a page with the form folded away again would read as the
         # attempt having vanished.
         "show_local": (
-            not settings.OIDC_ENABLED
+            not oidc_enabled
             or request.method == "POST"
             or bool(request.GET.get("local"))
         ),
@@ -100,7 +106,7 @@ def logout_view(request):
     without a prompt, which does not look like signing out at all. Handing over
     to ``oidc_logout`` is what makes the button mean what it says.
     """
-    if settings.OIDC_ENABLED and request.session.get("oidc_id_token"):
+    if request.session.get("oidc_id_token") and sso.is_enabled():
         # Handed over *before* logging out locally, because that view needs the
         # session it is ending: it reads the id token to build the provider's
         # end-session URL, and clearing the session here first would leave it

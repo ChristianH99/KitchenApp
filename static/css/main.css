@@ -1369,6 +1369,84 @@ form p.checkbox-row { flex-direction: row; align-items: center; gap: var(--space
 .link-button--danger { color: var(--danger); }
 .link-button--danger:hover { color: var(--danger); }
 
+/* ===== SSO SETTINGS ===== */
+/* The redirect URI, which is a value people come to this page to copy into DSM
+   and which fails silently if it is mistyped. Given its own block for that
+   reason rather than being one field among fifteen. */
+.callback-box {
+  padding: var(--space-6) var(--space-7);
+  margin-bottom: var(--space-8);
+  background: var(--herb-bg);
+  border-left: 4px solid var(--herb);
+  border-radius: var(--radius-sm);
+}
+.callback-label {
+  display: block;
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--herb);
+}
+.callback-url {
+  display: block;
+  margin: var(--space-3) 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  color: var(--text-dark);
+  word-break: break-all;
+}
+
+.check-results {
+  padding: var(--space-7);
+  margin-bottom: var(--space-8);
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.check-list { list-style: none; margin: 0; padding: 0; }
+/* Two columns, not three. The version with the outcome in a third `auto`
+   column collapsed the middle one to a single character wide the first time a
+   real failure came back: the detail was a `requests` exception several hundred
+   characters long with no spaces to break at, so it took the whole row and left
+   the URL wrapping one letter per line. Anything holding text of unpredictable
+   length gets its own row and is allowed to break anywhere. */
+.check {
+  display: grid;
+  grid-template-columns: 1.5rem 1fr;
+  gap: var(--space-2) var(--space-5);
+  padding: var(--space-5) 0;
+  border-bottom: 1px solid var(--border-light);
+}
+.check:last-child { border-bottom: none; }
+.check > * { min-width: 0; }
+.check-mark { font-weight: 800; }
+.check--ok .check-mark { color: var(--success); }
+.check--bad .check-mark { color: var(--danger); }
+.check-label { display: block; font-weight: 600; color: var(--text-dark); font-size: var(--text-sm); }
+.check-url {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-light);
+  overflow-wrap: anywhere;
+}
+.check-detail {
+  grid-column: 2;
+  font-size: var(--text-sm);
+  color: var(--text-mid);
+  overflow-wrap: anywhere;
+}
+.check--bad .check-detail { color: var(--danger); }
+
+.sso-actions {
+  display: flex; flex-wrap: wrap; gap: var(--space-5);
+  margin-top: var(--space-9);
+  padding-top: var(--space-7);
+  border-top: 1px solid var(--border);
+}
+.sso-actions form { margin: 0; }
+
 /* ===== TAG LIST ===== */
 .tag-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: var(--space-6); }
 .tag-card {

@@ -283,6 +283,24 @@ Each of these is here because breaking it produces a page that still renders.
   DSM-managed identity that SSO exists to close. Its name and e-mail are
   disabled for a quieter reason: DSM re-applies them at every sign-in, so a
   value typed here looks saved and is gone by tomorrow.
+- **The OIDC client secret is in the database, and that was a reversal.** It
+  used to be environment-only, which is where secrets belong. It was moved
+  because the *other* half of the setup is a Synology web GUI and nothing else,
+  so the real choice was never "config file or web page" but "one web page plus
+  an SSH session and a container restart" versus one web page. The cost is
+  real — it is now in `dumpdata` and in every Hyper Backup copy of `/data` —
+  and three things bound it: it is **encrypted at rest** with a key derived
+  from `DJANGO_SECRET_KEY` (so the backup copy alone is not enough; anyone with
+  the running system has both and always did), it is **never rendered back** to
+  a browser, and the page is **superuser-only**. `apps/accounts/models.py`
+  states all of this at the top; do not quietly undo it in either direction.
+- **The SSO settings page must never be able to lock everybody out.** The local
+  password form stays reachable at `?local=1` whatever is configured, the button
+  is only offered when the configuration could actually complete a login
+  (`sso.is_enabled()` checks usability, not just the switch), and
+  `sso.current()` swallows a database failure and falls back to the environment
+  — because it is called while rendering the login page, and raising there
+  turns "SSO needs reconfiguring" into "the app is down".
 - **Validation belongs to the door the untrusted value comes through.**
   `apps/recipes/images.py` is that door for photographs: size cap, Pillow
   verification, and a filename **we** generate — an extension is what a server
@@ -338,6 +356,18 @@ recognises them as decided rather than missed.
   second and folded away. `apps/accounts/middleware.OIDCSessionRefresh` exists
   solely because the library's own version would bounce that account to the
   provider on its first request.
+- **The SSO connection is edited in the app, not in `.env`.** Reversed from the
+  original decision — see the Security section for the trade and its bounds.
+  The environment still works and is what a row-less database reads; the moment
+  the page is saved, the stored row is the whole truth. There is deliberately
+  **no per-field fallback**: a page showing one thing while the app does another,
+  with no way to tell which field came from where, is worse than either source
+  on its own. `mozilla_django_oidc` is made to read it by overriding
+  `get_settings` on the backend, the two authentication views (wired in via
+  `OIDC_AUTHENTICATE_CLASS`/`OIDC_CALLBACK_CLASS`, so the URL names the SSO
+  server has registered do not move) and the refresh middleware — whose
+  `__init__` caches the endpoint at process start, hence the properties in
+  `apps/accounts/middleware.py`.
 - **No self-service password change.** Accounts come from DSM; the fallback is a
   superuser's job, done on the People page. Self-service would mean a second
   password store, which is the thing SSO is here to avoid — and the "set a new

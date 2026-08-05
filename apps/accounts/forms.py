@@ -28,6 +28,8 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
+from apps.accounts.models import SSOConfiguration, SignAlgorithm
+
 
 def is_sso_account(user):
     """Whether this row is the local end of a Synology identity."""
@@ -201,3 +203,93 @@ class SetPasswordForm(_PasswordPair):
         if self.account is not None:
             self._check_strength(self.account)
         return data
+
+
+class SSOConfigurationForm(forms.ModelForm):
+    """The Synology connection, as a form.
+
+    The secret is the only interesting part. It is a write-only field: the value
+    is never rendered back (``render_value`` stays at its default of False, and
+    the field's initial is never populated), so there is no request anywhere in
+    this app that returns the client secret to a browser. Leaving it blank keeps
+    what is stored; clearing it needs the explicit checkbox, because "I left
+    that box empty" and "I want no secret" are different intentions and only one
+    of them is what an empty password field usually means.
+    """
+
+    client_secret = forms.CharField(
+        label=_("Client secret"), required=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "off"}),
+        help_text=_("Leave empty to keep the one already stored."),
+    )
+    clear_client_secret = forms.BooleanField(
+        label=_("Remove the stored secret"), required=False,
+    )
+
+    class Meta:
+        model = SSOConfiguration
+        fields = [
+            "enabled", "op_base",
+            "authorization_endpoint", "token_endpoint", "user_endpoint", "jwks_endpoint",
+            "client_id", "sign_algo", "scopes",
+            "allowed_groups", "groups_claim", "staff_group", "verify_ssl",
+        ]
+
+    def clean(self):
+        data = super().clean()
+        if not data.get("enabled"):
+            # Half-filled settings are fine while SSO is off — that is what
+            # saving a work in progress looks like. The checks below are about
+            # switching it on.
+            return data
+
+        keeping = self.instance.has_client_secret and not data.get("clear_client_secret")
+        if not data.get("client_secret") and not keeping:
+            self.add_error("client_secret", _(
+                "A client secret is needed before Synology sign-in can be switched on."
+            ))
+        if not data.get("client_id"):
+            self.add_error("client_id", _(
+                "A client ID is needed before Synology sign-in can be switched on."
+            ))
+
+        # Resolved rather than checked field by field, because the four
+        # endpoints may legitimately be blank when the SSO server address is
+        # filled in — that is what deriving them from it means.
+        probe = SSOConfiguration(
+            op_base=data.get("op_base") or "",
+            authorization_endpoint=data.get("authorization_endpoint") or "",
+            token_endpoint=data.get("token_endpoint") or "",
+        )
+        endpoints = probe.endpoints()
+        if not endpoints["authorization"] or not endpoints["token"]:
+            self.add_error("op_base", _(
+                "Give the SSO server’s address, or fill the authorisation and token "
+                "endpoints in by hand."
+            ))
+
+        if data.get("sign_algo") == SignAlgorithm.RS256:
+            jwks = data.get("jwks_endpoint") or ""
+            if not jwks:
+                # RS256 verifies the token against the provider's published key,
+                # and without somewhere to fetch it the exchange fails with a
+                # signature error that reads like a wrong secret.
+                self.add_error("jwks_endpoint", _(
+                    "RS256 verifies the token against the provider’s key, so the JWKS "
+                    "address is needed. Use “Read the endpoints from the server”, or "
+                    "choose HS256, which signs with the client secret instead."
+                ))
+        return data
+
+    def save(self, commit=True, updated_by=None):
+        configuration = super().save(commit=False)
+        if self.cleaned_data.get("clear_client_secret"):
+            configuration.set_client_secret("")
+        elif self.cleaned_data.get("client_secret"):
+            configuration.set_client_secret(self.cleaned_data["client_secret"])
+        # else: the stored value rides along untouched on the instance.
+        if updated_by is not None:
+            configuration.updated_by = updated_by
+        if commit:
+            configuration.save()
+        return configuration

@@ -249,6 +249,7 @@ name = "kitchenapp"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "cryptography" },
     { name = "django" },
     { name = "gunicorn" },
     { name = "mozilla-django-oidc" },
@@ -265,6 +266,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cryptography", specifier = ">=42.0" },
     { name = "django", specifier = ">=5.2" },
     { name = "gunicorn", specifier = ">=23.0" },
     { name = "mozilla-django-oidc", specifier = ">=4.0" },

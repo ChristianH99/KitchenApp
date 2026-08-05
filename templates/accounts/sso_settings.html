@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Sign-in" %} – {% translate "Kitchen" %}{% endblock %}
+{% block topbar_title %}{% translate "Sign-in" %}{% endblock %}
+{% block topbar_sub %}{% translate "Synology SSO" %}{% endblock %}
+
+{% block topbar_actions %}
+  <button type="button" class="topbar-help" data-help-open
+          aria-label="{% translate 'Help for this page' %}" title="{% translate 'Help for this page' %}">?</button>
+{% endblock %}
+
+{% block content %}
+  <h1>{% translate "Signing in with Synology" %}</h1>
+  <p class="page-lead">{% translate "Everything this app needs in order to hand sign-in over to the Synology SSO Server. The other half — creating the application on the SSO server itself — is a page in DSM, and the address below is what it has to be told." %}</p>
+
+  {% comment %}The callback is fixed by config/urls.py and has to be registered
+  in the SSO server byte for byte, trailing slash included. Shown first because
+  it is the value people go and fetch from this page, and mistyping it produces
+  a login loop with no error message anywhere.{% endcomment %}
+  <div class="callback-box">
+    <span class="callback-label">{% translate "Redirect URI to register in DSM" %}</span>
+    <code class="callback-url">{{ callback_url }}</code>
+    <span class="help">{% translate "Must match exactly, trailing slash included." %}</span>
+  </div>
+
+  {% if from_environment %}
+    <p class="notice">{% translate "Nothing has been saved here yet, so these are the values from the container’s environment. Saving this page moves the configuration into the database, and the environment is ignored from then on." %}</p>
+  {% endif %}
+
+  {% if configuration.has_client_secret and not configuration.secret_is_readable %}
+    <p class="notice notice--error">{% translate "The stored client secret cannot be read any more. That happens when DJANGO_SECRET_KEY changes — the secret is encrypted with a key derived from it. Enter the secret again below." %}</p>
+  {% endif %}
+
+  {% if insecure %}
+    <p class="notice notice--warning">{% translate "One of the addresses below is plain http. The client secret and the tokens would cross the network unencrypted. This is only reasonable on a LAN you trust." %}</p>
+  {% endif %}
+
+  {% comment %}Results of the "check the connection" button, if it was the thing
+  that rendered this page. They sit above the form because they are the answer
+  to something somebody just pressed.{% endcomment %}
+  {% if checks %}
+    <div class="check-results">
+      <h2>{% translate "What this container can reach" %}</h2>
+      <ul class="check-list">
+        {% for label, url, result in checks %}
+          <li class="check{% if result.0 %} check--ok{% else %} check--bad{% endif %}">
+            <span class="check-mark" aria-hidden="true">{% if result.0 %}✓{% else %}✗{% endif %}</span>
+            <span class="check-what">
+              <span class="check-label">{{ label }}</span>
+              <code class="check-url">{{ url }}</code>
+            </span>
+            <span class="check-detail">{{ result.1 }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+      <p class="help">{% translate "Any HTTP answer counts as reachable — a 404 still proves the network path and the certificate work. Whether the address is the right one is what “Read the endpoints from the server” is for." %}</p>
+    </div>
+  {% endif %}
+
+  {% if form.non_field_errors %}
+    <p class="notice notice--error">{{ form.non_field_errors|striptags }}</p>
+  {% endif %}
+
+  <form method="post" data-unsaved-guard novalidate>
+    {% csrf_token %}
+
+    <p class="checkbox-row">
+      {{ form.enabled }}
+      <label for="{{ form.enabled.id_for_label }}">{% translate "Offer “Sign in with Synology”" %}</label>
+    </p>
+    <span class="help">{{ form.enabled.help_text }}</span>
+    <span class="field-error">{{ form.enabled.errors|striptags }}</span>
+
+    <h2 class="form-section">{% translate "The SSO server" %}</h2>
+    <p>
+      <label for="{{ form.op_base.id_for_label }}">{% translate "Address" %}</label>
+      {{ form.op_base }}
+      <span class="help">{{ form.op_base.help_text }}</span>
+      <span class="field-error">{{ form.op_base.errors|striptags }}</span>
+    </p>
+
+    <p class="help">{% translate "Do not trust any endpoint address written down anywhere, including this app’s own defaults — Synology has moved them between DSM versions. Read them off the server instead:" %}</p>
+
+    <div class="form-grid">
+      <p>
+        <label for="{{ form.authorization_endpoint.id_for_label }}">{% translate "Authorisation endpoint" %}</label>
+        {{ form.authorization_endpoint }}
+        <span class="field-error">{{ form.authorization_endpoint.errors|striptags }}</span>
+      </p>
+      <p>
+        <label for="{{ form.token_endpoint.id_for_label }}">{% translate "Token endpoint" %}</label>
+        {{ form.token_endpoint }}
+        <span class="field-error">{{ form.token_endpoint.errors|striptags }}</span>
+      </p>
+      <p>
+        <label for="{{ form.user_endpoint.id_for_label }}">{% translate "User info endpoint" %}</label>
+        {{ form.user_endpoint }}
+        <span class="field-error">{{ form.user_endpoint.errors|striptags }}</span>
+      </p>
+      <p>
+        <label for="{{ form.jwks_endpoint.id_for_label }}">{% translate "JWKS endpoint" %}</label>
+        {{ form.jwks_endpoint }}
+        <span class="field-error">{{ form.jwks_endpoint.errors|striptags }}</span>
+      </p>
+    </div>
+    <p class="hint">{% blocktranslate with url=configuration.discovery_url %}Blank fields are derived from the address above. Discovery document: {{ url }}{% endblocktranslate %}</p>
+
+    <h2 class="form-section">{% translate "The application in DSM" %}</h2>
+    <div class="form-grid">
+      <p>
+        <label for="{{ form.client_id.id_for_label }}">{% translate "Client ID" %}</label>
+        {{ form.client_id }}
+        <span class="field-error">{{ form.client_id.errors|striptags }}</span>
+      </p>
+      <p>
+        <label for="{{ form.client_secret.id_for_label }}">{% translate "Client secret" %}</label>
+        {{ form.client_secret }}
+        <span class="help">
+          {% if configuration.has_client_secret %}{% translate "A secret is stored. Leave empty to keep it." %}{% else %}{% translate "Nothing stored yet." %}{% endif %}
+        </span>
+        <span class="field-error">{{ form.client_secret.errors|striptags }}</span>
+      </p>
+    </div>
+    {% if configuration.has_client_secret %}
+      <p class="checkbox-row">
+        {{ form.clear_client_secret }}
+        <label for="{{ form.clear_client_secret.id_for_label }}">{{ form.clear_client_secret.label }}</label>
+      </p>
+    {% endif %}
+
+    <div class="form-grid">
+      <p>
+        <label for="{{ form.sign_algo.id_for_label }}">{% translate "Signature algorithm" %}</label>
+        {{ form.sign_algo }}
+        <span class="field-error">{{ form.sign_algo.errors|striptags }}</span>
+      </p>
+      <p>
+        <label for="{{ form.scopes.id_for_label }}">{% translate "Scopes" %}</label>
+        {{ form.scopes }}
+        <span class="help">{{ form.scopes.help_text }}</span>
+      </p>
+    </div>
+
+    <h2 class="form-section">{% translate "Who may sign in" %}</h2>
+    <p>
+      <label for="{{ form.allowed_groups.id_for_label }}">{% translate "Allowed groups" %}</label>
+      {{ form.allowed_groups }}
+      <span class="help">{{ form.allowed_groups.help_text }}</span>
+    </p>
+    <div class="form-grid">
+      <p>
+        <label for="{{ form.groups_claim.id_for_label }}">{% translate "Group claim" %}</label>
+        {{ form.groups_claim }}
+        <span class="help">{{ form.groups_claim.help_text }}</span>
+      </p>
+      <p>
+        <label for="{{ form.staff_group.id_for_label }}">{% translate "Administrator group" %}</label>
+        {{ form.staff_group }}
+        <span class="help">{{ form.staff_group.help_text }}</span>
+      </p>
+    </div>
+    <p class="checkbox-row">
+      {{ form.verify_ssl }}
+      <label for="{{ form.verify_ssl.id_for_label }}">{% translate "Verify the SSO server’s certificate" %}</label>
+    </p>
+    <span class="help">{{ form.verify_ssl.help_text }}</span>
+
+    <div class="form-actions">
+      <button type="submit" class="button">{% translate "Save" %}</button>
+      <a class="link-button" href="{% url 'accounts:user-list' %}">{% translate "Cancel" %}</a>
+    </div>
+  </form>
+
+  {% comment %}Separate forms, because both are POSTs that do something other
+  than save — putting them inside the form above would mean either a submit
+  button that saves first or nested forms, which no browser allows.{% endcomment %}
+  <div class="sso-actions">
+    <form method="post" action="{% url 'accounts:sso-discover' %}">
+      {% csrf_token %}
+      <button type="submit" class="button button--secondary">{% translate "Read the endpoints from the server" %}</button>
+    </form>
+    <form method="post" action="{% url 'accounts:sso-check' %}">
+      {% csrf_token %}
+      <button type="submit" class="button button--secondary">{% translate "Check the connection" %}</button>
+    </form>
+  </div>
+  <p class="help">{% translate "Both read what is currently saved, not what is typed above — save first." %}</p>
+{% endblock %}
+
+{% block help_modal %}
+  <div class="modal-overlay help-modal" hidden data-help-modal>
+    <div class="modal help-panel" role="dialog" aria-modal="true" aria-labelledby="help-title">
+      <button type="button" class="modal-close" data-help-close aria-label="{% translate 'Close' %}">&times;</button>
+      <h2 class="modal-title" id="help-title">{% translate "Setting up Synology sign-in" %}</h2>
+      <div class="modal-body">
+        <h3>{% translate "In DSM, once" %}</h3>
+        <p>{% translate "SSO Server → OIDC → Applications → Add. Give it a name and paste the redirect URI from the top of this page in as it is written, trailing slash included. DSM then shows a client ID and a client secret; those two go in the form here." %}</p>
+        <h3>{% translate "The order that cannot lock you out" %}</h3>
+        <p>{% translate "Fill everything in with the switch at the top still off, save, press “Check the connection”, and only then switch it on. The local password form stays available either way — it is at /accounts/login/?local=1 even when the Synology button is the only thing on the page." %}</p>
+        <h3>{% translate "If the login gets to DSM and then fails" %}</h3>
+        <p>{% translate "That is almost always the container being unable to reach the SSO server itself, which it has to do for the token exchange. “Check the connection” asks that question from inside the container. If the browser can reach the server and this cannot, it is your router not sending internal traffic back to itself." %}</p>
+        <h3>{% translate "Where the secret is kept" %}</h3>
+        <p>{% translate "In the database, encrypted with a key derived from DJANGO_SECRET_KEY — so a copy of the database alone does not reveal it, but a backup taken together with the environment does. Change DJANGO_SECRET_KEY and the secret has to be entered again." %}</p>
+      </div>
+    </div>
+  </div>
+{% endblock %}

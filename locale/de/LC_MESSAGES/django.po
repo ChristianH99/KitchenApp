@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kitchenapp 0.1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-05 17:42+0200\n"
+"POT-Creation-Date: 2026-08-05 22:26+0200\n"
 "PO-Revision-Date: 2026-08-05 12:00+0200\n"
 "Last-Translator: KitchenApp\n"
 "Language-Team: German\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: .\apps\accounts\forms.py:47 .\templates\accounts\login.html:63
+#: .\apps\accounts\forms.py:49 .\templates\accounts\login.html:63
 #: .\templates\accounts\user_form.html:52
 #: .\templates\accounts\user_form.html:55
 #: .\templates\accounts\user_list.html:56
@@ -26,66 +26,241 @@ msgstr ""
 msgid "Password"
 msgstr "Passwort"
 
-#: .\apps\accounts\forms.py:50 .\templates\accounts\user_form.html:60
+#: .\apps\accounts\forms.py:52 .\templates\accounts\user_form.html:60
 #: .\templates\accounts\user_password.html:25
 msgid "Repeat password"
 msgstr "Passwort wiederholen"
 
-#: .\apps\accounts\forms.py:58
+#: .\apps\accounts\forms.py:60
 msgid "The two passwords do not match."
 msgstr "Die beiden Passwörter stimmen nicht überein."
 
-#: .\apps\accounts\forms.py:87
+#: .\apps\accounts\forms.py:89
 msgid "What they type to sign in. Letters, digits and . @ + - _"
 msgstr "Womit sich die Person anmeldet. Buchstaben, Ziffern und . @ + - _"
 
-#: .\apps\accounts\forms.py:143
+#: .\apps\accounts\forms.py:145
 msgid "Managed by Synology DSM."
 msgstr "Wird von Synology DSM verwaltet."
 
-#: .\apps\accounts\forms.py:151 .\apps\accounts\users.py:209
+#: .\apps\accounts\forms.py:153 .\apps\accounts\users.py:191
 msgid "You cannot switch off your own account."
 msgstr "Das eigene Konto lässt sich nicht abschalten."
 
-#: .\apps\accounts\forms.py:160
+#: .\apps\accounts\forms.py:162
 msgid "You cannot take the administrator right off your own account."
 msgstr "Das Administrationsrecht lässt sich dem eigenen Konto nicht entziehen."
 
-#: .\apps\accounts\forms.py:167 .\apps\accounts\users.py:184
-#: .\apps\accounts\users.py:216
+#: .\apps\accounts\forms.py:169 .\apps\accounts\users.py:166
+#: .\apps\accounts\users.py:198
 msgid "This is the last active administrator. Give somebody else the right first."
 msgstr "Das ist die letzte aktive Administration. Erst jemand anderem das Recht geben."
 
-#: .\apps\accounts\users.py:92
+#: .\apps\accounts\forms.py:221 .\templates\accounts\sso_settings.html:118
+msgid "Client secret"
+msgstr "Client-Secret"
+
+#: .\apps\accounts\forms.py:223
+msgid "Leave empty to keep the one already stored."
+msgstr "Leer lassen, um das bereits gespeicherte zu behalten."
+
+#: .\apps\accounts\forms.py:226
+msgid "Remove the stored secret"
+msgstr "Gespeichertes Secret entfernen"
+
+#: .\apps\accounts\forms.py:249
+msgid "A client secret is needed before Synology sign-in can be switched on."
+msgstr "Ohne Client-Secret lässt sich die Synology-Anmeldung nicht einschalten."
+
+#: .\apps\accounts\forms.py:253
+msgid "A client ID is needed before Synology sign-in can be switched on."
+msgstr "Ohne Client-ID lässt sich die Synology-Anmeldung nicht einschalten."
+
+#: .\apps\accounts\forms.py:267
+msgid "Give the SSO server’s address, or fill the authorisation and token endpoints in by hand."
+msgstr "Die Adresse des SSO-Servers eintragen — oder Autorisierungs- und Token-Endpunkt von Hand ausfüllen."
+
+#: .\apps\accounts\forms.py:278
+msgid "RS256 verifies the token against the provider’s key, so the JWKS address is needed. Use “Read the endpoints from the server”, or choose HS256, which signs with the client secret instead."
+msgstr "RS256 prüft das Token gegen den Schlüssel des Anbieters, dafür wird die JWKS-Adresse gebraucht. Entweder „Endpunkte vom Server lesen“ benutzen oder HS256 wählen — das signiert stattdessen mit dem Client-Secret."
+
+#: .\apps\accounts\models.py:42
+msgid "RS256 — signed with the provider’s key (needs the JWKS endpoint)"
+msgstr "RS256 — mit dem Schlüssel des Anbieters signiert (braucht den JWKS-Endpunkt)"
+
+#: .\apps\accounts\models.py:43
+msgid "HS256 — signed with the client secret (no key fetch)"
+msgstr "HS256 — mit dem Client-Secret signiert (kein Schlüsselabruf nötig)"
+
+#: .\apps\accounts\models.py:59
+msgid "offer Synology sign-in"
+msgstr "Synology-Anmeldung anbieten"
+
+#: .\apps\accounts\models.py:60
+msgid "With this off, the local password form is the only way in."
+msgstr "Ist das aus, führt nur das lokale Passwortformular hinein."
+
+#: .\apps\accounts\models.py:67 .\apps\accounts\sso_views.py:146
+msgid "SSO server"
+msgstr "SSO-Server"
+
+#: .\apps\accounts\models.py:68
+msgid "e.g. https://sso.example.org — the four addresses below are derived from it."
+msgstr "z. B. https://sso.example.org — die vier Adressen darunter werden daraus abgeleitet."
+
+#: .\apps\accounts\models.py:70 .\apps\accounts\sso_views.py:147
+msgid "authorisation endpoint"
+msgstr "Autorisierungs-Endpunkt"
+
+#: .\apps\accounts\models.py:71 .\apps\accounts\sso_views.py:148
+msgid "token endpoint"
+msgstr "Token-Endpunkt"
+
+#: .\apps\accounts\models.py:72
+msgid "user info endpoint"
+msgstr "Benutzerinfo-Endpunkt"
+
+#: .\apps\accounts\models.py:73 .\apps\accounts\sso_views.py:149
+#: .\templates\accounts\sso_settings.html:103
+msgid "JWKS endpoint"
+msgstr "JWKS-Endpunkt"
+
+#: .\apps\accounts\models.py:75
+msgid "client ID"
+msgstr "Client-ID"
+
+#: .\apps\accounts\models.py:80
+msgid "signature algorithm"
+msgstr "Signaturverfahren"
+
+#: .\apps\accounts\models.py:84
+msgid "scopes"
+msgstr "Scopes"
+
+#: .\apps\accounts\models.py:85
+msgid "Separated by spaces."
+msgstr "Durch Leerzeichen getrennt."
+
+#: .\apps\accounts\models.py:89
+msgid "allowed groups"
+msgstr "erlaubte Gruppen"
+
+#: .\apps\accounts\models.py:90
+msgid "Separated by commas. Empty means anybody the SSO server authenticates."
+msgstr "Durch Kommas getrennt. Leer heißt: jede und jeder, den der SSO-Server anmeldet."
+
+#: .\apps\accounts\models.py:93
+msgid "group claim"
+msgstr "Gruppen-Claim"
+
+#: .\apps\accounts\models.py:94
+msgid "The claim the group names arrive in. Some DSM versions send none at all."
+msgstr "Der Claim, in dem die Gruppennamen ankommen. Manche DSM-Versionen senden gar keinen."
+
+#: .\apps\accounts\models.py:97
+msgid "administrator group"
+msgstr "Administrationsgruppe"
+
+#: .\apps\accounts\models.py:98
+msgid "Members of this group may manage people. Re-applied at every sign-in."
+msgstr "Mitglieder dieser Gruppe dürfen Personen verwalten. Wird bei jeder Anmeldung neu übernommen."
+
+#: .\apps\accounts\models.py:102
+msgid "verify the certificate"
+msgstr "Zertifikat prüfen"
+
+#: .\apps\accounts\models.py:103
+msgid "Leave on. Verification is the whole point of putting the SSO server behind a real certificate."
+msgstr "Angelassen lassen. Die Prüfung ist der ganze Sinn eines echten Zertifikats vor dem SSO-Server."
+
+#: .\apps\accounts\models.py:113 .\apps\accounts\models.py:114
+msgid "SSO configuration"
+msgstr "SSO-Konfiguration"
+
+#: .\apps\accounts\sso_views.py:67
+msgid "The SSO settings were saved."
+msgstr "Die SSO-Einstellungen wurden gespeichert."
+
+#: .\apps\accounts\sso_views.py:103
+msgid "Fill in the SSO server’s address first."
+msgstr "Zuerst die Adresse des SSO-Servers eintragen."
+
+#: .\apps\accounts\sso_views.py:109
+#, python-format
+msgid "Could not read the discovery document from %(url)s: %(error)s"
+msgstr "Das Discovery-Dokument unter %(url)s ließ sich nicht lesen: %(error)s"
+
+#: .\apps\accounts\sso_views.py:121
+msgid "That address answered, but with nothing that looks like a discovery document."
+msgstr "Diese Adresse hat geantwortet, aber nicht mit etwas, das nach einem Discovery-Dokument aussieht."
+
+#: .\apps\accounts\sso_views.py:132
+msgid "Read from the server. Check the four addresses below, then save."
+msgstr "Vom Server gelesen. Die vier Adressen unten prüfen und dann speichern."
+
+#: .\apps\accounts\sso_views.py:156
+msgid "There is nothing configured to check yet."
+msgstr "Es ist noch nichts eingetragen, das sich prüfen ließe."
+
+#: .\apps\accounts\sso_views.py:206
+#, python-format
+msgid "answered, HTTP %(code)s"
+msgstr "hat geantwortet, HTTP %(code)s"
+
+#: .\apps\accounts\sso_views.py:209
+msgid "the certificate was refused — wrong hostname, or an internal CA"
+msgstr "das Zertifikat wurde abgelehnt — falscher Hostname oder eine interne CA"
+
+#: .\apps\accounts\sso_views.py:213
+msgid "timed out. If a browser can reach this address but the container cannot, it is the router not sending internal traffic back to itself — DEPLOYMENT.md §3.3."
+msgstr "Zeitüberschreitung. Wenn ein Browser diese Adresse erreicht und der Container nicht, schickt der Router internen Verkehr nicht zu sich selbst zurück — DEPLOYMENT.md §3.3."
+
+#: .\apps\accounts\sso_views.py:221
+msgid "the name could not be resolved from inside the container"
+msgstr "der Name ließ sich aus dem Container heraus nicht auflösen"
+
+#: .\apps\accounts\sso_views.py:223
+msgid "the connection was refused — nothing is listening on that port"
+msgstr "die Verbindung wurde abgewiesen — auf diesem Port hört nichts zu"
+
+#: .\apps\accounts\sso_views.py:224
+msgid "no connection could be made"
+msgstr "es kam keine Verbindung zustande"
+
+#: .\apps\accounts\sso_views.py:227
+msgid "the request failed"
+msgstr "die Anfrage ist fehlgeschlagen"
+
+#: .\apps\accounts\users.py:74
 #, python-format
 msgid "The account “%(name)s” was created."
 msgstr "Das Konto „%(name)s“ wurde angelegt."
 
-#: .\apps\accounts\users.py:112
+#: .\apps\accounts\users.py:94
 #, python-format
 msgid "“%(name)s” was saved."
 msgstr "„%(name)s“ wurde gespeichert."
 
-#: .\apps\accounts\users.py:147
+#: .\apps\accounts\users.py:129
 #, python-format
 msgid "The password for “%(name)s” was changed."
 msgstr "Das Passwort für „%(name)s“ wurde geändert."
 
-#: .\apps\accounts\users.py:174
+#: .\apps\accounts\users.py:156
 msgid "You cannot delete your own account."
 msgstr "Das eigene Konto lässt sich nicht löschen."
 
-#: .\apps\accounts\users.py:191
+#: .\apps\accounts\users.py:173
 #, python-format
 msgid "“%(name)s” was deleted."
 msgstr "„%(name)s“ wurde gelöscht."
 
-#: .\apps\accounts\users.py:224
+#: .\apps\accounts\users.py:206
 #, python-format
 msgid "“%(name)s” can sign in again."
 msgstr "„%(name)s“ kann sich wieder anmelden."
 
-#: .\apps\accounts\users.py:225
+#: .\apps\accounts\users.py:207
 #, python-format
 msgid "“%(name)s” can no longer sign in."
 msgstr "„%(name)s“ kann sich nicht mehr anmelden."
@@ -370,11 +545,11 @@ msgstr "Notiert — „%(title)s“ gekocht."
 msgid "The entry was removed."
 msgstr "Der Eintrag wurde entfernt."
 
-#: .\config\settings.py:354
+#: .\config\settings.py:395
 msgid "German"
 msgstr "Deutsch"
 
-#: .\config\settings.py:355
+#: .\config\settings.py:396
 msgid "English"
 msgstr "Englisch"
 
@@ -388,9 +563,10 @@ msgid "Sign in"
 msgstr "Anmelden"
 
 #: .\templates\accounts\login.html:6 .\templates\accounts\login.html:15
+#: .\templates\accounts\sso_settings.html:3
 #: .\templates\accounts\user_form.html:3 .\templates\accounts\user_list.html:3
 #: .\templates\accounts\user_password.html:3 .\templates\base.html:6
-#: .\templates\base.html:27 .\templates\base.html:91
+#: .\templates\base.html:27 .\templates\base.html:107
 #: .\templates\recipes\home.html:3 .\templates\recipes\recipe_cook.html:3
 #: .\templates\recipes\recipe_detail.html:3
 #: .\templates\recipes\recipe_form.html:3
@@ -431,6 +607,199 @@ msgstr "Benutzername"
 #: .\templates\accounts\login.html:67
 msgid "Show password (hold)"
 msgstr "Passwort anzeigen (gedrückt halten)"
+
+#: .\templates\accounts\sso_settings.html:3
+#: .\templates\accounts\sso_settings.html:4 .\templates\base.html:63
+msgid "Sign-in"
+msgstr "Anmeldung"
+
+#: .\templates\accounts\sso_settings.html:5
+msgid "Synology SSO"
+msgstr "Synology SSO"
+
+#: .\templates\accounts\sso_settings.html:9
+#: .\templates\accounts\user_list.html:9
+#: .\templates\recipes\recipe_form.html:8
+msgid "Help for this page"
+msgstr "Hilfe zu dieser Seite"
+
+#: .\templates\accounts\sso_settings.html:13
+msgid "Signing in with Synology"
+msgstr "Anmeldung über Synology"
+
+#: .\templates\accounts\sso_settings.html:14
+msgid "Everything this app needs in order to hand sign-in over to the Synology SSO Server. The other half — creating the application on the SSO server itself — is a page in DSM, and the address below is what it has to be told."
+msgstr "Alles, was diese App braucht, um die Anmeldung an den Synology SSO Server zu übergeben. Die andere Hälfte — die Anwendung auf dem SSO-Server selbst anlegen — ist eine Seite in DSM, und die Adresse unten ist das, was dort eingetragen werden muss."
+
+#: .\templates\accounts\sso_settings.html:22
+msgid "Redirect URI to register in DSM"
+msgstr "In DSM einzutragende Redirect-URI"
+
+#: .\templates\accounts\sso_settings.html:24
+msgid "Must match exactly, trailing slash included."
+msgstr "Muss exakt übereinstimmen, abschließender Schrägstrich inbegriffen."
+
+#: .\templates\accounts\sso_settings.html:28
+msgid "Nothing has been saved here yet, so these are the values from the container’s environment. Saving this page moves the configuration into the database, and the environment is ignored from then on."
+msgstr "Hier wurde noch nichts gespeichert — das sind also die Werte aus der Umgebung des Containers. Mit dem Speichern dieser Seite wandert die Konfiguration in die Datenbank, und die Umgebung wird von da an ignoriert."
+
+#: .\templates\accounts\sso_settings.html:32
+msgid "The stored client secret cannot be read any more. That happens when DJANGO_SECRET_KEY changes — the secret is encrypted with a key derived from it. Enter the secret again below."
+msgstr "Das gespeicherte Client-Secret lässt sich nicht mehr lesen. Das passiert, wenn sich DJANGO_SECRET_KEY ändert — das Secret ist mit einem daraus abgeleiteten Schlüssel verschlüsselt. Bitte unten noch einmal eintragen."
+
+#: .\templates\accounts\sso_settings.html:36
+msgid "One of the addresses below is plain http. The client secret and the tokens would cross the network unencrypted. This is only reasonable on a LAN you trust."
+msgstr "Eine der Adressen unten ist einfaches http. Client-Secret und Tokens gingen dann unverschlüsselt über das Netz. Das ist nur in einem LAN vertretbar, dem man traut."
+
+#: .\templates\accounts\sso_settings.html:45
+msgid "What this container can reach"
+msgstr "Was dieser Container erreicht"
+
+#: .\templates\accounts\sso_settings.html:58
+msgid "Any HTTP answer counts as reachable — a 404 still proves the network path and the certificate work. Whether the address is the right one is what “Read the endpoints from the server” is for."
+msgstr "Jede HTTP-Antwort zählt als erreichbar — auch eine 404 belegt, dass Netzweg und Zertifikat funktionieren. Ob die Adresse die richtige ist, beantwortet „Endpunkte vom Server lesen“."
+
+#: .\templates\accounts\sso_settings.html:71
+msgid "Offer “Sign in with Synology”"
+msgstr "„Mit Synology anmelden“ anbieten"
+
+#: .\templates\accounts\sso_settings.html:76
+msgid "The SSO server"
+msgstr "Der SSO-Server"
+
+#: .\templates\accounts\sso_settings.html:78
+msgid "Address"
+msgstr "Adresse"
+
+#: .\templates\accounts\sso_settings.html:84
+msgid "Do not trust any endpoint address written down anywhere, including this app’s own defaults — Synology has moved them between DSM versions. Read them off the server instead:"
+msgstr "Keiner irgendwo notierten Endpunkt-Adresse trauen, auch nicht den Vorgaben dieser App — Synology hat sie zwischen DSM-Versionen verschoben. Besser direkt vom Server lesen:"
+
+#: .\templates\accounts\sso_settings.html:88
+msgid "Authorisation endpoint"
+msgstr "Autorisierungs-Endpunkt"
+
+#: .\templates\accounts\sso_settings.html:93
+msgid "Token endpoint"
+msgstr "Token-Endpunkt"
+
+#: .\templates\accounts\sso_settings.html:98
+msgid "User info endpoint"
+msgstr "Benutzerinfo-Endpunkt"
+
+#: .\templates\accounts\sso_settings.html:108
+#, python-format
+msgid "Blank fields are derived from the address above. Discovery document: %(url)s"
+msgstr "Leere Felder werden aus der Adresse oben abgeleitet. Discovery-Dokument: %(url)s"
+
+#: .\templates\accounts\sso_settings.html:110
+msgid "The application in DSM"
+msgstr "Die Anwendung in DSM"
+
+#: .\templates\accounts\sso_settings.html:113
+msgid "Client ID"
+msgstr "Client-ID"
+
+#: .\templates\accounts\sso_settings.html:121
+msgid "A secret is stored. Leave empty to keep it."
+msgstr "Ein Secret ist gespeichert. Leer lassen, um es zu behalten."
+
+#: .\templates\accounts\sso_settings.html:121
+msgid "Nothing stored yet."
+msgstr "Noch nichts gespeichert."
+
+#: .\templates\accounts\sso_settings.html:135
+msgid "Signature algorithm"
+msgstr "Signaturverfahren"
+
+#: .\templates\accounts\sso_settings.html:140
+msgid "Scopes"
+msgstr "Scopes"
+
+#: .\templates\accounts\sso_settings.html:146
+msgid "Who may sign in"
+msgstr "Wer sich anmelden darf"
+
+#: .\templates\accounts\sso_settings.html:148
+msgid "Allowed groups"
+msgstr "Erlaubte Gruppen"
+
+#: .\templates\accounts\sso_settings.html:154
+msgid "Group claim"
+msgstr "Gruppen-Claim"
+
+#: .\templates\accounts\sso_settings.html:159
+msgid "Administrator group"
+msgstr "Administrationsgruppe"
+
+#: .\templates\accounts\sso_settings.html:166
+msgid "Verify the SSO server’s certificate"
+msgstr "Zertifikat des SSO-Servers prüfen"
+
+#: .\templates\accounts\sso_settings.html:171
+msgid "Save"
+msgstr "Speichern"
+
+#: .\templates\accounts\sso_settings.html:172
+#: .\templates\accounts\user_form.html:95
+#: .\templates\accounts\user_password.html:31 .\templates\base.html:149
+#: .\templates\base.html:165 .\templates\recipes\recipe_form.html:210
+msgid "Cancel"
+msgstr "Abbrechen"
+
+#: .\templates\accounts\sso_settings.html:183
+msgid "Read the endpoints from the server"
+msgstr "Endpunkte vom Server lesen"
+
+#: .\templates\accounts\sso_settings.html:187
+msgid "Check the connection"
+msgstr "Verbindung prüfen"
+
+#: .\templates\accounts\sso_settings.html:190
+msgid "Both read what is currently saved, not what is typed above — save first."
+msgstr "Beide lesen den gespeicherten Stand, nicht das oben Eingetippte — also erst speichern."
+
+#: .\templates\accounts\sso_settings.html:196
+#: .\templates\accounts\user_list.html:109
+#: .\templates\recipes\recipe_form.html:222
+msgid "Close"
+msgstr "Schließen"
+
+#: .\templates\accounts\sso_settings.html:197
+msgid "Setting up Synology sign-in"
+msgstr "Die Synology-Anmeldung einrichten"
+
+#: .\templates\accounts\sso_settings.html:199
+msgid "In DSM, once"
+msgstr "Einmalig in DSM"
+
+#: .\templates\accounts\sso_settings.html:200
+msgid "SSO Server → OIDC → Applications → Add. Give it a name and paste the redirect URI from the top of this page in as it is written, trailing slash included. DSM then shows a client ID and a client secret; those two go in the form here."
+msgstr "SSO Server → OIDC → Applications → Add. Einen Namen vergeben und die Redirect-URI vom Kopf dieser Seite genau so einfügen, wie sie dort steht — abschließender Schrägstrich inbegriffen. DSM zeigt danach eine Client-ID und ein Client-Secret; diese beiden kommen hier ins Formular."
+
+#: .\templates\accounts\sso_settings.html:201
+msgid "The order that cannot lock you out"
+msgstr "Die Reihenfolge, die niemanden aussperrt"
+
+#: .\templates\accounts\sso_settings.html:202
+msgid "Fill everything in with the switch at the top still off, save, press “Check the connection”, and only then switch it on. The local password form stays available either way — it is at /accounts/login/?local=1 even when the Synology button is the only thing on the page."
+msgstr "Alles ausfüllen, während der Schalter oben noch aus ist, speichern, „Verbindung prüfen“ drücken — und erst dann einschalten. Das lokale Passwortformular bleibt in jedem Fall erreichbar: unter /accounts/login/?local=1, auch wenn auf der Seite sonst nur der Synology-Knopf steht."
+
+#: .\templates\accounts\sso_settings.html:203
+msgid "If the login gets to DSM and then fails"
+msgstr "Wenn die Anmeldung bis DSM kommt und dann scheitert"
+
+#: .\templates\accounts\sso_settings.html:204
+msgid "That is almost always the container being unable to reach the SSO server itself, which it has to do for the token exchange. “Check the connection” asks that question from inside the container. If the browser can reach the server and this cannot, it is your router not sending internal traffic back to itself."
+msgstr "Das liegt fast immer daran, dass der Container den SSO-Server selbst nicht erreicht — was er für den Token-Austausch tun muss. „Verbindung prüfen“ stellt genau diese Frage aus dem Container heraus. Wenn der Browser den Server erreicht und dies hier nicht, schickt der Router internen Verkehr nicht zu sich selbst zurück."
+
+#: .\templates\accounts\sso_settings.html:205
+msgid "Where the secret is kept"
+msgstr "Wo das Secret liegt"
+
+#: .\templates\accounts\sso_settings.html:206
+msgid "In the database, encrypted with a key derived from DJANGO_SECRET_KEY — so a copy of the database alone does not reveal it, but a backup taken together with the environment does. Change DJANGO_SECRET_KEY and the secret has to be entered again."
+msgstr "In der Datenbank, verschlüsselt mit einem aus DJANGO_SECRET_KEY abgeleiteten Schlüssel — eine Kopie der Datenbank allein gibt es also nicht preis, ein Backup zusammen mit der Umgebung schon. Ändert sich DJANGO_SECRET_KEY, muss das Secret neu eingetragen werden."
 
 #: .\templates\accounts\user_form.html:3 .\templates\accounts\user_form.html:4
 #: .\templates\accounts\user_form.html:9
@@ -491,7 +860,7 @@ msgstr "Alle Rechte, einschließlich des Wegs zurück, wenn etwas kaputt ist. Mi
 msgid "If a Synology group is configured as the administrator group, DSM decides this at every sign-in and anything set here is replaced."
 msgstr "Wenn eine Synology-Gruppe als Administrationsgruppe eingetragen ist, entscheidet DSM das bei jeder Anmeldung neu und überschreibt, was hier gesetzt wurde."
 
-#: .\templates\accounts\user_form.html:94 .\templates\base.html:147
+#: .\templates\accounts\user_form.html:94 .\templates\base.html:163
 #: .\templates\recipes\recipe_form.html:209
 msgid "Save changes"
 msgstr "Änderungen speichern"
@@ -499,12 +868,6 @@ msgstr "Änderungen speichern"
 #: .\templates\accounts\user_form.html:94
 msgid "Create the account"
 msgstr "Konto anlegen"
-
-#: .\templates\accounts\user_form.html:95
-#: .\templates\accounts\user_password.html:31 .\templates\base.html:133
-#: .\templates\base.html:149 .\templates\recipes\recipe_form.html:210
-msgid "Cancel"
-msgstr "Abbrechen"
 
 #: .\templates\accounts\user_form.html:97
 msgid "Set a new password"
@@ -521,11 +884,6 @@ msgid "%(n)s account can sign in"
 msgid_plural "%(n)s accounts can sign in"
 msgstr[0] "%(n)s Konto kann sich anmelden"
 msgstr[1] "%(n)s Konten können sich anmelden"
-
-#: .\templates\accounts\user_list.html:9
-#: .\templates\recipes\recipe_form.html:8
-msgid "Help for this page"
-msgstr "Hilfe zu dieser Seite"
 
 #: .\templates\accounts\user_list.html:15
 msgid "Add an account"
@@ -642,11 +1000,6 @@ msgstr "Löschen"
 msgid "Nobody yet."
 msgstr "Noch niemand."
 
-#: .\templates\accounts\user_list.html:109
-#: .\templates\recipes\recipe_form.html:222
-msgid "Close"
-msgstr "Schließen"
-
 #: .\templates\accounts\user_list.html:110
 msgid "Accounts in this app"
 msgstr "Konten in dieser App"
@@ -719,27 +1072,27 @@ msgstr "Alle Rezepte"
 msgid "Tags"
 msgstr "Tags"
 
-#: .\templates\base.html:60
+#: .\templates\base.html:76
 msgid "Administration"
 msgstr "Verwaltung"
 
-#: .\templates\base.html:72
+#: .\templates\base.html:88
 msgid "Sign out"
 msgstr "Abmelden"
 
-#: .\templates\base.html:87
+#: .\templates\base.html:103
 msgid "Toggle navigation"
 msgstr "Navigation ein- und ausblenden"
 
-#: .\templates\base.html:144
+#: .\templates\base.html:160
 msgid "Unsaved changes"
 msgstr "Nicht gespeicherte Änderungen"
 
-#: .\templates\base.html:145
+#: .\templates\base.html:161
 msgid "You have unsaved changes on this page. Do you want to save them before leaving?"
 msgstr "Auf dieser Seite gibt es nicht gespeicherte Änderungen. Vor dem Verlassen speichern?"
 
-#: .\templates\base.html:148
+#: .\templates\base.html:164
 msgid "Discard"
 msgstr "Verwerfen"
 

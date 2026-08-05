@@ -50,6 +50,13 @@
           <a class="shell-nav-item{% if 'users' in nav_current %} active{% endif %}"
              href="{% url 'accounts:user-list' %}">{% translate "People" %}</a>
         {% endif %}
+        {% comment %}Superuser only, and a level below People on purpose: "may
+        add an account" and "may repoint the whole app at a different identity
+        provider" are not the same right.{% endcomment %}
+        {% if user.is_superuser %}
+          <a class="shell-nav-item{% if 'sso' in nav_current %} active{% endif %}"
+             href="{% url 'accounts:sso' %}">{% translate "Sign-in" %}</a>
+        {% endif %}
       </nav>
       <div class="shell-sidebar-footer">
         {% comment %}Which build this is. Blank in a checkout and blank renders

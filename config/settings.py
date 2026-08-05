@@ -261,10 +261,35 @@ LOGIN_URL = 'accounts:login'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = 'accounts:login'
 
+# --- Where the OIDC values below actually come from ---
+#
+# Everything in this block is now a **bootstrap default**, not the live
+# configuration. The connection is edited from a page in the app (Personen →
+# Synology SSO, superuser only) and stored in the database, because the other
+# half of the setup — creating the OIDC application — is a Synology web GUI and
+# nothing else, so "config file or web page" was never the real choice.
+#
+# apps/accounts/models.py states the cost of that decision, which is a client
+# secret in the database and therefore in the backups; apps/accounts/secrets.py
+# is what limits it. The rule is simple: with **no row** in that table, the app
+# reads exactly these settings, which is what keeps a fresh checkout and a first
+# container boot working with no database content at all. Once the page has been
+# saved once, the stored row is the whole truth and these are ignored.
+#
+# apps/accounts/sso.py is the resolver; the four classes in the OIDC library
+# that read configuration are pointed at it.
+
 # Whether the "Sign in with Synology" button is offered at all. Off by default
-# so a fresh checkout runs on the local login with nothing configured; the
-# deployment sets it along with the three OIDC values below.
+# so a fresh checkout runs on the local login with nothing configured.
 OIDC_ENABLED = _env_bool('OIDC_ENABLED', default=False)
+
+# The library builds its URLconf from these two, so subclassing its views is how
+# they are made to read the stored configuration rather than these settings —
+# and doing it this way keeps `mozilla_django_oidc.urls` in charge of the paths.
+# `/oidc/callback/` in particular is a string registered in the SSO server's
+# client configuration and is not ours to move.
+OIDC_AUTHENTICATE_CLASS = 'apps.accounts.oidc.ConfiguredAuthenticationRequestView'
+OIDC_CALLBACK_CLASS = 'apps.accounts.oidc.ConfiguredAuthenticationCallbackView'
 
 OIDC_RP_CLIENT_ID = os.environ.get('OIDC_RP_CLIENT_ID', '')
 OIDC_RP_CLIENT_SECRET = os.environ.get('OIDC_RP_CLIENT_SECRET', '')

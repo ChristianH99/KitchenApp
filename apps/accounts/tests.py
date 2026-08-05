@@ -13,7 +13,8 @@ from django.core.cache import cache
 from django.core.exceptions import SuspiciousOperation
 from django.urls import reverse
 
-from apps.accounts import throttle
+from apps.accounts import sso, throttle
+from apps.accounts.models import SSOConfiguration
 from apps.accounts.oidc import SynologyOIDCBackend, _claim_groups, _display_name
 
 
@@ -22,6 +23,33 @@ def clear_throttle():
     cache.clear()
     yield
     cache.clear()
+
+
+def configured_sso(**overrides):
+    """A saved, complete SSO configuration — enough for a login to be offered.
+
+    A helper rather than a fixture because most tests want to vary one field of
+    it, and "the same thing with one thing wrong" is what most of these are
+    about.
+    """
+    # Popped before the rest is handed to the model: `client_secret` is a
+    # read-only property, so passing it as a field would be a TypeError.
+    secret = overrides.pop("client_secret", "s3cr3t")
+    values = {
+        "enabled": True,
+        "op_base": "https://sso.example.org",
+        "jwks_endpoint": "https://sso.example.org/jwks",
+        "client_id": "kitchen",
+        "sign_algo": "RS256",
+        "scopes": "openid profile email",
+        "groups_claim": "groups",
+    }
+    values.update(overrides)
+    configuration = SSOConfiguration(**values)
+    configuration.set_client_secret(secret)
+    configuration.save()
+    sso.invalidate()
+    return configuration
 
 
 # --------------------------------------------------------------------------
@@ -189,16 +217,32 @@ class TestTheLocalLogin:
         })
         assert response["Location"] == "/recipes/"
 
-    def test_the_sso_button_is_offered_only_when_it_is_configured(self, anon, db, settings):
-        settings.OIDC_ENABLED = False
+    def test_the_sso_button_is_offered_only_when_it_is_configured(self, anon, db):
         assert b"Sign in with Synology" not in anon.get(reverse("accounts:login")).content
-        settings.OIDC_ENABLED = True
+        configured_sso()
         assert b"Sign in with Synology" in anon.get(reverse("accounts:login")).content
 
-    def test_the_local_form_is_always_reachable(self, anon, db, settings):
+    def test_switching_it_on_half_configured_offers_no_button(self, anon, db):
+        """A button that leads to the provider's error page is worse than no
+        button: it reads as the provider being broken, when what happened is
+        that somebody ticked the box before filling the form in — and this is
+        the page they will come back to in order to fix it."""
+        configured_sso(client_id="", enabled=True)
+        assert b"Sign in with Synology" not in anon.get(reverse("accounts:login")).content
+
+    def test_a_secret_that_cannot_be_decrypted_withdraws_the_button(self, anon, db, settings):
+        """DJANGO_SECRET_KEY has changed, so the stored secret is unreadable.
+        The login *would* fail; offering it anyway would send somebody round the
+        provider and back for an error."""
+        configured_sso()
+        settings.SECRET_KEY = "a-completely-different-signing-key-000000"
+        sso.invalidate()
+        assert b"Sign in with Synology" not in anon.get(reverse("accounts:login")).content
+
+    def test_the_local_form_is_always_reachable(self, anon, db):
         """The whole point of the fallback: it has to be there when SSO is
         the thing that is broken."""
-        settings.OIDC_ENABLED = True
+        configured_sso()
         body = anon.get(reverse("accounts:login"), {"local": "1"}).content
         assert b'name="password"' in body
 
@@ -265,11 +309,11 @@ class TestSigningOut:
         assert response.status_code == 302
         assert not response.wsgi_request.user.is_authenticated
 
-    def test_an_sso_session_is_handed_to_the_provider(self, client, user, settings):
+    def test_an_sso_session_is_handed_to_the_provider(self, client, user, db):
         """A local logout only drops this app's cookie — the Synology session
         is still live, so the next click on "Sign in with Synology" goes
         straight back in without a prompt, which is not signing out."""
-        settings.OIDC_ENABLED = True
+        configured_sso()
         session = client.session
         session["oidc_id_token"] = "token"
         session.save()
@@ -501,3 +545,241 @@ class TestSwitchingAnAccountOff:
         Recipe.objects.create(title="Griesbrei", created_by=user)
         session.post(reverse("accounts:user-delete", args=[user.pk]))
         assert Recipe.objects.get(title="Griesbrei").created_by is None
+
+
+# --------------------------------------------------------------------------
+# The SSO configuration, and the page that edits it
+# --------------------------------------------------------------------------
+
+def _sso_post(**overrides):
+    data = {
+        "enabled": "on",
+        "op_base": "https://sso.example.org",
+        "authorization_endpoint": "", "token_endpoint": "", "user_endpoint": "",
+        "jwks_endpoint": "https://sso.example.org/jwks",
+        "client_id": "kitchen", "client_secret": "",
+        "sign_algo": "RS256", "scopes": "openid profile email",
+        "allowed_groups": "", "groups_claim": "groups", "staff_group": "",
+        "verify_ssl": "on",
+    }
+    data.update(overrides)
+    return data
+
+
+@pytest.fixture
+def superuser_client(db):
+    from django.test import Client
+
+    person = User.objects.create_superuser(username="chefin", password="pw-that-is-long")
+    session = Client()
+    session.force_login(person)
+    return session
+
+
+class TestWhereTheConfigurationComesFrom:
+    """With no row, the environment. With a row, the row. Nothing in between —
+    a per-field fallback would mean a page showing one thing and an app doing
+    another, with no way to tell which field came from where."""
+
+    def test_with_no_row_it_reads_the_environment(self, db, settings):
+        settings.OIDC_RP_CLIENT_ID = "from-the-env"
+        sso.invalidate()
+        assert sso.get_setting("OIDC_RP_CLIENT_ID") == "from-the-env"
+
+    def test_nothing_is_written_just_by_reading(self, db):
+        """A GET that writes takes SQLite's one write lock, and this is
+        consulted on requests that have nothing to do with configuring."""
+        sso.current(refresh=True)
+        assert not SSOConfiguration.objects.exists()
+
+    def test_a_saved_row_wins_over_the_environment(self, db, settings):
+        settings.OIDC_RP_CLIENT_ID = "from-the-env"
+        configured_sso(client_id="from-the-database")
+        assert sso.get_setting("OIDC_RP_CLIENT_ID") == "from-the-database"
+
+    def test_an_unknown_setting_falls_through_to_django(self, db, settings):
+        """The shim answers for a closed list. Anything else has to reach the
+        real settings, or the library gets None for something it needs."""
+        configured_sso()
+        assert sso.get_setting("LOGIN_REDIRECT_URL") == settings.LOGIN_REDIRECT_URL
+
+    def test_the_endpoints_are_derived_from_the_server_address(self, db):
+        endpoints = configured_sso().endpoints()
+        assert endpoints["authorization"].startswith("https://sso.example.org/")
+        assert endpoints["token"].startswith("https://sso.example.org/")
+
+    def test_an_explicit_endpoint_beats_the_derived_one(self, db):
+        """DSM has moved these between versions, which is the whole reason each
+        one can be overridden."""
+        configuration = configured_sso(
+            authorization_endpoint="https://sso.example.org/somewhere/else"
+        )
+        assert configuration.endpoints()["authorization"] == "https://sso.example.org/somewhere/else"
+
+    def test_a_broken_database_falls_back_rather_than_500ing(self, db, settings, monkeypatch):
+        """This is called while rendering the login page. Raising would turn
+        "SSO needs reconfiguring" into "the app is down" — including for the
+        local account that exists to fix it."""
+        settings.OIDC_RP_CLIENT_ID = "from-the-env"
+
+        def broken():
+            raise RuntimeError("no such table")
+
+        monkeypatch.setattr(SSOConfiguration, "load", staticmethod(broken))
+        sso.invalidate()
+        assert sso.get_setting("OIDC_RP_CLIENT_ID") == "from-the-env"
+
+
+class TestTheClientSecret:
+    def test_it_round_trips(self, db):
+        configured_sso(client_secret="hunter2")
+        assert SSOConfiguration.objects.get(pk=1).client_secret == "hunter2"
+
+    def test_it_is_not_stored_in_the_clear(self, db):
+        """The point of encrypting it: a copy of the database — which is what a
+        nightly backup is — does not carry the credential."""
+        configured_sso(client_secret="hunter2")
+        stored = SSOConfiguration.objects.get(pk=1).client_secret_encrypted
+        assert stored and "hunter2" not in stored
+
+    def test_a_changed_signing_key_makes_it_unreadable_rather_than_fatal(self, db, settings):
+        configured_sso(client_secret="hunter2")
+        settings.SECRET_KEY = "a-completely-different-signing-key-000000"
+        configuration = SSOConfiguration.objects.get(pk=1)
+        assert configuration.client_secret == ""       # not an exception
+        assert configuration.has_client_secret         # something *is* stored
+        assert not configuration.secret_is_readable    # and the page says so
+
+    def test_the_page_never_sends_it_back(self, superuser_client, db):
+        """There is no request in this app that returns the client secret to a
+        browser. The field is write-only."""
+        configured_sso(client_secret="hunter2")
+        assert b"hunter2" not in superuser_client.get(reverse("accounts:sso")).content
+
+    def test_saving_with_the_box_empty_keeps_it(self, superuser_client, db):
+        configured_sso(client_secret="hunter2")
+        superuser_client.post(reverse("accounts:sso"), _sso_post())
+        assert SSOConfiguration.objects.get(pk=1).client_secret == "hunter2"
+
+    def test_clearing_it_takes_the_explicit_checkbox(self, superuser_client, db):
+        """"I left that box empty" and "I want no secret" are different
+        intentions, and only one of them is what an empty password field
+        usually means."""
+        configured_sso(client_secret="hunter2")
+        superuser_client.post(reverse("accounts:sso"), _sso_post(
+            enabled="", clear_client_secret="on",
+        ))
+        assert SSOConfiguration.objects.get(pk=1).client_secret == ""
+
+
+class TestOnlyASuperuserMayChangeHowSignInWorks:
+    def test_every_sso_route_refuses_a_staff_account(self, staff, db):
+        """A narrower door than the People page on purpose: "may add an
+        account" and "may repoint the app at another identity provider" are not
+        the same right, and the second can be used to take the first."""
+        from django.test import Client
+        from django.urls import get_resolver
+
+        session = Client()
+        session.force_login(staff)
+
+        names = []
+        for pattern in get_resolver().url_patterns:
+            if getattr(pattern, "app_name", None) != "accounts":
+                continue
+            names += [
+                entry.name for entry in pattern.url_patterns
+                if entry.name and entry.name.startswith("sso")
+            ]
+        assert names, "no accounts:sso* routes were found — has the prefix changed?"
+
+        for name in names:
+            url = reverse("accounts:" + name)
+            for response in (session.get(url), session.post(url)):
+                assert response.status_code in (404, 405), (
+                    name + " answers " + str(response.status_code) + " to a staff "
+                    "account that is not a superuser"
+                )
+
+    def test_a_superuser_may(self, superuser_client, db):
+        assert superuser_client.get(reverse("accounts:sso")).status_code == 200
+
+
+class TestTheSSOPage:
+    def test_it_offers_the_redirect_uri_to_register(self, superuser_client, db):
+        """The value people come to this page to copy into DSM. It is fixed by
+        config/urls.py and mistyping it produces a login loop with no error."""
+        body = superuser_client.get(reverse("accounts:sso")).content.decode()
+        assert "/oidc/callback/" in body
+
+    def test_saving_moves_the_configuration_into_the_database(self, superuser_client, db):
+        assert not SSOConfiguration.objects.exists()
+        superuser_client.post(reverse("accounts:sso"), _sso_post(client_secret="s3cr3t"))
+        configuration = SSOConfiguration.objects.get(pk=1)
+        assert configuration.enabled and configuration.client_id == "kitchen"
+
+    def test_there_is_only_ever_one_row(self, superuser_client, db):
+        superuser_client.post(reverse("accounts:sso"), _sso_post(client_secret="a-secret"))
+        superuser_client.post(reverse("accounts:sso"), _sso_post(client_secret="another"))
+        assert SSOConfiguration.objects.count() == 1
+
+    def test_switching_it_on_without_a_secret_is_refused(self, superuser_client, db):
+        response = superuser_client.post(reverse("accounts:sso"), _sso_post())
+        assert response.status_code == 200
+        assert not SSOConfiguration.objects.filter(enabled=True).exists()
+
+    def test_rs256_without_a_jwks_address_is_refused(self, superuser_client, db):
+        """RS256 verifies against the provider's published key, and without
+        somewhere to fetch it the exchange fails with a signature error that
+        reads like a wrong secret."""
+        response = superuser_client.post(reverse("accounts:sso"), _sso_post(
+            client_secret="s3cr3t", jwks_endpoint="",
+        ))
+        assert response.status_code == 200
+        assert not SSOConfiguration.objects.filter(enabled=True).exists()
+
+    def test_half_filled_settings_may_be_saved_while_it_is_off(self, superuser_client, db):
+        """Saving work in progress has to be possible, or the page can only be
+        filled in correctly on the first attempt."""
+        superuser_client.post(reverse("accounts:sso"), _sso_post(
+            enabled="", client_id="", op_base="", jwks_endpoint="",
+        ))
+        assert SSOConfiguration.objects.filter(pk=1, enabled=False).exists()
+
+    def test_the_helper_actions_need_a_post(self, superuser_client, db):
+        """They make outbound requests. Reachable by GET would mean a link
+        preview or a prefetcher firing them."""
+        for name in ("accounts:sso-discover", "accounts:sso-check"):
+            assert superuser_client.get(reverse(name)).status_code == 405
+
+    def test_checking_with_nothing_configured_says_so(self, superuser_client, db):
+        response = superuser_client.post(reverse("accounts:sso-check"), follow=True)
+        assert response.status_code == 200
+
+
+class TestTheGroupRulesFollowTheConfiguration:
+    """The claim handling used to read Django settings. It reads the stored
+    configuration now, and these are the same rules from the other side."""
+
+    def test_the_allowed_group_list_comes_from_the_row(self, db):
+        configured_sso(allowed_groups="haushalt, gaeste")
+        backend = SynologyOIDCBackend()
+        assert backend.verify_claims({"sub": "abc", "groups": ["haushalt"]})
+        assert not backend.verify_claims({"sub": "abc", "groups": ["andere"]})
+
+    def test_it_still_fails_closed_when_the_claim_is_missing(self, db):
+        """Some DSM builds send no group claim at all. An app told "only these
+        groups" must not fall open because the claim it needs went missing."""
+        configured_sso(allowed_groups="haushalt")
+        assert not SynologyOIDCBackend().verify_claims({"sub": "abc"})
+
+    def test_the_claim_name_comes_from_the_row(self, db):
+        configured_sso(allowed_groups="haushalt", groups_claim="dsm_groups")
+        backend = SynologyOIDCBackend()
+        assert backend.verify_claims({"sub": "abc", "dsm_groups": ["haushalt"]})
+        assert not backend.verify_claims({"sub": "abc", "groups": ["haushalt"]})
+
+    def test_the_staff_group_comes_from_the_row(self, db):
+        configured_sso(staff_group="admins")
+        person = SynologyOIDCBackend().create_user({"sub": "abc", "groups": ["admins"]})
+        assert person.is_staff

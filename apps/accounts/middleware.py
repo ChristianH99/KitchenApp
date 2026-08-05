@@ -7,7 +7,7 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from mozilla_django_oidc.middleware import SessionRefresh
 
-from apps.accounts import pages
+from apps.accounts import pages, sso
 
 
 class LoginRequiredMiddleware:
@@ -60,14 +60,50 @@ class OIDCSessionRefresh(SessionRefresh):
 
     So the refresh applies to a session that actually holds an OIDC token, and
     only while the provider is configured at all.
+
+    The three properties below exist because ``SessionRefresh.__init__`` reads
+    the provider's details **once, at process start**, and the configuration
+    now lives in the database where a superuser can change it. Without them a
+    changed SSO server would keep redirecting to the old one until the container
+    was restarted — which is precisely the restart this whole feature exists to
+    remove. Each has a setter that swallows the assignment the base class makes;
+    the value it read at start-up is exactly the stale one being avoided.
     """
 
+    @property
+    def OIDC_OP_AUTHORIZATION_ENDPOINT(self):
+        return sso.get_setting("OIDC_OP_AUTHORIZATION_ENDPOINT", "")
+
+    @OIDC_OP_AUTHORIZATION_ENDPOINT.setter
+    def OIDC_OP_AUTHORIZATION_ENDPOINT(self, value):
+        pass
+
+    @property
+    def OIDC_RP_CLIENT_ID(self):
+        return sso.get_setting("OIDC_RP_CLIENT_ID", "")
+
+    @OIDC_RP_CLIENT_ID.setter
+    def OIDC_RP_CLIENT_ID(self, value):
+        pass
+
+    @property
+    def OIDC_RP_SCOPES(self):
+        return sso.get_setting("OIDC_RP_SCOPES", "openid email")
+
+    @OIDC_RP_SCOPES.setter
+    def OIDC_RP_SCOPES(self, value):
+        pass
+
     def is_refreshable_url(self, request):
-        if not settings.OIDC_ENABLED:
-            return False
+        # The session check first, and it is free: without it every request from
+        # a local-password session would cost a configuration lookup to answer a
+        # question the session cookie had already settled.
+        #
         # The session's own token, not the user's — an SSO account signing in
         # through the local form (which cannot happen: those accounts have no
         # usable password) would still not have a provider session to renew.
         if not request.session.get("oidc_id_token"):
+            return False
+        if not sso.is_enabled():
             return False
         return super().is_refreshable_url(request)

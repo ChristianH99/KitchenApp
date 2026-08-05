@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kitchenapp 0.1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-05 09:30+0200\n"
+"POT-Creation-Date: 2026-08-05 22:26+0200\n"
 "PO-Revision-Date: 2026-08-05 12:00+0200\n"
 "Last-Translator: KitchenApp\n"
 "Language-Team: German\n"
@@ -49,15 +49,15 @@ msgstr "Zeit ist um"
 msgid "Running"
 msgstr "Läuft"
 
-#: .\static\js\recipe_diagram.js:130
+#: .\static\js\recipe_diagram.js:136
 msgid "Step %(n)s"
 msgstr "Schritt %(n)s"
 
-#: .\static\js\recipe_diagram.js:132
+#: .\static\js\recipe_diagram.js:138
 msgid "Line %(n)s"
 msgstr "Zeile %(n)s"
 
-#: .\static\js\recipe_diagram.js:267
+#: .\static\js\recipe_diagram.js:273
 msgid "Not in any step yet: %(names)s"
 msgstr "Noch in keinem Schritt: %(names)s"
 

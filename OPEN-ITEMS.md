@@ -48,6 +48,7 @@ Everything below was observed working, not merely written.
 | The version really is end to end | Git tag `v0.1.0` → build arg → env var → OCI label (`0.1.0`, revision `fa59ab0`) → **printed in the sidebar of the released container**, seen in a browser |
 | The released image is usable | Signed in to it, added a recipe with a two-step diagram through the real form, and the diagram rendered on the detail page |
 | `seed_demo` refuses in a release | `CommandError` inside the released container, as designed — it creates an account with a known password |
+| **The SSO settings page** | Driven in the browser: filled in and saved, the “from the environment” notice went away, the sign-in button appeared on the login page **with no restart and no `.env`**, and the client secret was nowhere in the returned HTML. “Check the connection” reported the right failure for an address that does not resolve |
 | `deploy/entrypoint.sh` parses | `sh -n`, and now also runs for real |
 
 **One caveat on the responsive work.** Chrome's `resize_window` had no effect in
@@ -65,6 +66,13 @@ the NAS.
 
 - **`OIDC_ALLOWED_GROUPS` / `OIDC_STAFF_GROUP` against a real token.** The claim
   handling is unit-tested but no DSM has ever supplied the claims.
+- **The SSO settings page against a real SSO server.** The page, the stored
+  configuration, the write-only secret and the on/off switch were all driven in
+  a browser (§1); what has never happened is *"Read the endpoints from the
+  server"* pointed at an actual Synology, or a login completing against a
+  configuration that came out of the database rather than out of `.env`. The
+  discovery-document parsing in particular is written from what OIDC discovery
+  documents contain, not from one Synology returned.
 - **A migration on a database that already has recipes in it.** Every migration
   so far has run against an empty or development database. The first update that
   carries a schema change to a `/data` with the household's real collection in

@@ -13,6 +13,23 @@ from django.utils import translation
 
 
 @pytest.fixture(autouse=True)
+def forget_sso_configuration():
+    """Drop the cached SSO configuration around every test.
+
+    ``apps/accounts/sso.py`` caches it for thirty seconds so that the two
+    gunicorn workers are not each running a query per request. In a test run
+    that cache spans tests, so one test that saves a configuration decides what
+    the next one sees — and the symptom is a suite that passes alone and fails
+    in order, which is the worst kind to chase.
+    """
+    from django.core.cache import cache
+
+    cache.clear()
+    yield
+    cache.clear()
+
+
+@pytest.fixture(autouse=True)
 def english(settings):
     """Both halves are needed.
 

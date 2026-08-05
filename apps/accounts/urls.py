@@ -11,7 +11,7 @@ up at the project level instead (config/urls.py), where no namespace applies.
 
 from django.urls import path
 
-from apps.accounts import users, views
+from apps.accounts import sso_views, users, views
 
 app_name = "accounts"
 
@@ -29,4 +29,11 @@ urlpatterns = [
     path("users/<int:pk>/password/", users.user_password, name="user-password"),
     path("users/<int:pk>/delete/", users.user_delete, name="user-delete"),
     path("users/<int:pk>/active/", users.user_toggle_active, name="user-active"),
+
+    # The Synology connection. Superuser only — a narrower door than the pages
+    # above, because this one decides how everybody authenticates and holds the
+    # client secret.
+    path("sso/", sso_views.sso_settings, name="sso"),
+    path("sso/discover/", sso_views.sso_discover, name="sso-discover"),
+    path("sso/check/", sso_views.sso_check, name="sso-check"),
 ]

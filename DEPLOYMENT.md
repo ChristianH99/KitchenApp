@@ -91,22 +91,20 @@ certificate covering `kitchen.haeusslerr.de` (and the other hosts), then
 
 ## 3. The Synology SSO client
 
-### 3.1 Read the discovery document first
+**This section is done in two browser tabs and no text editor.** One half is a
+page in DSM, because Synology's SSO Server has no supported way to create an
+OIDC application except its own GUI. The other half is a page in *this* app —
+**Anmeldung** in the sidebar, superuser only — which is where the client ID, the
+secret, the endpoints and the on/off switch live. Nothing here needs `.env` or a
+container restart.
 
-Do not trust any endpoint URL written down anywhere, including in this app's
-`settings.py`. Synology has moved these between DSM versions. Fetch them:
+> The `OIDC_*` values in `.env` still work and are what the app reads until that
+> page has been saved once. After that the stored configuration is the whole
+> truth and the environment is ignored. Opening the page on a system configured
+> through `.env` shows those values already filled in, so migrating is: open,
+> check, save.
 
-```
-curl -s https://sso.haeusslerr.de/webman/sso/.well-known/openid-configuration | python -m json.tool
-```
-
-Write down `authorization_endpoint`, `token_endpoint`, `userinfo_endpoint` and
-`jwks_uri`. If that URL 404s, the SSO Server package's own **Service → OIDC**
-tab shows them. Put whatever you find into `.env`
-(`OIDC_OP_AUTHORIZATION_ENDPOINT` and friends); the defaults derived from
-`OIDC_OP_BASE` are a starting guess, not a promise.
-
-### 3.2 Create the application
+### 3.1 Create the application in DSM
 
 SSO Server → **OIDC** → Applications → Add:
 
@@ -118,9 +116,55 @@ SSO Server → **OIDC** → Applications → Add:
 The redirect URI must match **exactly**, trailing slash included. It is fixed by
 `config/urls.py`, where `mozilla_django_oidc.urls` is included un-namespaced —
 see the comment in `apps/accounts/urls.py` for why it cannot live under
-`/accounts/`.
+`/accounts/`. The app's own SSO page prints the exact string to paste, built
+from the address you reached it on; copy it from there rather than typing it.
 
-Copy the client ID and secret into `.env`.
+DSM then shows a **client ID** and a **client secret**. Those two go into the
+app's page, not into a file.
+
+### 3.2 Fill the app's page in, in the order that cannot lock you out
+
+Sidebar → **Anmeldung**. With the switch at the top still **off**:
+
+1. Enter the SSO server's address (`https://sso.haeusslerr.de`).
+2. Press **Endpunkte vom Server lesen**. It fetches the discovery document
+   *from inside the container* and fills the four endpoints in — the same
+   request as the old instruction to run
+   `curl -s .../webman/sso/.well-known/openid-configuration` by hand, with the
+   same caveat: **do not trust any endpoint URL written down anywhere**,
+   including this app's own derived defaults, because Synology has moved them
+   between DSM versions. If the fetch fails, the SSO Server package's
+   **Service → OIDC** tab shows them and every field can be typed in.
+3. Enter the client ID and secret from §3.1.
+4. Save, then press **Verbindung prüfen** — §3.3 is the failure that button
+   exists for.
+5. Only now tick **„Mit Synology anmelden“ anbieten** and save again.
+
+The switch refuses to go on while the configuration could not complete a login
+(no secret, no client ID, no resolvable endpoints, or RS256 with no JWKS
+address), because a sign-in button leading to the provider's error page reads as
+the provider being broken rather than as the app not being set up.
+
+The local password form stays reachable throughout, at
+`https://kitchen.haeusslerr.de/accounts/login/?local=1`.
+
+### 3.2.1 Where the secret ends up, and what that costs
+
+In the database, encrypted with a key derived from `DJANGO_SECRET_KEY` — which
+stays in the environment. So a copy of `db.sqlite3` on its own does not yield
+it, which matters because §6 backs that file up nightly to another share. A
+backup taken *together with* the environment does yield it, and anybody who can
+`docker exec` into the container has both and always did; encryption at rest is
+about the copies, not the original.
+
+Two consequences worth knowing before they surprise you:
+
+- **Change `DJANGO_SECRET_KEY` and the secret becomes unreadable.** The app says
+  so on the page and refuses to offer the sign-in button rather than failing
+  mid-login. Re-enter the secret; nothing else is lost.
+- **The secret is never sent back to a browser.** The field on the page is
+  write-only: blank means "keep what is stored", and removing it takes a
+  separate checkbox.
 
 ### 3.3 The trap that is not obvious: hairpin DNS
 
@@ -133,23 +177,28 @@ The symptom is a login that gets as far as the Synology page, accepts the
 password, returns to the app, and then fails with a connection error in the
 container log. Nothing about it points at DNS.
 
-Check it after the container is up:
+**Press „Verbindung prüfen“ on the SSO page.** That is this check, run from the
+right machine, and it is why the button exists: it asks the container — not your
+laptop — whether it can reach each configured address, and names the three
+causes that actually happen (name not resolvable, connection refused, timeout).
+Over SSH the same question is:
 
 ```
 docker exec kitchen curl -sI https://sso.haeusslerr.de/ | head -1
 ```
 
-If that hangs or fails, add a host alias so the container resolves the name to
-the NAS's LAN address — in `deploy/docker-compose.yml`:
+If it hangs or fails, add a host alias so the container resolves the name to the
+NAS's LAN address — in the compose file:
 
 ```yaml
     extra_hosts:
       - "sso.haeusslerr.de:192.168.1.10"     # the NAS's LAN address
 ```
 
-Only then does `OIDC_VERIFY_SSL=True` still work, because the certificate is for
-that hostname and the hostname is what is being requested. Do not "solve" this
-by turning verification off.
+Only then does certificate verification still work, because the certificate is
+for that hostname and the hostname is what is being requested. Do not "solve"
+this by turning verification off — the tick box on the SSO page exists for a
+private CA, not for making an error go away.
 
 ---
 
@@ -283,21 +332,19 @@ Deliberately in this order, because it is the order that cannot lock you out.
 
 2. Open `https://kitchen.haeusslerr.de/`, sign in locally, confirm the app works
    end to end — add a recipe, upload a photograph.
-3. Now set `OIDC_ENABLED=True` (and the client ID/secret) in `.env` and restart:
-
-   ```
-   sudo docker compose -f deploy/docker-compose.yml up -d
-   ```
-
-4. Sign out, then use **Sign in with Synology**. If it fails, the local login is
+3. Now do §3 — the DSM application, then the app's **Anmeldung** page. No
+   restart: the switch on that page is what turns SSO on, and it takes effect
+   on the next request.
+4. Sign out, then use **Mit Synology anmelden**. If it fails, the local login is
    still there at `https://kitchen.haeusslerr.de/accounts/login/?local=1` — which
    is the whole reason it exists.
 
-Optionally, once the DSM groups are settled: set `OIDC_ALLOWED_GROUPS` so only
-household members may sign in, and `OIDC_STAFF_GROUP` for Django admin access.
-Verify `OIDC_GROUPS_CLAIM` against a real token first — some DSM builds send no
-group claim at all, and the app refuses rather than falling open when a
-configured group requirement cannot be checked.
+Optionally, once the DSM groups are settled, on the same page: fill in
+**Erlaubte Gruppen** so only household members may sign in, and
+**Administrationsgruppe** for the right to manage people. Check the
+**Gruppen-Claim** against a real token first — some DSM builds send no group
+claim at all, and the app refuses rather than falling open when a configured
+group requirement cannot be checked.
 
 ---
 

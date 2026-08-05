@@ -15,6 +15,11 @@ dependencies = [
     # file really is an image before it is stored under MEDIA_ROOT.
     "pillow>=11.0",
     "tzlocal>=5.2",
+    # Encrypts the OIDC client secret at rest (apps/accounts/secrets.py). It
+    # arrives anyway as a dependency of mozilla-django-oidc, and is named here
+    # because this app imports it directly — a transitive dependency is one
+    # somebody else may drop in a minor release.
+    "cryptography>=42.0",
 ]
 
 [dependency-groups]

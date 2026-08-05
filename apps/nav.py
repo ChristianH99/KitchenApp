@@ -41,6 +41,7 @@ ITEMS = {
         for name in ("user-list", "user-add", "user-edit", "user-password",
                      "user-delete", "user-active")
     },
+    "sso": {("accounts", name) for name in ("sso", "sso-discover", "sso-check")},
 }
 
 # Parent entry -> the entries nested under it. A parent is a link too, but never

@@ -21,8 +21,6 @@ URLconf and refuses to let any ``accounts:user-*`` route answer an ordinary
 account.
 """
 
-from functools import wraps
-
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.models import User
@@ -36,23 +34,7 @@ from django.views.decorators.http import require_POST
 from apps.accounts.forms import (
     SetPasswordForm, UserCreateForm, UserEditForm, is_sso_account,
 )
-
-
-def staff_required(view):
-    """404, not 403, for an ordinary account.
-
-    The same choice the recipe edit view makes: a bare 403 is a dead end with
-    no way back into the app, while a 404 renders the app's own not-found page
-    — and there is nothing to conceal either way, since the link is only in the
-    sidebar for the people who may follow it.
-    """
-    @wraps(view)
-    def guarded(request, *args, **kwargs):
-        if not request.user.is_staff:
-            raise Http404
-        return view(request, *args, **kwargs)
-
-    return guarded
+from apps.accounts.permissions import staff_required
 
 
 @staff_required

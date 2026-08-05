@@ -24,14 +24,19 @@ version of this that survives a rename.
 
 import logging
 
-from django.conf import settings
 from django.core.exceptions import SuspiciousOperation
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
+from mozilla_django_oidc.views import (
+    OIDCAuthenticationCallbackView,
+    OIDCAuthenticationRequestView,
+)
+
+from apps.accounts import sso
 
 log = logging.getLogger(__name__)
 
 
-def _claim_groups(claims):
+def _claim_groups(claims, claim_name=None):
     """The group names in a token, however this DSM version spells them.
 
     Returns a set of strings. A provider that sends no group claim at all — and
@@ -39,7 +44,10 @@ def _claim_groups(claims):
     is why the caller treats "no groups" as "cannot satisfy a group
     requirement" rather than as "no requirement".
     """
-    raw = claims.get(settings.OIDC_GROUPS_CLAIM)
+    if claim_name is None:
+        configuration = sso.current()
+        claim_name = configuration.groups_claim if configuration else "groups"
+    raw = claims.get(claim_name)
     if raw is None:
         return set()
     if isinstance(raw, str):
@@ -70,6 +78,17 @@ def _display_name(claims):
 
 
 class SynologyOIDCBackend(OIDCAuthenticationBackend):
+    @staticmethod
+    def get_settings(attr, *args):
+        """Read the provider's details from the configuration, not from settings.
+
+        The library's own version is ``getattr(settings, attr)``, which is fixed
+        for the life of the process — and this app lets a superuser change the
+        client secret from a page. apps/accounts/sso.py answers for the handful
+        of names that are editable and passes everything else through.
+        """
+        return sso.get_setting(attr, *args)
+
     def filter_users_by_claims(self, claims):
         """Find the local row for this identity — by ``sub``, never by e-mail.
 
@@ -97,7 +116,8 @@ class SynologyOIDCBackend(OIDCAuthenticationBackend):
             log.warning("OIDC token carried no 'sub' claim; refusing the login")
             raise SuspiciousOperation("The identity provider returned no subject claim.")
 
-        allowed = set(settings.OIDC_ALLOWED_GROUPS)
+        configuration = sso.current()
+        allowed = set(configuration.allowed_group_list if configuration else [])
         if allowed:
             groups = _claim_groups(claims)
             if not groups & allowed:
@@ -135,10 +155,42 @@ class SynologyOIDCBackend(OIDCAuthenticationBackend):
     def _apply_claims(self, user, claims):
         user.email = (claims.get("email") or "")[:254]
         user.first_name, user.last_name = _display_name(claims)
-        staff_group = settings.OIDC_STAFF_GROUP
+        configuration = sso.current()
+        staff_group = configuration.staff_group if configuration else ""
         if staff_group:
             # Only managed when a group is configured. Otherwise a superuser
             # created by hand for the fallback login would be demoted by their
             # own first SSO sign-in.
             user.is_staff = staff_group in _claim_groups(claims)
         user.save()
+
+
+# ---------------------------------------------------------------------------
+# The two views that read the provider's details
+# ---------------------------------------------------------------------------
+#
+# Subclassed for one reason: the same `get_settings` override as the backend
+# above. They are wired in through the library's own `OIDC_AUTHENTICATE_CLASS`
+# and `OIDC_CALLBACK_CLASS` settings rather than by writing new URL patterns,
+# which keeps `mozilla_django_oidc.urls` in charge of the paths and the names —
+# and `/oidc/callback/` in particular is a string registered in the SSO server's
+# client configuration, so it is not ours to move.
+#
+# `OIDCLogoutView` is deliberately not subclassed: it reads only
+# LOGOUT_REDIRECT_URL and OIDC_OP_LOGOUT_URL_METHOD, neither of which is
+# editable here.
+
+class ConfiguredAuthenticationRequestView(OIDCAuthenticationRequestView):
+    """Starts the login. Note that the base class reads the authorisation
+    endpoint and client ID in ``__init__`` — which is per request, because
+    ``as_view()`` builds a new instance each time."""
+
+    @staticmethod
+    def get_settings(attr, *args):
+        return sso.get_setting(attr, *args)
+
+
+class ConfiguredAuthenticationCallbackView(OIDCAuthenticationCallbackView):
+    @staticmethod
+    def get_settings(attr, *args):
+        return sso.get_setting(attr, *args)
