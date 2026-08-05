@@ -198,6 +198,17 @@ visible from the code alone.
 - **`collectstatic` is a prerequisite of `pytest`**, not only of a deployment.
   A fresh checkout fails most of the suite with "Missing staticfiles manifest
   entry" until it has run once.
+- **A shell script's executable bit does not survive this machine.** Windows
+  sets `core.filemode=false`, so git never records it: `deploy/entrypoint.sh`
+  sat in the index as `100644` from the day it was written. Docker Desktop hides
+  it completely — it copies from NTFS and hands everything `0755`, so the image
+  builds and runs perfectly *here* and the identical commit built on Linux dies
+  with `exec: "/app/deploy/entrypoint.sh": permission denied`, exit 126, no
+  application log. **This is what the first CI run found**, and it is the exact
+  failure the pipeline was worth building for: the image that works locally was
+  not the image that ships. Fixed in git (`git update-index --chmod=+x`) and
+  again in the Dockerfile, which chmods it regardless of how the source arrived.
+  Check `git ls-files -s` before adding another script.
 - **GNU gettext is not on PATH** on the development machine. It ships with Git:
   `$env:PATH = "C:\Program Files\Git\usr\bin;$env:PATH"`.
 - **`makemessages` on Windows emits a malformed `#:` reference line** — a

@@ -78,6 +78,22 @@ COPY --from=builder /venv /venv
 WORKDIR /app
 COPY --chown=kitchen:kitchen . /app
 
+# The entrypoint has to be executable, and it cannot be assumed to arrive that
+# way. This repository is developed on Windows, where `core.filemode` is false
+# and git therefore never notices the bit — `deploy/entrypoint.sh` sat in the
+# index as 0644 for its whole life. Docker Desktop hides that completely: it
+# copies from an NTFS filesystem and hands everything 0755, so the image builds
+# and runs perfectly on the machine it was written on, and the *same commit*
+# built on Linux dies at start-up with
+#
+#     exec: "/app/deploy/entrypoint.sh": permission denied
+#
+# which is an exit code 126 and no application log at all. The mode is fixed in
+# git as well; this line is here so that a checkout which loses it again — any
+# Windows clone, a zip download, a `COPY` from a context that flattens modes —
+# still produces an image that starts.
+RUN chmod +x /app/deploy/entrypoint.sh
+
 # Both of these are *build* steps, not start-up steps, and doing them here is
 # deliberate:
 #
