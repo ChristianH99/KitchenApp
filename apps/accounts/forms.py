@@ -233,6 +233,7 @@ class SSOConfigurationForm(forms.ModelForm):
             "authorization_endpoint", "token_endpoint", "user_endpoint", "jwks_endpoint",
             "client_id", "sign_algo", "scopes",
             "allowed_groups", "groups_claim", "staff_group", "verify_ssl",
+            "request_timeout",
         ]
 
     def clean(self):
@@ -274,10 +275,18 @@ class SSOConfigurationForm(forms.ModelForm):
                 # RS256 verifies the token against the provider's published key,
                 # and without somewhere to fetch it the exchange fails with a
                 # signature error that reads like a wrong secret.
-                self.add_error("jwks_endpoint", _(
+                #
+                # The error goes on `op_base`, not on `jwks_endpoint`, and that
+                # placement is the point: the JWKS field lives inside a closed
+                # disclosure now, and an error on a control nobody can see is a
+                # Save that does nothing for no stated reason. The address is
+                # the field somebody would actually act on — discovery is what
+                # fills the JWKS in, so a bad address is the real fault.
+                self.add_error("op_base", _(
                     "RS256 verifies the token against the provider’s key, so the JWKS "
-                    "address is needed. Use “Read the endpoints from the server”, or "
-                    "choose HS256, which signs with the client secret instead."
+                    "address is needed and could not be read from this server. Check the "
+                    "address, fill the endpoints in by hand below, or choose HS256, which "
+                    "signs with the client secret instead."
                 ))
         return data
 

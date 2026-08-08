@@ -77,6 +77,8 @@ Everything below was observed working, not merely written.
 | **A timer finer than a minute** | Minutes and seconds are two boxes either side of a colon on the step card, and one attribute — `data-cook-seconds` — carries the total to the cooking view. Read back off the real page: 3600 and 2700 for the two Zwetschgenkuchen timers, and no `data-cook-minutes` anywhere. `seed_demo` now has one 45 s step, for the same reason it has one 1,5 kg ingredient |
 | The recipe page shows its ingredients once | Read back from the DOM: one `.ingredient-list` on the page, in the Preparing panel; the Cooking panel carries each line under the step that consumes it |
 | The cooking view | Walked Kartoffelsalat step by step in the browser: the current cell and its four ingredient rows light up, earlier steps go green, the stopwatch runs, "Fertig" opens the finish panel with the measured minutes filled in |
+| **v0.2.0 running on the DS723+** | The first install on the real NAS, 2026-08-08. The image came down, the container started, `→ applying migrations` completed and the process stayed up — on the hardware, not on Docker Desktop. Everything past the container itself (proxy, certificate, sign-in, SSO) is still §2 |
+| **The bind mount, and the ACL that defeats the documented `chown`** | Found by a crash loop: 17 restarts, exit 1, `sqlite3.OperationalError: unable to open database file` about 2.7 s after `→ applying migrations` — presenting as a crash *a minute in* because of the restart backoff. The cause was `/volume1/docker` being an ACL-enabled share: `everyone` is `r-x`, there is no owner entry, so `chown -R 1000:1000` reported success and granted nothing. Two tells, both read off the running system: a `+` on `drwxrwxrwx+`, and the host reporting mode 777 while the container saw the same directory as 555. `user: "1026:101"` in the compose file fixes it — 101 is `administrators`, and gid 100 (`users`) does not work. DEPLOYMENT.md §4.1 was rewritten around this |
 | Creating a local account | Typed into the real People form; account created, password usable |
 | No sideways scroll at 390px | Measured, not eyeballed: the recipe page was 508px wide inside a 390px column before `min-width: 0` and is exactly 390px after it, with the diagram scrolling inside its own box. The form and the cooking view were measured the same way |
 | German UI | `lang="de"`, sidebar and headings in German, catalogs compiled and loaded; every new string translated |
@@ -128,15 +130,25 @@ the NAS.
   so far has run against an empty or development database. The first update that
   carries a schema change to a `/data` with the household's real collection in
   it is the one to take a copy before — see DEPLOYMENT.md §7.
-- **An *update* of a running container.** v0.2.0 now exists and was built,
-  published and attached (§1), but nothing has been installed from it.
-  Replacing a running container with a newer image — the path in §7, including
-  whether the version in the sidebar actually changes — has still not been
-  done, because v0.1.0 was never put anywhere either.
-- **Anything on the DS723+ itself.** Everything below §1's container rows was
-  observed on the development machine with Docker Desktop, not on the NAS: the
-  bind mount at `/volume1/docker/kitchen/data`, the uid-1000 ownership rule, the
-  reverse proxy, the certificate, DSM's Container Manager.
+- **An *update* of a running container.** v0.2.0 is now installed and running on
+  the DS723+ (§1), but it went onto an empty folder — it was the first thing
+  ever put there. Replacing a *running* container with a newer image — the path
+  in §7, including whether the version in the sidebar actually changes — has
+  still not been done.
+- **Most of the DS723+, still.** v0.2.0 now starts on the NAS and its bind mount
+  works (§1), so the container half of this is no longer a guess. Everything
+  around it is: the reverse proxy rule and its two custom headers, the
+  certificate, DSM's Container Manager as opposed to `docker compose` over SSH,
+  and the app being reached over `https://kitchen.haeusslerr.de` at all rather
+  than on `127.0.0.1:8000`. Nobody has signed in on that machine yet.
+- **The uid-1000 ownership rule turned out to be wrong on this NAS, and the
+  correction is only tested one way round.** `/volume1/docker` is an
+  ACL-enabled share whose ACL has no owner entry, so `chown -R 1000:1000`
+  succeeds and grants nothing — see DEPLOYMENT.md §4.1. What works here is
+  `user: "1026:101"` in the compose file. The documented alternative in that
+  section (widening the `everyone` entry with `synoacltool -replace` and leaving
+  the container at uid 1000) is written from the same ACL dump and has **not**
+  been run.
 - **The OIDC flow has never touched a real Synology SSO Server.** The claim
   handling is unit-tested by handing the backend dictionaries — which is the
   only way to test the DSM version that omits the group claim — but no browser

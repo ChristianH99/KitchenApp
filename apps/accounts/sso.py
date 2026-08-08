@@ -102,6 +102,10 @@ def get_setting(attr, *args):
             "OIDC_OP_USER_ENDPOINT": endpoints["user"],
             "OIDC_OP_JWKS_ENDPOINT": endpoints["jwks"],
             "OIDC_VERIFY_SSL": configuration.verify_ssl,
+            # The library passes this to every `requests` call it makes. Left
+            # unset it is None, which means *no timeout* — see the field's
+            # comment in models.py for what that costs when a provider hangs.
+            "OIDC_TIMEOUT": configuration.request_timeout or None,
         }
         if attr in answers:
             return answers[attr]

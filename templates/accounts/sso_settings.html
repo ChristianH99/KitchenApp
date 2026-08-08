@@ -11,20 +11,44 @@
 
 {% block content %}
   <h1>{% translate "Signing in through SSO" %}</h1>
-  <p class="page-lead">{% translate "Everything this app needs in order to hand sign-in over to an OpenID Connect provider. The other half — registering this app as a client on the provider itself — is done there, and the address below is what it has to be told." %}</p>
+  <p class="page-lead">{% translate "Setting this up is three steps and two of them are on the provider. Work down this page in order." %}</p>
 
   {% comment %}The callback is fixed by config/urls.py and has to be registered
-  in the SSO server byte for byte, trailing slash included. Shown first because
-  it is the value people go and fetch from this page, and mistyping it produces
-  a login loop with no error message anywhere.{% endcomment %}
+  in the SSO server byte for byte, trailing slash included. It is first on the
+  page because it is first in time: the provider asks for it *before* it will
+  issue a client ID and secret, so anybody who has to save this page to find it
+  has already been sent away to fetch something they could not get. Mistyping it
+  produces a login loop with no error message anywhere.{% endcomment %}
   <div class="callback-box">
-    <span class="callback-label">{% translate "Redirect URI to register with the provider" %}</span>
-    <code class="callback-url">{{ callback_url }}</code>
-    <span class="help">{% translate "Must match exactly, trailing slash included." %}</span>
+    <span class="callback-label">{% translate "Step 1 — give the provider this redirect URI" %}</span>
+    <code class="callback-url" id="callback-url">{{ callback_url }}</code>
+    <button type="button" class="button button--secondary button--small"
+            data-copy-target="callback-url">{% translate "Copy" %}</button>
+    <span class="help">{% translate "Register this as the redirect URI (some providers call it callback or reply URL). It must match exactly, trailing slash included. The provider then gives you a client ID and a secret for step 2." %}</span>
+    {% if callback_is_derived %}
+      <p class="callback-note">{% blocktranslate with browsing=callback_from_request %}This is built from the app’s configured public address, not from the address you are on now ({{ browsing }}) — that one is only reachable inside the house, and a provider cannot send a browser back to it.{% endblocktranslate %}</p>
+    {% endif %}
   </div>
 
   {% if from_environment %}
-    <p class="notice">{% translate "Nothing has been saved here yet, so these are the values from the container’s environment. Saving this page moves the configuration into the database, and the environment is ignored from then on." %}</p>
+    <p class="notice">{% translate "This page has never been saved, so what you see below is what the container’s environment configured. Nothing is wrong — it is a starting point. The first save copies it into the database, and from then on this page is the only thing that decides how sign-in works." %}</p>
+  {% endif %}
+
+  {% comment %}Every error in one place at the top. The fields these belong to
+  can be inside a closed disclosure, and an error on a control nobody can see
+  is a Save that appears to do nothing — which is exactly how this page was
+  reported.{% endcomment %}
+  {% if form.errors %}
+    <div class="notice notice--error">
+      <p><strong>{% translate "Nothing was saved. Fix these first:" %}</strong></p>
+      <ul class="error-summary">
+        {% for field in form %}
+          {% for error in field.errors %}
+            <li><a href="#{{ field.id_for_label }}">{{ field.label }}</a>: {{ error }}</li>
+          {% endfor %}
+        {% endfor %}
+      </ul>
+    </div>
   {% endif %}
 
   {% if configuration.has_client_secret and not configuration.secret_is_readable %}
@@ -71,41 +95,67 @@
     <span class="help">{{ form.enabled.help_text }}</span>
     <span class="field-error">{{ form.enabled.errors|striptags }}</span>
 
-    <h2 class="form-section">{% translate "The SSO server" %}</h2>
+    <h2 class="form-section">{% translate "Step 2 — the SSO server" %}</h2>
     <p>
       <label for="{{ form.op_base.id_for_label }}">{% translate "Address" %}</label>
       {{ form.op_base }}
       <span class="help">{{ form.op_base.help_text }}</span>
       <span class="field-error">{{ form.op_base.errors|striptags }}</span>
     </p>
+    <p class="help">{% translate "This is the only address you should have to type. Saving reads the provider’s discovery document and fills the four endpoints in from it — do not copy them from documentation, because providers move them between versions." %}</p>
 
-    <p class="help">{% translate "Do not trust any endpoint address written down anywhere, including this app’s own defaults — providers move them between versions. Read them off the discovery document instead:" %}</p>
-
-    <div class="form-grid">
-      <p>
-        <label for="{{ form.authorization_endpoint.id_for_label }}">{% translate "Authorisation endpoint" %}</label>
-        {{ form.authorization_endpoint }}
-        <span class="field-error">{{ form.authorization_endpoint.errors|striptags }}</span>
-      </p>
-      <p>
-        <label for="{{ form.token_endpoint.id_for_label }}">{% translate "Token endpoint" %}</label>
-        {{ form.token_endpoint }}
-        <span class="field-error">{{ form.token_endpoint.errors|striptags }}</span>
-      </p>
-      <p>
-        <label for="{{ form.user_endpoint.id_for_label }}">{% translate "User info endpoint" %}</label>
-        {{ form.user_endpoint }}
-        <span class="field-error">{{ form.user_endpoint.errors|striptags }}</span>
-      </p>
-      <p>
-        <label for="{{ form.jwks_endpoint.id_for_label }}">{% translate "JWKS endpoint" %}</label>
-        {{ form.jwks_endpoint }}
-        <span class="field-error">{{ form.jwks_endpoint.errors|striptags }}</span>
+    {% comment %}Read-only, because they are an answer rather than a question:
+    what the server said when it was last asked. The editable versions are in
+    the disclosure below, for a provider that publishes no discovery document.
+    {% endcomment %}
+    <div class="endpoint-readout">
+      {% for label, url in endpoint_rows %}
+        <div class="endpoint{% if not url %} endpoint--missing{% endif %}">
+          <span class="endpoint-mark" aria-hidden="true">{% if url %}✓{% else %}—{% endif %}</span>
+          <span class="endpoint-label">{{ label }}</span>
+          <code class="endpoint-url">{% if url %}{{ url }}{% else %}{% translate "not set" %}{% endif %}</code>
+        </div>
+      {% endfor %}
+      <p class="endpoint-provenance">
+        {% if endpoints_read_at %}
+          {% blocktranslate with when=endpoints_read_at %}Read from the server on {{ when }}.{% endblocktranslate %}
+        {% elif endpoints_overridden %}
+          {% translate "Entered by hand." %}
+        {% else %}
+          {% translate "Not read from the server yet — these are guesses from the address above. Press Save to read the real ones." %}
+        {% endif %}
       </p>
     </div>
-    <p class="hint">{% blocktranslate with url=configuration.discovery_url %}Blank fields are derived from the address above. Discovery document: {{ url }}{% endblocktranslate %}</p>
 
-    <h2 class="form-section">{% translate "The registered client" %}</h2>
+    <details class="endpoint-override"{% if endpoints_overridden and not endpoints_read_at %} open{% endif %}>
+      <summary>{% translate "Enter the endpoints by hand instead" %}</summary>
+      <p class="help">{% translate "For a provider that publishes no discovery document. Anything filled in here wins over what the server says, and is left alone on save unless the address above changes." %}</p>
+      <div class="form-grid">
+        <p>
+          <label for="{{ form.authorization_endpoint.id_for_label }}">{% translate "Authorisation endpoint" %}</label>
+          {{ form.authorization_endpoint }}
+          <span class="field-error">{{ form.authorization_endpoint.errors|striptags }}</span>
+        </p>
+        <p>
+          <label for="{{ form.token_endpoint.id_for_label }}">{% translate "Token endpoint" %}</label>
+          {{ form.token_endpoint }}
+          <span class="field-error">{{ form.token_endpoint.errors|striptags }}</span>
+        </p>
+        <p>
+          <label for="{{ form.user_endpoint.id_for_label }}">{% translate "User info endpoint" %}</label>
+          {{ form.user_endpoint }}
+          <span class="field-error">{{ form.user_endpoint.errors|striptags }}</span>
+        </p>
+        <p>
+          <label for="{{ form.jwks_endpoint.id_for_label }}">{% translate "JWKS endpoint" %}</label>
+          {{ form.jwks_endpoint }}
+          <span class="field-error">{{ form.jwks_endpoint.errors|striptags }}</span>
+        </p>
+      </div>
+    </details>
+
+    <h2 class="form-section">{% translate "Step 3 — the client the provider issued" %}</h2>
+    <p class="help">{% translate "Both of these come from the provider, after you gave it the redirect URI at the top." %}</p>
     <div class="form-grid">
       <p>
         <label for="{{ form.client_id.id_for_label }}">{% translate "Client ID" %}</label>
@@ -138,6 +188,12 @@
         <label for="{{ form.scopes.id_for_label }}">{% translate "Scopes" %}</label>
         {{ form.scopes }}
         <span class="help">{{ form.scopes.help_text }}</span>
+      </p>
+      <p>
+        <label for="{{ form.request_timeout.id_for_label }}">{% translate "Request timeout" %}</label>
+        {{ form.request_timeout }}
+        <span class="help">{{ form.request_timeout.help_text }}</span>
+        <span class="field-error">{{ form.request_timeout.errors|striptags }}</span>
       </p>
     </div>
 
@@ -193,8 +249,12 @@
       <button type="button" class="modal-close" data-help-close aria-label="{% translate 'Close' %}">&times;</button>
       <h2 class="modal-title" id="help-title">{% translate "Setting up single sign-on" %}</h2>
       <div class="modal-body">
-        <h3>{% translate "On the provider, once" %}</h3>
-        <p>{% translate "Register this app as a new OpenID Connect client. Give it a name and paste the redirect URI from the top of this page in as it is written, trailing slash included. The provider then shows a client ID and a client secret; those two go in the form here." %}</p>
+        <h3>{% translate "The order the three steps happen in" %}</h3>
+        <p>{% translate "The redirect URI comes first because the provider asks for it before it will issue anything: you register this app there, give it that address, and it hands back a client ID and a secret. Those two come back here for step 3. Nothing on this page has to be saved before you can copy the redirect URI — it is at the top on every visit." %}</p>
+        <h3>{% translate "Why there is only one address to type" %}</h3>
+        <p>{% translate "Saving asks the provider for its discovery document and reads the authorisation, token, user info and JWKS addresses out of it. You can paste either the issuer or the full …/.well-known/openid-configuration address — both are understood. The endpoints are shown afterwards with the date they were read, and there is a disclosure below them for a provider that publishes no discovery document at all." %}</p>
+        <h3>{% translate "If a save seems to do nothing" %}</h3>
+        <p>{% translate "It did not save, and the reason is listed in red at the top of the page. Every error is collected there and links to the field it belongs to, including fields inside the closed sections — an error on a box you cannot see is the one case where a page looks like it is ignoring you." %}</p>
         <h3>{% translate "The order that cannot lock you out" %}</h3>
         <p>{% translate "Fill everything in with the switch at the top still off, save, press “Check the connection”, and only then switch it on. The local password form stays available either way — it is at /accounts/login/?local=1 even when the single sign-on button is the only thing on the page." %}</p>
         <h3>{% translate "If the login reaches the provider and then fails" %}</h3>

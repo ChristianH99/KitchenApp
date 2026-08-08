@@ -206,15 +206,87 @@ private CA, not for making an error go away.
 
 ### 4.1 Prepare the data folder
 
-File Station → create `docker/kitchen/data`. Then over SSH:
+File Station → create `docker/kitchen/data`. Everything the app writes lives
+here — the database, the photographs, the logs — so that an image update
+replaces the code and leaves the collection alone.
+
+The container runs as uid 1000, so that folder has to be writable by uid 1000.
+Over SSH:
 
 ```
 sudo chown -R 1000:1000 /volume1/docker/kitchen/data
 ```
 
-1000:1000 is the container's user. Everything the app writes lives here — the
-database, the photographs, the logs — so that an image update replaces the code
-and leaves the collection alone.
+**On this NAS that is not enough, and the way it fails is the problem.** Check
+before believing it:
+
+```
+ls -land /volume1/docker/kitchen/data
+```
+
+A `+` on the permission string (`drwxrwxrwx+`) means the share has a Synology
+ACL, and the ACL — not the POSIX bits — is what is enforced. `chown` then
+reports success, `ls` shows the new owner, and the container still cannot write.
+`/volume1/docker` is ACL-enabled as DSM creates it:
+
+```
+$ sudo synoacltool -get /volume1/docker/kitchen/data
+[0] group:administrators:allow:rwxpdDaARWc--:fd--
+[1] user:ContainerManager:allow:rwxpdDaARWc--:fd--
+[2] everyone::allow:r-x---a-R-c--:fd--
+```
+
+There is **no owner entry**, so changing the owner grants nothing at all: uid
+1000 has no DSM identity and matches only `everyone`, which is `r-x`. The second
+tell is that the host reports mode 777 while the container sees the same
+directory as 555 — nothing but the ACL layer produces that discrepancy.
+
+What this looks like if you skip the check: the container comes up, prints
+`→ applying migrations`, and dies about three seconds later with
+`sqlite3.OperationalError: unable to open database file` — and because
+`restart: unless-stopped` backs off between attempts, it presents as a crash
+roughly a minute in rather than immediately. §9 has the symptom row.
+
+**The fix used here** — run the container as an identity the ACL already grants,
+rather than trying to make the ACL grant uid 1000. In `docker-compose.yml`,
+inside the `kitchen:` service:
+
+```yaml
+    user: "1026:101"
+```
+
+1026 is the DSM user that owns the folder (`Christian`); **101 is
+`administrators`, and that is the half that matters** — gid 100 (`users`)
+matches only the `everyone` entry. Confirm both against this machine with
+`grep -E '^(administrators|users):' /etc/group`, then put the ownership back to
+match:
+
+```
+sudo chown -R 1026:100 /volume1/docker/kitchen/data
+```
+
+Test any of this without waiting on the restart loop — a throwaway container
+with the same mount and the same user answers in a second:
+
+```
+sudo docker run --rm -u 1026:101 \
+  -v /volume1/docker/kitchen/data:/data \
+  --entrypoint sh ghcr.io/christianh99/kitchenapp:<version> \
+  -c 'id; ls -land /data; touch /data/.wtest && echo WRITABLE && rm /data/.wtest || echo NOT-WRITABLE'
+```
+
+That `user:` line is a **local edit to a file that ships with every release**.
+Carry it across when you edit the version line for an update (§7), and re-add it
+if you ever download a fresh `docker-compose.yml` from a release page. Losing it
+fails loudly — straight back to this error — which is why it is preferred here
+over the alternative: widening the ACL's `everyone` entry to `rwx` with
+`synoacltool -replace` and leaving the container at uid 1000. That keeps the
+compose file stock at the cost of giving every DSM account write on the
+household's recipes and photographs, which they can already read.
+
+The gid only affects file permissions on this one bind mount. The container has
+no DSM API and nothing else mounted, so it is not DSM administrator in any sense
+that reaches beyond `/data`.
 
 ### 4.2 Configure
 
@@ -456,6 +528,8 @@ there.
 | `DisallowedHost` on every request | `DJANGO_ALLOWED_HOSTS` does not include the hostname the proxy forwards. |
 | Every page renders unstyled | `collectstatic` did not run — check the build log, not the run log. |
 | Container restarts every ten seconds | Read `docker logs`; a missing `DJANGO_SECRET_KEY` raises at import with a sentence saying so. |
+| Restart loop, `unable to open database file` after `→ applying migrations` | `/data` is not writable by the container's user. On an ACL-enabled share `chown` succeeds and changes nothing — §4.1, including the `+` tell and the `user:` line that fixes it. |
+| No way to sign in on a fresh install | There are no default credentials. `docker exec -it kitchen python manage.py createsuperuser` — §5. |
 | Signature error during the token exchange | Try `OIDC_RP_SIGN_ALGO=HS256`; older DSM builds sign with the client secret rather than RS256, and then no JWKS endpoint is needed. |
 | Nobody can sign in via SSO after a DSM update | Re-read the discovery document (§3.1) — the endpoints may have moved. The local login (`?local=1`) still works. |
 

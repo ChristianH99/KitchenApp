@@ -7,6 +7,8 @@ matter: the DSM version that omits the group claim, the account that was
 renamed, the token with no subject.
 """
 
+import re
+
 import pytest
 from django.contrib.auth.models import User
 from django.core.cache import cache
@@ -560,7 +562,7 @@ def _sso_post(**overrides):
         "client_id": "kitchen", "client_secret": "",
         "sign_algo": "RS256", "scopes": "openid profile email",
         "allowed_groups": "", "groups_claim": "groups", "staff_group": "",
-        "verify_ssl": "on",
+        "verify_ssl": "on", "request_timeout": "10",
     }
     data.update(overrides)
     return data
@@ -755,6 +757,185 @@ class TestTheSSOPage:
     def test_checking_with_nothing_configured_says_so(self, superuser_client, db):
         response = superuser_client.post(reverse("accounts:sso-check"), follow=True)
         assert response.status_code == 200
+
+
+class TestTheRedirectURIIsAvailableBeforeAnythingElse:
+    """It is the *first* thing the provider asks for — before it will issue a
+    client ID and secret — so it has to be right on a page that has never been
+    saved, reached over the LAN, on the very first visit."""
+
+    def test_it_is_there_before_the_page_has_ever_been_saved(self, superuser_client, db):
+        assert not SSOConfiguration.objects.exists()
+        body = superuser_client.get(reverse("accounts:sso")).content.decode()
+        assert "/oidc/callback/" in body
+
+    def test_it_is_the_public_address_not_the_one_being_browsed(
+        self, superuser_client, settings, db,
+    ):
+        """The normal first visit is over http://<nas>:8000, because the
+        reverse proxy is the step after this one. Handing somebody that address
+        to register produces DEPLOYMENT.md §2's silent redirect loop."""
+        settings.ALLOWED_HOSTS = ["kitchen.example.org", "192.168.1.10"]
+        settings.CSRF_TRUSTED_ORIGINS = ["https://kitchen.example.org"]
+
+        body = superuser_client.get(
+            reverse("accounts:sso"), headers={"host": "192.168.1.10:8000"},
+        ).content.decode()
+
+        # The value to copy, specifically — the LAN address does appear on the
+        # page, in the sentence explaining why it is not the one being offered.
+        offered = re.search(r'id="callback-url">([^<]+)<', body).group(1)
+        assert offered == "https://kitchen.example.org/oidc/callback/"
+        assert "192.168.1.10:8000" in body
+
+    def test_a_public_https_request_is_taken_at_its_word(
+        self, superuser_client, settings, db,
+    ):
+        settings.ALLOWED_HOSTS = ["kitchen.example.org"]
+        response = superuser_client.get(
+            reverse("accounts:sso"), secure=True,
+            headers={"host": "kitchen.example.org"},
+        )
+        assert "https://kitchen.example.org/oidc/callback/" in response.content.decode()
+
+
+class TestTheOnlyAddressToTypeIsTheServer:
+    """The four endpoints are an answer, not four questions. Saving reads them
+    off the discovery document."""
+
+    def test_an_issuer_and_a_discovery_url_mean_the_same_thing(self):
+        plain = SSOConfiguration(op_base="https://sso.example.org")
+        full = SSOConfiguration(
+            op_base="https://sso.example.org/.well-known/openid-configuration",
+        )
+        assert plain.issuer == full.issuer == "https://sso.example.org"
+
+    def test_a_discovery_url_is_taken_at_its_word(self):
+        """Nothing is guessed on top of an address that is already one."""
+        url = "https://sso.example.org/custom/.well-known/openid-configuration"
+        assert SSOConfiguration(op_base=url).discovery_candidates() == [url]
+
+    def test_the_standard_location_is_tried_before_synologys(self):
+        candidates = SSOConfiguration(op_base="https://sso.example.org").discovery_candidates()
+        assert candidates == [
+            "https://sso.example.org/.well-known/openid-configuration",
+            "https://sso.example.org/webman/sso/.well-known/openid-configuration",
+        ]
+
+    def test_saving_reads_the_endpoints_off_the_server(
+        self, superuser_client, discovery_document, db,
+    ):
+        discovery_document({
+            "https://sso.example.org/.well-known/openid-configuration": {
+                "authorization_endpoint": "https://sso.example.org/oauth2/authorize",
+                "token_endpoint": "https://sso.example.org/oauth2/token",
+                "userinfo_endpoint": "https://sso.example.org/userinfo",
+                "jwks_uri": "https://sso.example.org/jwks.json",
+            },
+        })
+        superuser_client.post(reverse("accounts:sso"), _sso_post(
+            client_secret="s3cr3t", jwks_endpoint="",
+        ))
+        saved = SSOConfiguration.objects.get(pk=1)
+        assert saved.token_endpoint == "https://sso.example.org/oauth2/token"
+        assert saved.jwks_endpoint == "https://sso.example.org/jwks.json"
+        assert saved.endpoints_read_at is not None
+
+    def test_rs256_is_satisfied_by_what_discovery_found(
+        self, superuser_client, discovery_document, db,
+    ):
+        """The reported bug. Enabling SSO with only an address, an ID and a
+        secret was refused because the JWKS box was empty — a box nobody was
+        asked to fill in, whose error appeared on a control inside a closed
+        section. Discovery runs before validation now, so the rule is applied
+        to what the server said."""
+        discovery_document({
+            "https://sso.example.org/.well-known/openid-configuration": {
+                "authorization_endpoint": "https://sso.example.org/oauth2/authorize",
+                "token_endpoint": "https://sso.example.org/oauth2/token",
+                "jwks_uri": "https://sso.example.org/jwks.json",
+            },
+        })
+        superuser_client.post(reverse("accounts:sso"), _sso_post(
+            client_secret="s3cr3t", jwks_endpoint="",
+        ))
+        assert SSOConfiguration.objects.filter(pk=1, enabled=True).exists()
+
+    def test_the_synology_location_is_reached_when_the_standard_one_is_not(
+        self, superuser_client, discovery_document, db,
+    ):
+        discovery_document({
+            "https://sso.example.org/webman/sso/.well-known/openid-configuration": {
+                "authorization_endpoint": "https://sso.example.org/webman/sso/SSOOauth.cgi",
+                "token_endpoint": "https://sso.example.org/webman/sso/SSOAccessToken.cgi",
+                "jwks_uri": "https://sso.example.org/webman/sso/jwks",
+            },
+        })
+        superuser_client.post(reverse("accounts:sso"), _sso_post(
+            client_secret="s3cr3t", jwks_endpoint="",
+        ))
+        saved = SSOConfiguration.objects.get(pk=1)
+        assert saved.token_endpoint.endswith("SSOAccessToken.cgi")
+
+    def test_a_typed_override_survives_a_save(
+        self, superuser_client, discovery_document, db,
+    ):
+        """An override that discovery overwrote would be an override in name
+        only. Only a *changed* server address re-reads them."""
+        configured_sso(token_endpoint="https://sso.example.org/typed-by-hand")
+        discovery_document({
+            "https://sso.example.org/.well-known/openid-configuration": {
+                "authorization_endpoint": "https://sso.example.org/oauth2/authorize",
+                "token_endpoint": "https://sso.example.org/oauth2/token",
+                "jwks_uri": "https://sso.example.org/jwks.json",
+            },
+        })
+        superuser_client.post(reverse("accounts:sso"), _sso_post(
+            client_secret="s3cr3t",
+            token_endpoint="https://sso.example.org/typed-by-hand",
+            authorization_endpoint="https://sso.example.org/typed-authorize",
+        ))
+        assert SSOConfiguration.objects.get(pk=1).token_endpoint.endswith("typed-by-hand")
+
+    def test_a_new_server_address_discards_the_old_endpoints(
+        self, superuser_client, discovery_document, db,
+    ):
+        """Endpoints belonging to the *previous* provider are worse than none:
+        they resolve, they answer, and they authenticate against the wrong
+        directory."""
+        configured_sso(token_endpoint="https://old.example.org/token")
+        discovery_document({
+            "https://new.example.org/.well-known/openid-configuration": {
+                "authorization_endpoint": "https://new.example.org/authorize",
+                "token_endpoint": "https://new.example.org/token",
+                "jwks_uri": "https://new.example.org/jwks",
+            },
+        })
+        superuser_client.post(reverse("accounts:sso"), _sso_post(
+            client_secret="s3cr3t", op_base="https://new.example.org",
+            token_endpoint="https://old.example.org/token",
+        ))
+        assert SSOConfiguration.objects.get(pk=1).token_endpoint == "https://new.example.org/token"
+
+    def test_an_unreachable_provider_still_saves_and_says_so(
+        self, superuser_client, db,
+    ):
+        """A save that is thrown away because the provider is down loses
+        everything typed, including the client secret — which then has to be
+        fetched from DSM again."""
+        superuser_client.post(reverse("accounts:sso"), _sso_post(
+            enabled="", client_secret="s3cr3t", jwks_endpoint="",
+        ))
+        assert SSOConfiguration.objects.filter(pk=1).exists()
+
+
+class TestTheTimeoutReachesTheLibrary:
+    def test_it_is_answered_from_the_stored_row(self, db):
+        """Unset, `requests` waits forever: a provider that accepts the
+        connection and goes quiet holds a gunicorn worker until its own
+        60-second limit, and two of those take the app down."""
+        configured_sso(request_timeout=7)
+        assert sso.get_setting("OIDC_TIMEOUT") == 7
 
 
 class TestTheGroupRulesFollowTheConfiguration:

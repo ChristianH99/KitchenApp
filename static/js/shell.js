@@ -416,3 +416,57 @@ window.modalController = function modalController(modal, options) {
     }
   });
 })();
+
+/**
+ * Copy a value to the clipboard.
+ *
+ * Generic, and in shell.js rather than in a page script, because it is one
+ * behaviour with no page-specific knowledge and putting it here means no
+ * template has to grow a <script> tag to get it — see
+ * config/tests.py::test_no_page_loads_a_script_without_what_it_reaches_for.
+ *
+ * The value that needs this most is the OIDC redirect URI, which has to be
+ * registered with the provider byte for byte: mistyping it produces a login
+ * loop with no error message anywhere, and it is long enough that selecting it
+ * by hand on a phone is where the mistake gets made.
+ *
+ * `writeText` needs a secure context, which the app is not while somebody is
+ * setting it up over http://<nas>:8000. So the fallback is a real one, not a
+ * courtesy: select the text so a plain Ctrl-C works.
+ */
+(function () {
+  const buttons = document.querySelectorAll("[data-copy-target]");
+  if (!buttons.length) return;
+
+  function select(node) {
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  buttons.forEach((button) => {
+    const original = button.textContent;
+    button.addEventListener("click", () => {
+      const source = document.getElementById(button.dataset.copyTarget);
+      if (!source) return;
+      const text = source.textContent.trim();
+
+      const done = (message) => {
+        button.textContent = message;
+        window.setTimeout(() => { button.textContent = original; }, 2000);
+      };
+
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(
+          () => done(gettext("Copied")),
+          () => { select(source); done(gettext("Press Ctrl-C")); },
+        );
+        return;
+      }
+      select(source);
+      done(gettext("Press Ctrl-C"));
+    });
+  });
+})();

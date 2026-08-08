@@ -2,12 +2,12 @@
 # Copyright (C) 2026
 # This file is distributed under the same licence as the kitchenapp package.
 # Maintained alongside the source strings; see README.md.
-# 
+#
 msgid ""
 msgstr ""
 "Project-Id-Version: kitchenapp 0.1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-08 16:31+0200\n"
+"POT-Creation-Date: 2026-08-08 21:12+0200\n"
 "PO-Revision-Date: 2026-08-05 12:00+0200\n"
 "Last-Translator: KitchenApp\n"
 "Language-Team: German\n"
@@ -56,7 +56,7 @@ msgstr "Das Administrationsrecht lässt sich dem eigenen Konto nicht entziehen."
 msgid "This is the last active administrator. Give somebody else the right first."
 msgstr "Das ist die letzte aktive Administration. Erst jemand anderem das Recht geben."
 
-#: .\apps\accounts\forms.py:221 .\templates\accounts\sso_settings.html:118
+#: .\apps\accounts\forms.py:221 .\templates\accounts\sso_settings.html:170
 msgid "Client secret"
 msgstr "Client-Secret"
 
@@ -68,198 +68,246 @@ msgstr "Leer lassen, um das bereits gespeicherte zu behalten."
 msgid "Remove the stored secret"
 msgstr "Gespeichertes Secret entfernen"
 
-#: .\apps\accounts\forms.py:249
+#: .\apps\accounts\forms.py:250
 msgid "A client secret is needed before Synology sign-in can be switched on."
 msgstr "Ohne Client-Secret lässt sich die Synology-Anmeldung nicht einschalten."
 
-#: .\apps\accounts\forms.py:253
+#: .\apps\accounts\forms.py:254
 msgid "A client ID is needed before Synology sign-in can be switched on."
 msgstr "Ohne Client-ID lässt sich die Synology-Anmeldung nicht einschalten."
 
-#: .\apps\accounts\forms.py:267
+#: .\apps\accounts\forms.py:268
 msgid "Give the SSO server’s address, or fill the authorisation and token endpoints in by hand."
 msgstr "Die Adresse des SSO-Servers eintragen — oder Autorisierungs- und Token-Endpunkt von Hand ausfüllen."
 
-#: .\apps\accounts\forms.py:278
-msgid "RS256 verifies the token against the provider’s key, so the JWKS address is needed. Use “Read the endpoints from the server”, or choose HS256, which signs with the client secret instead."
-msgstr "RS256 prüft das Token gegen den Schlüssel des Anbieters, dafür wird die JWKS-Adresse gebraucht. Entweder „Endpunkte vom Server lesen“ benutzen oder HS256 wählen — das signiert stattdessen mit dem Client-Secret."
+#: .\apps\accounts\forms.py:286
+msgid "RS256 verifies the token against the provider’s key, so the JWKS address is needed and could not be read from this server. Check the address, fill the endpoints in by hand below, or choose HS256, which signs with the client secret instead."
+msgstr "RS256 prüft das Token gegen den Schlüssel des Anbieters, dafür wird die JWKS-Adresse gebraucht — und die konnte von diesem Server nicht gelesen werden. Prüfe die Adresse, trage die Endpunkte unten von Hand ein, oder wähle HS256 — das signiert stattdessen mit dem Client-Secret."
 
-#: .\apps\accounts\models.py:42
+#: .\apps\accounts\models.py:49
 msgid "RS256 — signed with the provider’s key (needs the JWKS endpoint)"
 msgstr "RS256 — mit dem Schlüssel des Anbieters signiert (braucht den JWKS-Endpunkt)"
 
-#: .\apps\accounts\models.py:43
+#: .\apps\accounts\models.py:50
 msgid "HS256 — signed with the client secret (no key fetch)"
 msgstr "HS256 — mit dem Client-Secret signiert (kein Schlüsselabruf nötig)"
 
-#: .\apps\accounts\models.py:59
+#: .\apps\accounts\models.py:66
 msgid "offer single sign-on"
 msgstr "Single Sign-on anbieten"
 
-#: .\apps\accounts\models.py:60
+#: .\apps\accounts\models.py:67
 msgid "With this off, the local password form is the only way in."
 msgstr "Ist das aus, führt nur das lokale Passwortformular hinein."
 
-#: .\apps\accounts\models.py:67 .\apps\accounts\sso_views.py:146
+#: .\apps\accounts\models.py:80 .\apps\accounts\sso_views.py:325
 msgid "SSO server"
 msgstr "SSO-Server"
 
-#: .\apps\accounts\models.py:68
-msgid "e.g. https://sso.example.org — the four addresses below are derived from it."
-msgstr "z. B. https://sso.example.org — die vier Adressen darunter werden daraus abgeleitet."
+#: .\apps\accounts\models.py:82
+msgid "The issuer, e.g. https://sso.example.org — or paste the full …/.well-known/openid-configuration address if that is what your provider gives you."
+msgstr "Der Issuer, z. B. https://sso.example.org — oder füge die vollständige Adresse auf …/.well-known/openid-configuration ein, falls der Anbieter dir diese nennt."
 
-#: .\apps\accounts\models.py:70 .\apps\accounts\sso_views.py:147
+#: .\apps\accounts\models.py:86 .\apps\accounts\sso_views.py:326
 msgid "authorisation endpoint"
 msgstr "Autorisierungs-Endpunkt"
 
-#: .\apps\accounts\models.py:71 .\apps\accounts\sso_views.py:148
+#: .\apps\accounts\models.py:87 .\apps\accounts\sso_views.py:327
 msgid "token endpoint"
 msgstr "Token-Endpunkt"
 
-#: .\apps\accounts\models.py:72
+#: .\apps\accounts\models.py:88
 msgid "user info endpoint"
 msgstr "Benutzerinfo-Endpunkt"
 
-#: .\apps\accounts\models.py:73 .\apps\accounts\sso_views.py:149
-#: .\templates\accounts\sso_settings.html:103
+#: .\apps\accounts\models.py:89 .\apps\accounts\sso_views.py:328
+#: .\templates\accounts\sso_settings.html:154
 msgid "JWKS endpoint"
 msgstr "JWKS-Endpunkt"
 
-#: .\apps\accounts\models.py:75
+#: .\apps\accounts\models.py:97
 msgid "client ID"
 msgstr "Client-ID"
 
-#: .\apps\accounts\models.py:80
+#: .\apps\accounts\models.py:102
 msgid "signature algorithm"
 msgstr "Signaturverfahren"
 
-#: .\apps\accounts\models.py:84
+#: .\apps\accounts\models.py:106
 msgid "scopes"
 msgstr "Scopes"
 
-#: .\apps\accounts\models.py:85
+#: .\apps\accounts\models.py:107
 msgid "Separated by spaces."
 msgstr "Durch Leerzeichen getrennt."
 
-#: .\apps\accounts\models.py:89
+#: .\apps\accounts\models.py:111
 msgid "allowed groups"
 msgstr "erlaubte Gruppen"
 
-#: .\apps\accounts\models.py:90
+#: .\apps\accounts\models.py:112
 msgid "Separated by commas. Empty means anybody the SSO server authenticates."
 msgstr "Durch Kommas getrennt. Leer heißt: jede und jeder, den der SSO-Server anmeldet."
 
-#: .\apps\accounts\models.py:93
+#: .\apps\accounts\models.py:115
 msgid "group claim"
 msgstr "Gruppen-Claim"
 
-#: .\apps\accounts\models.py:94
+#: .\apps\accounts\models.py:116
 msgid "The claim the group names arrive in. Some providers send none at all."
 msgstr "Der Claim, in dem die Gruppennamen ankommen. Manche Anbieter senden gar keinen."
 
-#: .\apps\accounts\models.py:97
+#: .\apps\accounts\models.py:119
 msgid "administrator group"
 msgstr "Administrationsgruppe"
 
-#: .\apps\accounts\models.py:98
+#: .\apps\accounts\models.py:120
 msgid "Members of this group may manage people. Re-applied at every sign-in."
 msgstr "Mitglieder dieser Gruppe dürfen Personen verwalten. Wird bei jeder Anmeldung neu übernommen."
 
-#: .\apps\accounts\models.py:102
+#: .\apps\accounts\models.py:124
 msgid "verify the certificate"
 msgstr "Zertifikat prüfen"
 
-#: .\apps\accounts\models.py:103
+#: .\apps\accounts\models.py:125
 msgid "Leave on. Verification is the whole point of putting the SSO server behind a real certificate."
 msgstr "Angelassen lassen. Die Prüfung ist der ganze Sinn eines echten Zertifikats vor dem SSO-Server."
 
-#: .\apps\accounts\models.py:113 .\apps\accounts\models.py:114
+#: .\apps\accounts\models.py:135
+msgid "request timeout"
+msgstr "Zeitlimit für Anfragen"
+
+#: .\apps\accounts\models.py:136
+msgid "Seconds to wait for the provider before giving up."
+msgstr "Sekunden, die auf den Anbieter gewartet wird, bevor abgebrochen wird."
+
+#: .\apps\accounts\models.py:146 .\apps\accounts\models.py:147
 msgid "SSO configuration"
 msgstr "SSO-Konfiguration"
 
-#: .\apps\accounts\models.py:260
+#: .\apps\accounts\models.py:328
 msgid "chime — two soft notes"
 msgstr "Glockenspiel — zwei weiche Töne"
 
-#: .\apps\accounts\models.py:261
+#: .\apps\accounts\models.py:329
 msgid "bell — one long ring"
 msgstr "Glocke — ein langer Ton"
 
-#: .\apps\accounts\models.py:262
+#: .\apps\accounts\models.py:330
 msgid "beeps — three short tones"
 msgstr "Piepen — drei kurze Töne"
 
-#: .\apps\accounts\models.py:263
+#: .\apps\accounts\models.py:331
 msgid "alarm — insistent, for a noisy kitchen"
 msgstr "Alarm — aufdringlich, für eine laute Küche"
 
-#: .\apps\accounts\models.py:264
+#: .\apps\accounts\models.py:332
 msgid "no sound"
 msgstr "kein Ton"
 
-#: .\apps\accounts\models.py:284
+#: .\apps\accounts\models.py:352
 msgid "timer sound"
 msgstr "Timerton"
 
-#: .\apps\accounts\models.py:286
+#: .\apps\accounts\models.py:354
 msgid "Played when a step’s timer reaches nought."
 msgstr "Wird abgespielt, wenn der Timer eines Schritts bei null ankommt."
 
-#: .\apps\accounts\models.py:290 .\apps\accounts\models.py:291
+#: .\apps\accounts\models.py:358 .\apps\accounts\models.py:359
 msgid "preferences"
 msgstr "Einstellungen"
 
-#: .\apps\accounts\sso_views.py:67
+#: .\apps\accounts\sso_views.py:96
+#, python-format
+msgid "Saved, but the endpoints could not be read from %(url)s: %(error)s. Fill them in by hand under “Enter the endpoints by hand”."
+msgstr "Gespeichert, aber die Endpunkte konnten nicht von %(url)s gelesen werden: %(error)s. Trage sie unter „Endpunkte von Hand eintragen“ selbst ein."
+
+#: .\apps\accounts\sso_views.py:101
+#, python-format
+msgid "Saved, and the endpoints were read from %(url)s."
+msgstr "Gespeichert, und die Endpunkte wurden von %(url)s gelesen."
+
+#: .\apps\accounts\sso_views.py:104
 msgid "The SSO settings were saved."
 msgstr "Die SSO-Einstellungen wurden gespeichert."
 
-#: .\apps\accounts\sso_views.py:103
-msgid "Fill in the SSO server’s address first."
-msgstr "Zuerst die Adresse des SSO-Servers eintragen."
+#: .\apps\accounts\sso_views.py:111
+#, python-format
+msgid "The endpoints could not be read from %(url)s: %(error)s"
+msgstr "Die Endpunkte konnten nicht von %(url)s gelesen werden: %(error)s"
 
-#: .\apps\accounts\sso_views.py:109
+#: .\apps\accounts\sso_views.py:188
+msgid "Authorisation"
+msgstr "Autorisierung"
+
+#: .\apps\accounts\sso_views.py:189
+msgid "Token"
+msgstr "Token"
+
+#: .\apps\accounts\sso_views.py:190
+msgid "User info"
+msgstr "Benutzerinfo"
+
+#: .\apps\accounts\sso_views.py:191
+msgid "JWKS"
+msgstr "JWKS"
+
+#: .\apps\accounts\sso_views.py:224
+msgid "there is no SSO server address to look at"
+msgstr "es ist keine Adresse des SSO-Servers hinterlegt"
+
+#: .\apps\accounts\sso_views.py:235
+msgid "it answered, but with nothing that looks like a discovery document"
+msgstr "es hat geantwortet, aber nicht mit etwas, das nach einem Discovery-Dokument aussieht"
+
+#: .\apps\accounts\sso_views.py:300
 #, python-format
 msgid "Could not read the discovery document from %(url)s: %(error)s"
 msgstr "Das Discovery-Dokument unter %(url)s ließ sich nicht lesen: %(error)s"
 
-#: .\apps\accounts\sso_views.py:121
-msgid "That address answered, but with nothing that looks like a discovery document."
-msgstr "Diese Adresse hat geantwortet, aber nicht mit etwas, das nach einem Discovery-Dokument aussieht."
+#: .\apps\accounts\sso_views.py:301
+msgid "(nowhere — no address is set)"
+msgstr "(nirgends — es ist keine Adresse gesetzt)"
 
-#: .\apps\accounts\sso_views.py:132
-msgid "Read from the server. Check the four addresses below, then save."
-msgstr "Vom Server gelesen. Die vier Adressen unten prüfen und dann speichern."
+#: .\apps\accounts\sso_views.py:311
+#, python-format
+msgid "Read from %(url)s. Check the addresses below, then save."
+msgstr "Von %(url)s gelesen. Die Adressen unten prüfen und dann speichern."
 
-#: .\apps\accounts\sso_views.py:156
+#: .\apps\accounts\sso_views.py:335
 msgid "There is nothing configured to check yet."
 msgstr "Es ist noch nichts eingetragen, das sich prüfen ließe."
 
-#: .\apps\accounts\sso_views.py:206
+#: .\apps\accounts\sso_views.py:360 .\apps\accounts\sso_views.py:415
+msgid "the certificate was refused — wrong hostname, or an internal CA"
+msgstr "das Zertifikat wurde abgelehnt — falscher Hostname oder eine interne CA"
+
+#: .\apps\accounts\sso_views.py:371
+msgid "the response was not JSON"
+msgstr "die Antwort war kein JSON"
+
+#: .\apps\accounts\sso_views.py:381 .\apps\accounts\sso_views.py:419
+msgid "timed out. If a browser can reach this address but the container cannot, it is the router not sending internal traffic back to itself — DEPLOYMENT.md §3.3."
+msgstr "Zeitüberschreitung. Wenn ein Browser diese Adresse erreicht und der Container nicht, schickt der Router internen Verkehr nicht zu sich selbst zurück — DEPLOYMENT.md §3.3."
+
+#: .\apps\accounts\sso_views.py:387 .\apps\accounts\sso_views.py:427
+msgid "the name could not be resolved from inside the container"
+msgstr "der Name ließ sich aus dem Container heraus nicht auflösen"
+
+#: .\apps\accounts\sso_views.py:389 .\apps\accounts\sso_views.py:429
+msgid "the connection was refused — nothing is listening on that port"
+msgstr "die Verbindung wurde abgewiesen — auf diesem Port hört nichts zu"
+
+#: .\apps\accounts\sso_views.py:390 .\apps\accounts\sso_views.py:430
+msgid "no connection could be made"
+msgstr "es kam keine Verbindung zustande"
+
+#: .\apps\accounts\sso_views.py:412
 #, python-format
 msgid "answered, HTTP %(code)s"
 msgstr "hat geantwortet, HTTP %(code)s"
 
-#: .\apps\accounts\sso_views.py:209
-msgid "the certificate was refused — wrong hostname, or an internal CA"
-msgstr "das Zertifikat wurde abgelehnt — falscher Hostname oder eine interne CA"
-
-#: .\apps\accounts\sso_views.py:213
-msgid "timed out. If a browser can reach this address but the container cannot, it is the router not sending internal traffic back to itself — DEPLOYMENT.md §3.3."
-msgstr "Zeitüberschreitung. Wenn ein Browser diese Adresse erreicht und der Container nicht, schickt der Router internen Verkehr nicht zu sich selbst zurück — DEPLOYMENT.md §3.3."
-
-#: .\apps\accounts\sso_views.py:221
-msgid "the name could not be resolved from inside the container"
-msgstr "der Name ließ sich aus dem Container heraus nicht auflösen"
-
-#: .\apps\accounts\sso_views.py:223
-msgid "the connection was refused — nothing is listening on that port"
-msgstr "die Verbindung wurde abgewiesen — auf diesem Port hört nichts zu"
-
-#: .\apps\accounts\sso_views.py:224
-msgid "no connection could be made"
-msgstr "es kam keine Verbindung zustande"
-
-#: .\apps\accounts\sso_views.py:227
+#: .\apps\accounts\sso_views.py:433
 msgid "the request failed"
 msgstr "die Anfrage ist fehlgeschlagen"
 
@@ -1155,7 +1203,7 @@ msgstr "Meine Einstellungen"
 
 #: .\templates\accounts\preferences.html:7
 #: .\templates\accounts\preferences.html:43
-#: .\templates\accounts\sso_settings.html:171
+#: .\templates\accounts\sso_settings.html:229
 #: .\templates\pantry\ingredient_form.html:12
 #: .\templates\pantry\ingredient_form.html:133
 #: .\templates\recipes\cook_log_form.html:8
@@ -1201,115 +1249,156 @@ msgid "Signing in through SSO"
 msgstr "Anmeldung über SSO"
 
 #: .\templates\accounts\sso_settings.html:14
-msgid "Everything this app needs in order to hand sign-in over to an OpenID Connect provider. The other half — registering this app as a client on the provider itself — is done there, and the address below is what it has to be told."
-msgstr "Alles, was diese App braucht, um die Anmeldung an einen OpenID-Connect-Anbieter zu übergeben. Die andere Hälfte — diese App dort als Client zu registrieren — passiert beim Anbieter, und die Adresse unten ist das, was er erfahren muss."
-
-#: .\templates\accounts\sso_settings.html:22
-msgid "Redirect URI to register with the provider"
-msgstr "Redirect-URI, die beim Anbieter zu hinterlegen ist"
+msgid "Setting this up is three steps and two of them are on the provider. Work down this page in order."
+msgstr "Die Einrichtung sind drei Schritte, zwei davon beim Anbieter. Arbeite diese Seite von oben nach unten durch."
 
 #: .\templates\accounts\sso_settings.html:24
-msgid "Must match exactly, trailing slash included."
-msgstr "Muss exakt übereinstimmen, abschließender Schrägstrich inbegriffen."
+msgid "Step 1 — give the provider this redirect URI"
+msgstr "Schritt 1 — dem Anbieter diese Weiterleitungs-URI geben"
+
+#: .\templates\accounts\sso_settings.html:27
+msgid "Copy"
+msgstr "Kopieren"
 
 #: .\templates\accounts\sso_settings.html:28
-msgid "Nothing has been saved here yet, so these are the values from the container’s environment. Saving this page moves the configuration into the database, and the environment is ignored from then on."
-msgstr "Hier wurde noch nichts gespeichert — das sind also die Werte aus der Umgebung des Containers. Mit dem Speichern dieser Seite wandert die Konfiguration in die Datenbank, und die Umgebung wird von da an ignoriert."
+msgid "Register this as the redirect URI (some providers call it callback or reply URL). It must match exactly, trailing slash included. The provider then gives you a client ID and a secret for step 2."
+msgstr "Trage dies beim Anbieter als Weiterleitungs-URI ein (manche nennen es Callback- oder Reply-URL). Sie muss exakt übereinstimmen, mit abschließendem Schrägstrich. Der Anbieter gibt dir daraufhin eine Client-ID und ein Geheimnis für Schritt 2."
 
-#: .\templates\accounts\sso_settings.html:32
+#: .\templates\accounts\sso_settings.html:30
+#, python-format
+msgid "This is built from the app’s configured public address, not from the address you are on now (%(browsing)s) — that one is only reachable inside the house, and a provider cannot send a browser back to it."
+msgstr "Diese Adresse stammt aus der konfigurierten öffentlichen Adresse der App, nicht aus der Adresse, auf der du gerade bist (%(browsing)s) — die ist nur im Haus erreichbar, und ein Anbieter kann keinen Browser dorthin zurückschicken."
+
+#: .\templates\accounts\sso_settings.html:35
+msgid "This page has never been saved, so what you see below is what the container’s environment configured. Nothing is wrong — it is a starting point. The first save copies it into the database, and from then on this page is the only thing that decides how sign-in works."
+msgstr "Diese Seite wurde noch nie gespeichert; was unten steht, kommt daher aus der Umgebung des Containers. Das ist kein Fehler, sondern ein Ausgangspunkt. Das erste Speichern übernimmt es in die Datenbank, und von da an entscheidet allein diese Seite, wie die Anmeldung funktioniert."
+
+#: .\templates\accounts\sso_settings.html:45
+msgid "Nothing was saved. Fix these first:"
+msgstr "Es wurde nichts gespeichert. Behebe zuerst das hier:"
+
+#: .\templates\accounts\sso_settings.html:57
 msgid "The stored client secret cannot be read any more. That happens when DJANGO_SECRET_KEY changes — the secret is encrypted with a key derived from it. Enter the secret again below."
 msgstr "Das gespeicherte Client-Secret lässt sich nicht mehr lesen. Das passiert, wenn sich DJANGO_SECRET_KEY ändert — das Secret ist mit einem daraus abgeleiteten Schlüssel verschlüsselt. Bitte unten noch einmal eintragen."
 
-#: .\templates\accounts\sso_settings.html:36
+#: .\templates\accounts\sso_settings.html:61
 msgid "One of the addresses below is plain http. The client secret and the tokens would cross the network unencrypted. This is only reasonable on a LAN you trust."
 msgstr "Eine der Adressen unten ist einfaches http. Client-Secret und Tokens gingen dann unverschlüsselt über das Netz. Das ist nur in einem LAN vertretbar, dem man traut."
 
-#: .\templates\accounts\sso_settings.html:45
+#: .\templates\accounts\sso_settings.html:70
 msgid "What this container can reach"
 msgstr "Was dieser Container erreicht"
 
-#: .\templates\accounts\sso_settings.html:58
+#: .\templates\accounts\sso_settings.html:83
 msgid "Any HTTP answer counts as reachable — a 404 still proves the network path and the certificate work. Whether the address is the right one is what “Read the endpoints from the server” is for."
 msgstr "Jede HTTP-Antwort zählt als erreichbar — auch eine 404 belegt, dass Netzweg und Zertifikat funktionieren. Ob die Adresse die richtige ist, beantwortet „Endpunkte vom Server lesen“."
 
-#: .\templates\accounts\sso_settings.html:71
+#: .\templates\accounts\sso_settings.html:96
 msgid "Offer the single sign-on button"
 msgstr "Die Single-Sign-on-Schaltfläche anbieten"
 
-#: .\templates\accounts\sso_settings.html:76
-msgid "The SSO server"
-msgstr "Der SSO-Server"
+#: .\templates\accounts\sso_settings.html:101
+msgid "Step 2 — the SSO server"
+msgstr "Schritt 2 — der SSO-Server"
 
-#: .\templates\accounts\sso_settings.html:78
+#: .\templates\accounts\sso_settings.html:103
 msgid "Address"
 msgstr "Adresse"
 
-#: .\templates\accounts\sso_settings.html:84
-msgid "Do not trust any endpoint address written down anywhere, including this app’s own defaults — providers move them between versions. Read them off the discovery document instead:"
-msgstr "Vertraue keiner irgendwo notierten Endpunkt-Adresse, auch nicht den Vorgaben dieser App — Anbieter verschieben sie zwischen Versionen. Lies sie stattdessen aus dem Discovery-Dokument ab:"
+#: .\templates\accounts\sso_settings.html:108
+msgid "This is the only address you should have to type. Saving reads the provider’s discovery document and fills the four endpoints in from it — do not copy them from documentation, because providers move them between versions."
+msgstr "Das ist die einzige Adresse, die du eintragen musst. Beim Speichern wird das Discovery-Dokument des Anbieters gelesen und die vier Endpunkte werden daraus gefüllt — übernimm sie nicht aus einer Dokumentation, denn Anbieter verschieben sie zwischen Versionen."
 
-#: .\templates\accounts\sso_settings.html:88
+#: .\templates\accounts\sso_settings.html:120
+msgid "not set"
+msgstr "nicht gesetzt"
+
+#: .\templates\accounts\sso_settings.html:125
+#, python-format
+msgid "Read from the server on %(when)s."
+msgstr "Am %(when)s vom Server gelesen."
+
+#: .\templates\accounts\sso_settings.html:127
+msgid "Entered by hand."
+msgstr "Von Hand eingetragen."
+
+#: .\templates\accounts\sso_settings.html:129
+msgid "Not read from the server yet — these are guesses from the address above. Press Save to read the real ones."
+msgstr "Noch nicht vom Server gelesen — das hier sind Vermutungen aus der Adresse oben. Zum Lesen der echten Adressen auf Speichern drücken."
+
+#: .\templates\accounts\sso_settings.html:135
+msgid "Enter the endpoints by hand instead"
+msgstr "Endpunkte stattdessen von Hand eintragen"
+
+#: .\templates\accounts\sso_settings.html:136
+msgid "For a provider that publishes no discovery document. Anything filled in here wins over what the server says, and is left alone on save unless the address above changes."
+msgstr "Für einen Anbieter, der kein Discovery-Dokument veröffentlicht. Was hier eingetragen ist, hat Vorrang vor dem, was der Server sagt, und bleibt beim Speichern unangetastet — es sei denn, die Adresse oben ändert sich."
+
+#: .\templates\accounts\sso_settings.html:139
 msgid "Authorisation endpoint"
 msgstr "Autorisierungs-Endpunkt"
 
-#: .\templates\accounts\sso_settings.html:93
+#: .\templates\accounts\sso_settings.html:144
 msgid "Token endpoint"
 msgstr "Token-Endpunkt"
 
-#: .\templates\accounts\sso_settings.html:98
+#: .\templates\accounts\sso_settings.html:149
 msgid "User info endpoint"
 msgstr "Benutzerinfo-Endpunkt"
 
-#: .\templates\accounts\sso_settings.html:108
-#, python-format
-msgid "Blank fields are derived from the address above. Discovery document: %(url)s"
-msgstr "Leere Felder werden aus der Adresse oben abgeleitet. Discovery-Dokument: %(url)s"
+#: .\templates\accounts\sso_settings.html:161
+msgid "Step 3 — the client the provider issued"
+msgstr "Schritt 3 — der Client, den der Anbieter ausgestellt hat"
 
-#: .\templates\accounts\sso_settings.html:110
-msgid "The registered client"
-msgstr "Der registrierte Client"
+#: .\templates\accounts\sso_settings.html:162
+msgid "Both of these come from the provider, after you gave it the redirect URI at the top."
+msgstr "Beides kommt vom Anbieter, nachdem du ihm die Weiterleitungs-URI von oben gegeben hast."
 
-#: .\templates\accounts\sso_settings.html:113
+#: .\templates\accounts\sso_settings.html:165
 msgid "Client ID"
 msgstr "Client-ID"
 
-#: .\templates\accounts\sso_settings.html:121
+#: .\templates\accounts\sso_settings.html:173
 msgid "A secret is stored. Leave empty to keep it."
 msgstr "Ein Secret ist gespeichert. Leer lassen, um es zu behalten."
 
-#: .\templates\accounts\sso_settings.html:121
+#: .\templates\accounts\sso_settings.html:173
 msgid "Nothing stored yet."
 msgstr "Noch nichts gespeichert."
 
-#: .\templates\accounts\sso_settings.html:135
+#: .\templates\accounts\sso_settings.html:187
 msgid "Signature algorithm"
 msgstr "Signaturverfahren"
 
-#: .\templates\accounts\sso_settings.html:140
+#: .\templates\accounts\sso_settings.html:192
 msgid "Scopes"
 msgstr "Scopes"
 
-#: .\templates\accounts\sso_settings.html:146
+#: .\templates\accounts\sso_settings.html:197
+msgid "Request timeout"
+msgstr "Zeitlimit für Anfragen"
+
+#: .\templates\accounts\sso_settings.html:204
 msgid "Who may sign in"
 msgstr "Wer sich anmelden darf"
 
-#: .\templates\accounts\sso_settings.html:148
+#: .\templates\accounts\sso_settings.html:206
 msgid "Allowed groups"
 msgstr "Erlaubte Gruppen"
 
-#: .\templates\accounts\sso_settings.html:154
+#: .\templates\accounts\sso_settings.html:212
 msgid "Group claim"
 msgstr "Gruppen-Claim"
 
-#: .\templates\accounts\sso_settings.html:159
+#: .\templates\accounts\sso_settings.html:217
 msgid "Administrator group"
 msgstr "Administrationsgruppe"
 
-#: .\templates\accounts\sso_settings.html:166
+#: .\templates\accounts\sso_settings.html:224
 msgid "Verify the SSO server’s certificate"
 msgstr "Zertifikat des SSO-Servers prüfen"
 
-#: .\templates\accounts\sso_settings.html:172
+#: .\templates\accounts\sso_settings.html:230
 #: .\templates\accounts\user_form.html:95
 #: .\templates\accounts\user_password.html:31 .\templates\base.html:192
 #: .\templates\base.html:208 .\templates\pantry\ingredient_form.html:134
@@ -1318,58 +1407,74 @@ msgstr "Zertifikat des SSO-Servers prüfen"
 msgid "Cancel"
 msgstr "Abbrechen"
 
-#: .\templates\accounts\sso_settings.html:183
+#: .\templates\accounts\sso_settings.html:241
 msgid "Read the endpoints from the server"
 msgstr "Endpunkte vom Server lesen"
 
-#: .\templates\accounts\sso_settings.html:187
+#: .\templates\accounts\sso_settings.html:245
 msgid "Check the connection"
 msgstr "Verbindung prüfen"
 
-#: .\templates\accounts\sso_settings.html:190
+#: .\templates\accounts\sso_settings.html:248
 msgid "Both read what is currently saved, not what is typed above — save first."
 msgstr "Beide lesen den gespeicherten Stand, nicht das oben Eingetippte — also erst speichern."
 
-#: .\templates\accounts\sso_settings.html:196
+#: .\templates\accounts\sso_settings.html:254
 #: .\templates\accounts\user_list.html:109
 #: .\templates\pantry\pantry_list.html:126
 #: .\templates\recipes\recipe_form.html:233
 msgid "Close"
 msgstr "Schließen"
 
-#: .\templates\accounts\sso_settings.html:197
+#: .\templates\accounts\sso_settings.html:255
 msgid "Setting up single sign-on"
 msgstr "Single Sign-on einrichten"
 
-#: .\templates\accounts\sso_settings.html:199
-msgid "On the provider, once"
-msgstr "Einmalig beim Anbieter"
+#: .\templates\accounts\sso_settings.html:257
+msgid "The order the three steps happen in"
+msgstr "Die Reihenfolge der drei Schritte"
 
-#: .\templates\accounts\sso_settings.html:200
-msgid "Register this app as a new OpenID Connect client. Give it a name and paste the redirect URI from the top of this page in as it is written, trailing slash included. The provider then shows a client ID and a client secret; those two go in the form here."
-msgstr "Registriere diese App als neuen OpenID-Connect-Client. Gib ihr einen Namen und füge die Redirect-URI vom Anfang dieser Seite genau so ein, wie sie dort steht, mit abschließendem Schrägstrich. Der Anbieter zeigt daraufhin eine Client-ID und ein Client-Secret; diese beiden gehören in das Formular hier."
+#: .\templates\accounts\sso_settings.html:258
+msgid "The redirect URI comes first because the provider asks for it before it will issue anything: you register this app there, give it that address, and it hands back a client ID and a secret. Those two come back here for step 3. Nothing on this page has to be saved before you can copy the redirect URI — it is at the top on every visit."
+msgstr "Die Weiterleitungs-URI kommt zuerst, weil der Anbieter danach fragt, bevor er überhaupt etwas ausstellt: Du registrierst diese App dort, gibst ihm diese Adresse, und er gibt dir eine Client-ID und ein Geheimnis zurück. Diese beiden kommen für Schritt 3 hierher. Auf dieser Seite muss nichts gespeichert sein, bevor du die Weiterleitungs-URI kopieren kannst — sie steht bei jedem Aufruf ganz oben."
 
-#: .\templates\accounts\sso_settings.html:201
+#: .\templates\accounts\sso_settings.html:259
+msgid "Why there is only one address to type"
+msgstr "Warum nur eine einzige Adresse einzutragen ist"
+
+#: .\templates\accounts\sso_settings.html:260
+msgid "Saving asks the provider for its discovery document and reads the authorisation, token, user info and JWKS addresses out of it. You can paste either the issuer or the full …/.well-known/openid-configuration address — both are understood. The endpoints are shown afterwards with the date they were read, and there is a disclosure below them for a provider that publishes no discovery document at all."
+msgstr "Beim Speichern wird das Discovery-Dokument des Anbieters abgerufen und die Adressen für Autorisierung, Token, Benutzerinfo und JWKS werden daraus gelesen. Du kannst entweder den Issuer oder die vollständige …/.well-known/openid-configuration-Adresse einfügen — beides wird verstanden. Die Endpunkte stehen danach mit dem Datum da, an dem sie gelesen wurden, und darunter gibt es einen aufklappbaren Bereich für einen Anbieter, der überhaupt kein Discovery-Dokument veröffentlicht."
+
+#: .\templates\accounts\sso_settings.html:261
+msgid "If a save seems to do nothing"
+msgstr "Wenn das Speichern nichts zu bewirken scheint"
+
+#: .\templates\accounts\sso_settings.html:262
+msgid "It did not save, and the reason is listed in red at the top of the page. Every error is collected there and links to the field it belongs to, including fields inside the closed sections — an error on a box you cannot see is the one case where a page looks like it is ignoring you."
+msgstr "Dann wurde nicht gespeichert, und der Grund steht rot oben auf der Seite. Dort sind alle Fehler gesammelt und mit dem Feld verlinkt, zu dem sie gehören — auch mit Feldern in zugeklappten Bereichen. Ein Fehler an einem Feld, das man nicht sehen kann, ist der eine Fall, in dem eine Seite wirkt, als würde sie einen ignorieren."
+
+#: .\templates\accounts\sso_settings.html:263
 msgid "The order that cannot lock you out"
 msgstr "Die Reihenfolge, die niemanden aussperrt"
 
-#: .\templates\accounts\sso_settings.html:202
+#: .\templates\accounts\sso_settings.html:264
 msgid "Fill everything in with the switch at the top still off, save, press “Check the connection”, and only then switch it on. The local password form stays available either way — it is at /accounts/login/?local=1 even when the single sign-on button is the only thing on the page."
 msgstr "Trage alles ein, während der Schalter oben noch aus ist, speichere, drücke „Verbindung prüfen“ und schalte ihn erst dann ein. Das lokale Passwortformular bleibt so oder so erreichbar — unter /accounts/login/?local=1, auch wenn die Single-Sign-on-Schaltfläche das Einzige auf der Seite ist."
 
-#: .\templates\accounts\sso_settings.html:203
+#: .\templates\accounts\sso_settings.html:265
 msgid "If the login reaches the provider and then fails"
 msgstr "Wenn die Anmeldung beim Anbieter ankommt und dann scheitert"
 
-#: .\templates\accounts\sso_settings.html:204
+#: .\templates\accounts\sso_settings.html:266
 msgid "That is almost always the container being unable to reach the SSO server itself, which it has to do for the token exchange. “Check the connection” asks that question from inside the container. If the browser can reach the server and this cannot, it is your router not sending internal traffic back to itself."
 msgstr "Das liegt fast immer daran, dass der Container den SSO-Server selbst nicht erreicht — was er für den Token-Austausch tun muss. „Verbindung prüfen“ stellt genau diese Frage aus dem Container heraus. Wenn der Browser den Server erreicht und dies hier nicht, schickt der Router internen Verkehr nicht zu sich selbst zurück."
 
-#: .\templates\accounts\sso_settings.html:205
+#: .\templates\accounts\sso_settings.html:267
 msgid "Where the secret is kept"
 msgstr "Wo das Secret liegt"
 
-#: .\templates\accounts\sso_settings.html:206
+#: .\templates\accounts\sso_settings.html:268
 msgid "In the database, encrypted with a key derived from DJANGO_SECRET_KEY — so a copy of the database alone does not reveal it, but a backup taken together with the environment does. Change DJANGO_SECRET_KEY and the secret has to be entered again."
 msgstr "In der Datenbank, verschlüsselt mit einem aus DJANGO_SECRET_KEY abgeleiteten Schlüssel — eine Kopie der Datenbank allein gibt es also nicht preis, ein Backup zusammen mit der Umgebung schon. Ändert sich DJANGO_SECRET_KEY, muss das Secret neu eingetragen werden."
 
@@ -2672,3 +2777,34 @@ msgstr "Tags erscheinen hier, sobald Rezepte welche tragen. „Suppe“, „vege
 #: .\templates\recipes\tag_list.html:35
 msgid "Go to the recipes"
 msgstr "Zu den Rezepten"
+
+#~ msgid "e.g. https://sso.example.org — the four addresses below are derived from it."
+#~ msgstr "z. B. https://sso.example.org — die vier Adressen darunter werden daraus abgeleitet."
+
+#~ msgid "Fill in the SSO server’s address first."
+#~ msgstr "Zuerst die Adresse des SSO-Servers eintragen."
+
+#~ msgid "Everything this app needs in order to hand sign-in over to an OpenID Connect provider. The other half — registering this app as a client on the provider itself — is done there, and the address below is what it has to be told."
+#~ msgstr "Alles, was diese App braucht, um die Anmeldung an einen OpenID-Connect-Anbieter zu übergeben. Die andere Hälfte — diese App dort als Client zu registrieren — passiert beim Anbieter, und die Adresse unten ist das, was er erfahren muss."
+
+#~ msgid "Redirect URI to register with the provider"
+#~ msgstr "Redirect-URI, die beim Anbieter zu hinterlegen ist"
+
+#~ msgid "Must match exactly, trailing slash included."
+#~ msgstr "Muss exakt übereinstimmen, abschließender Schrägstrich inbegriffen."
+
+#~ msgid "Nothing has been saved here yet, so these are the values from the container’s environment. Saving this page moves the configuration into the database, and the environment is ignored from then on."
+#~ msgstr "Hier wurde noch nichts gespeichert — das sind also die Werte aus der Umgebung des Containers. Mit dem Speichern dieser Seite wandert die Konfiguration in die Datenbank, und die Umgebung wird von da an ignoriert."
+
+#~ msgid "Do not trust any endpoint address written down anywhere, including this app’s own defaults — providers move them between versions. Read them off the discovery document instead:"
+#~ msgstr "Vertraue keiner irgendwo notierten Endpunkt-Adresse, auch nicht den Vorgaben dieser App — Anbieter verschieben sie zwischen Versionen. Lies sie stattdessen aus dem Discovery-Dokument ab:"
+
+#, python-format
+#~ msgid "Blank fields are derived from the address above. Discovery document: %(url)s"
+#~ msgstr "Leere Felder werden aus der Adresse oben abgeleitet. Discovery-Dokument: %(url)s"
+
+#~ msgid "The registered client"
+#~ msgstr "Der registrierte Client"
+
+#~ msgid "On the provider, once"
+#~ msgstr "Einmalig beim Anbieter"

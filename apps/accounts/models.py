@@ -38,6 +38,13 @@ from django.utils.translation import gettext_lazy as _
 from apps.accounts.secrets import decrypt, encrypt
 
 
+# Where a discovery document lives. The first is the specification's answer and
+# is tried first; the second is where older DSM builds put it. See
+# SSOConfiguration.discovery_candidates.
+WELL_KNOWN = "/.well-known/openid-configuration"
+SYNOLOGY_DISCOVERY = "/webman/sso" + WELL_KNOWN
+
+
 class SignAlgorithm(models.TextChoices):
     RS256 = "RS256", _("RS256 — signed with the provider’s key (needs the JWKS endpoint)")
     HS256 = "HS256", _("HS256 — signed with the client secret (no key fetch)")
@@ -60,17 +67,32 @@ class SSOConfiguration(models.Model):
         help_text=_("With this off, the local password form is the only way in."),
     )
 
-    # The provider. `base` is a convenience: the four endpoints below are
-    # derived from it when they are left blank, using Synology's usual paths —
-    # which are a starting guess and not a promise, hence the override fields.
+    # The provider. This is the only address anybody should have to type: the
+    # four endpoints below are read off the discovery document when it is saved
+    # (see sso_views._autofill_endpoints) and are overrides, not inputs.
+    #
+    # It accepts either an issuer — https://sso.example.org — or a full
+    # discovery address ending in /.well-known/openid-configuration, because
+    # that is the URL most providers actually print on their own settings page,
+    # and demanding the shorter form means somebody trims it by hand and gets
+    # it wrong. `issuer` normalises one to the other.
     op_base = models.URLField(
         _("SSO server"), max_length=500, blank=True,
-        help_text=_("e.g. https://sso.example.org — the four addresses below are derived from it."),
+        help_text=_(
+            "The issuer, e.g. https://sso.example.org — or paste the full "
+            "…/.well-known/openid-configuration address if that is what your provider gives you."
+        ),
     )
     authorization_endpoint = models.URLField(_("authorisation endpoint"), max_length=500, blank=True)
     token_endpoint = models.URLField(_("token endpoint"), max_length=500, blank=True)
     user_endpoint = models.URLField(_("user info endpoint"), max_length=500, blank=True)
     jwks_endpoint = models.URLField(_("JWKS endpoint"), max_length=500, blank=True)
+
+    # When the four above were last read off the discovery document. Shown
+    # beside them, and it is the difference between "these are what the server
+    # says" and "these are what somebody typed in March" — which is exactly the
+    # question after a DSM update moves an endpoint.
+    endpoints_read_at = models.DateTimeField(null=True, blank=True, editable=False)
 
     client_id = models.CharField(_("client ID"), max_length=200, blank=True)
     # Fernet token, never the secret itself. See apps/accounts/secrets.py.
@@ -101,6 +123,17 @@ class SSOConfiguration(models.Model):
     verify_ssl = models.BooleanField(
         _("verify the certificate"), default=True,
         help_text=_("Leave on. Verification is the whole point of putting the SSO server behind a real certificate."),
+    )
+
+    # Passed to the library as OIDC_TIMEOUT, which it hands to every `requests`
+    # call it makes. Unset, those calls have **no timeout at all** — so a
+    # provider that accepts the connection and then goes quiet holds the worker
+    # until gunicorn's own 60-second limit kills it, and two of those take out
+    # both workers and the whole app with them. A default is the safe thing;
+    # this is only editable because a slow provider is a real thing.
+    request_timeout = models.PositiveSmallIntegerField(
+        _("request timeout"), default=10,
+        help_text=_("Seconds to wait for the provider before giving up."),
     )
 
     updated_at = models.DateTimeField(auto_now=True)
@@ -198,13 +231,14 @@ class SSOConfiguration(models.Model):
     # -- derived values --------------------------------------------------
 
     def endpoints(self):
-        """The four provider URLs, filling blanks in from ``op_base``.
+        """The four provider URLs, filling blanks in from the issuer.
 
-        Synology's usual shape, and explicitly a guess — DSM has moved these
-        between versions, which is why each one can be overridden and why the
-        page offers to read them off the discovery document instead.
+        The fallback is Synology's usual shape and explicitly a guess — DSM has
+        moved these between versions. It exists for a configuration that came
+        out of `.env` and has never been through the settings page; anything
+        saved here has them read off the discovery document instead.
         """
-        base = (self.op_base or "").rstrip("/")
+        base = self.issuer
         default = {
             "authorization": f"{base}/webman/sso/SSOOauth.cgi" if base else "",
             "token": f"{base}/webman/sso/SSOAccessToken.cgi" if base else "",
@@ -219,9 +253,43 @@ class SSOConfiguration(models.Model):
         }
 
     @property
+    def issuer(self):
+        """``op_base`` with any discovery path taken off the end.
+
+        Both forms are accepted in the field because both are what providers
+        print: some show the issuer, some show the full
+        ``…/.well-known/openid-configuration``. Requiring one means somebody
+        trims the other by hand, and a half-trimmed URL fails as a 404 that
+        reads like the server being wrong.
+        """
+        base = (self.op_base or "").strip().rstrip("/")
+        for suffix in (SYNOLOGY_DISCOVERY, WELL_KNOWN):
+            if base.endswith(suffix):
+                return base[: -len(suffix)].rstrip("/")
+        return base
+
+    def discovery_candidates(self):
+        """Where to look for the discovery document, best guess first.
+
+        The standard location comes first because that is where every provider
+        that follows the specification puts it, including — on current DSM —
+        Synology. The ``webman`` path is second because older DSM builds put it
+        there and this app was written against those, and a candidate that
+        costs one 404 is cheaper than a support question. An address that is
+        already a discovery URL is taken at its word and nothing is guessed.
+        """
+        base = (self.op_base or "").strip().rstrip("/")
+        if base.endswith(WELL_KNOWN):
+            return [base]
+        issuer = self.issuer
+        if not issuer:
+            return []
+        return [issuer + WELL_KNOWN, issuer + SYNOLOGY_DISCOVERY]
+
+    @property
     def discovery_url(self):
-        base = (self.op_base or "").rstrip("/")
-        return f"{base}/webman/sso/.well-known/openid-configuration" if base else ""
+        candidates = self.discovery_candidates()
+        return candidates[0] if candidates else ""
 
     @property
     def allowed_group_list(self):

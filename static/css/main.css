@@ -2410,6 +2410,64 @@ select[data-unit-select] { max-width: 11rem; }
   color: var(--text-dark);
   word-break: break-all;
 }
+/* Said when the address shown is the app's configured public one rather than
+   the address in the bar — which is the normal case while somebody is setting
+   this up over the LAN, and the difference decides whether the login works. */
+.callback-note {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-sm);
+  color: var(--amber);
+}
+
+/* Every validation error, at the top, linked to its field. The fields these
+   belong to can be inside a closed <details>, and an error on a control nobody
+   can see is a Save that appears to do nothing. */
+.error-summary { margin: var(--space-4) 0 0; padding-left: var(--space-7); }
+.error-summary li { margin-bottom: var(--space-2); }
+
+/* The four endpoints as an answer rather than as four questions: what the
+   provider said when it was last asked. */
+.endpoint-readout {
+  margin: var(--space-6) 0;
+  padding: var(--space-6);
+  background: var(--cream);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+}
+.endpoint {
+  display: grid;
+  grid-template-columns: 1.25rem 9rem minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: baseline;
+  padding: var(--space-2) 0;
+}
+.endpoint-mark { color: var(--success); font-weight: 700; }
+.endpoint--missing .endpoint-mark { color: var(--text-muted); }
+.endpoint-label { font-size: var(--text-sm); color: var(--text-mid); }
+/* min-width: 0 so a long URL wraps inside its column instead of widening the
+   grid and pushing the page sideways. */
+.endpoint-url {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-dark);
+  word-break: break-all;
+}
+.endpoint--missing .endpoint-url { color: var(--text-muted); font-style: italic; }
+.endpoint-provenance {
+  margin: var(--space-5) 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-light);
+}
+
+.endpoint-override { margin-bottom: var(--space-8); }
+.endpoint-override > summary {
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--text-mid);
+  padding: var(--space-3) 0;
+}
+.endpoint-override > summary:hover { color: var(--text-dark); }
 
 .check-results {
   padding: var(--space-7);

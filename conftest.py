@@ -30,6 +30,61 @@ def forget_sso_configuration():
 
 
 @pytest.fixture(autouse=True)
+def no_outbound_requests(monkeypatch):
+    """Nothing in a test run may talk to the network.
+
+    The SSO settings page reads the provider's discovery document *as part of
+    saving*, so a test that posts that form would otherwise resolve a real
+    hostname — turning a unit test into something that is slow on a good day,
+    fails on an aeroplane, and behaves differently in CI than on a laptop.
+
+    The stub fails the way an unreachable provider fails, so the paths that
+    handle "discovery did not work" are what runs by default. A test that wants
+    a document back installs one with ``discovery_document`` below, which is
+    the only way to get an answer out of this.
+    """
+    import requests
+
+    def refuse(*args, **kwargs):
+        raise requests.exceptions.ConnectionError("no network in tests")
+
+    monkeypatch.setattr("apps.accounts.sso_views.requests.get", refuse)
+    monkeypatch.setattr("apps.accounts.sso_views.requests.head", refuse)
+
+
+@pytest.fixture
+def discovery_document(monkeypatch):
+    """Install a discovery document for the addresses a test names.
+
+    Takes ``{url: document}``; anything not named refuses the connection, which
+    is what makes "the first candidate 404s and the second answers" testable.
+    """
+    import requests
+
+    def install(documents):
+        def get(url, **kwargs):
+            if url not in documents:
+                raise requests.exceptions.ConnectionError("no such host")
+            return _Response(documents[url])
+
+        monkeypatch.setattr("apps.accounts.sso_views.requests.get", get)
+
+    return install
+
+
+class _Response:
+    """The two attributes ``_fetch_json`` reads. A real Response is a lot of
+    machinery to build for a dict."""
+
+    status_code = 200
+
+    def __init__(self, document):
+        import json
+
+        self.content = json.dumps(document).encode()
+
+
+@pytest.fixture(autouse=True)
 def english(settings):
     """Both halves are needed.
 

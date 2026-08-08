@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kitchenapp 0.1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-08 17:19+0200\n"
+"POT-Creation-Date: 2026-08-08 20:42+0200\n"
 "PO-Revision-Date: 2026-08-05 12:00+0200\n"
 "Last-Translator: KitchenApp\n"
 "Language-Team: German\n"
@@ -149,6 +149,14 @@ msgstr "Weiter"
 #: .\static\js\shell.js:380
 msgid "Dismiss"
 msgstr "Schließen"
+
+#: .\static\js\shell.js:463
+msgid "Copied"
+msgstr "Kopiert"
+
+#: .\static\js\shell.js:464 .\static\js\shell.js:469
+msgid "Press Ctrl-C"
+msgstr "Strg-C drücken"
 
 #: .\static\js\timer_watch.js:164
 msgid "Kitchen timers"
