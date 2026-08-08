@@ -540,11 +540,50 @@ def validate_structure(step_formset, ingredient_formset):
     step_indices = set(steps)
     ok = True
 
+    # --- a step something goes into needs to say what it is ---------------
+    #
+    # A step with no text is invisible to ``_live``, which is right for a card
+    # nobody has typed into yet and wrong the moment something points at it.
+    # The complaint then landed on the *ingredient* — "put this into one of the
+    # steps", about a line that was already in one — while the box the fault
+    # was actually in said nothing at all. The step is what is unfinished, so
+    # the step is what says so.
+    unnamed = {}
+    removed = set(step_formset.deleted_forms)
+    for index, form in enumerate(step_formset.forms):
+        if index in steps or form in removed or not form.is_valid():
+            continue
+        unnamed[index] = form
+
+    # Only the ones being relied on. A blank card with nothing pointing at it
+    # is still where the next step gets typed, and refusing the page for it
+    # would make an empty canvas unsaveable.
+    wanted = set()
+    for form in lines.values():
+        if form.cleaned_data.get("step_index") in unnamed:
+            wanted.add(form.cleaned_data["step_index"])
+    for index, form in steps.items():
+        parent = form.cleaned_data.get("parent_index")
+        if parent in unnamed and parent != index:
+            wanted.add(parent)
+
+    for index in sorted(wanted):
+        unnamed[index].add_error("text", _(
+            "Write what happens in this step — something already goes into it."
+        ))
+        ok = False
+
     # --- every line goes somewhere ---------------------------------------
     if steps:
         for index, form in lines.items():
             if form.cleaned_data.get("alt_index") in lines:
                 continue                      # a substitute; it has no step
+            # Assigned to a step that has no text yet: the step is carrying
+            # that error, and saying it twice in two places sends somebody
+            # looking for a second fault that is not there.
+            if form.cleaned_data.get("step_index") in wanted:
+                ok = False
+                continue
             if form.cleaned_data.get("step_index") not in step_indices:
                 form.add_error(None, _(
                     "Put this into one of the steps — every ingredient has to "

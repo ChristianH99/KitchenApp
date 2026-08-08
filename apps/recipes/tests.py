@@ -1185,6 +1185,57 @@ class TestARecipeMustBeJoinedUp:
     not then be shopped for, scaled, or cooked from.
     """
 
+    def test_a_step_with_no_text_says_so_itself(self, client, db):
+        """The complaint has to land on the box the fault is in.
+
+        A step with no text is invisible to ``_live``, so the ingredient
+        sitting in it looked unassigned and got "put this into one of the
+        steps" — about a line that was already in one. Somebody then goes
+        looking for a wiring fault that does not exist, while the empty box
+        that caused it says nothing at all.
+        """
+        response = client.post(reverse("recipes:add"), _post_data(**{
+            **_management("steps", 2),
+            "steps-0-id": "", "steps-0-text": "", "steps-0-minutes": "",
+            "steps-0-detail": "", "steps-0-parent_index": "1",
+            "steps-1-id": "", "steps-1-text": "bake", "steps-1-minutes": "",
+            "steps-1-detail": "", "steps-1-parent_index": "",
+            "ingredients-0-step_index": "0",
+        }))
+        assert response.status_code == 200
+        assert "text" in response.context["steps"].forms[0].errors
+        # ...and *only* there. The same fault reported twice in two places is
+        # two faults to hunt for.
+        assert not response.context["formset"].forms[0].errors
+
+    def test_a_step_another_step_feeds_needs_a_text_too(self, client, db):
+        """The same rule from the other side — and the shape "+ Step" makes:
+        it mints the joining step already wired up and empty."""
+        response = client.post(reverse("recipes:add"), _post_data(**{
+            **_management("steps", 2),
+            "steps-0-id": "", "steps-0-text": "melt", "steps-0-minutes": "",
+            "steps-0-detail": "", "steps-0-parent_index": "1",
+            "steps-1-id": "", "steps-1-text": "", "steps-1-minutes": "",
+            "steps-1-detail": "", "steps-1-parent_index": "",
+            "ingredients-0-step_index": "0",
+        }))
+        assert response.status_code == 200
+        assert "text" in response.context["steps"].forms[1].errors
+
+    def test_a_blank_step_nobody_uses_is_not_an_error(self, client, db):
+        """The exception that keeps the rule usable. A card nobody has typed
+        into is where the next step gets typed, and a page that refuses to
+        save because one is sitting there is a page nobody can leave."""
+        response = client.post(reverse("recipes:add"), _post_data(**{
+            **_management("steps", 2),
+            "steps-0-id": "", "steps-0-text": "bake", "steps-0-minutes": "",
+            "steps-0-detail": "", "steps-0-parent_index": "",
+            "steps-1-id": "", "steps-1-text": "", "steps-1-minutes": "",
+            "steps-1-detail": "", "steps-1-parent_index": "",
+            "ingredients-0-step_index": "0",
+        }))
+        assert response.status_code == 302
+
     def test_a_line_with_no_amount_is_refused(self, client, db):
         response = client.post(reverse("recipes:add"), _post_data(**{
             "ingredients-0-amount": "",

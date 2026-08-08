@@ -2,12 +2,12 @@
 # Copyright (C) 2026
 # This file is distributed under the same licence as the kitchenapp package.
 # Maintained alongside the source strings; see README.md.
-#
+# 
 msgid ""
 msgstr ""
 "Project-Id-Version: kitchenapp 0.1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-08 22:13+0200\n"
+"POT-Creation-Date: 2026-08-08 22:45+0200\n"
 "PO-Revision-Date: 2026-08-05 12:00+0200\n"
 "Last-Translator: KitchenApp\n"
 "Language-Team: German\n"
@@ -814,23 +814,27 @@ msgstr "Eine Ofentemperatur liegt zwischen 0 und 500 °C."
 msgid "Give this step a name, or clear it."
 msgstr "Diesem Schritt einen Namen geben oder ihn leeren."
 
-#: .\apps\recipes\forms.py:550
+#: .\apps\recipes\forms.py:572
+msgid "Write what happens in this step — something already goes into it."
+msgstr "Schreib auf, was in diesem Schritt passiert — es geht bereits etwas hinein."
+
+#: .\apps\recipes\forms.py:589
 msgid "Put this into one of the steps — every ingredient has to be used somewhere once the recipe has a method."
 msgstr "Ordne das einem der Schritte zu — sobald ein Rezept eine Zubereitung hat, muss jede Zutat irgendwo verwendet werden."
 
-#: .\apps\recipes\forms.py:587
+#: .\apps\recipes\forms.py:626
 msgid "This step is not joined to the rest of the recipe. Say what it feeds into — with the “feeds into” box in the step list, or by dragging it onto that step on the diagram."
 msgstr "Dieser Schritt hängt nicht am Rest des Rezepts. Sag, wo er hineinfließt — mit dem Feld „fließt ein in“ in der Schrittliste oder indem du ihn im Diagramm auf diesen Schritt ziehst."
 
-#: .\apps\recipes\forms.py:852
+#: .\apps\recipes\forms.py:891
 msgid "Use this as the recipe’s cooking time"
 msgstr "Als Garzeit des Rezepts übernehmen"
 
-#: .\apps\recipes\forms.py:924
+#: .\apps\recipes\forms.py:963
 msgid "A cooking is for at least one serving."
 msgstr "Eine Zubereitung ist für mindestens eine Portion."
 
-#: .\apps\recipes\forms.py:934
+#: .\apps\recipes\forms.py:973
 msgid "Record how long it took, how far it went, or both."
 msgstr "Eintragen, wie lange es gedauert hat, wie weit es gereicht hat — oder beides."
 
