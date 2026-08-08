@@ -92,6 +92,7 @@ Everything below was observed working, not merely written.
 | The workflows parse | YAML loads, and all 21 `run:` blocks pass `bash -n` with the GitHub expressions stubbed out |
 | **CI runs green on GitHub** | Both jobs, on a runner. The *first* run failed — see the entrypoint note in §6, which is the bug the pipeline was worth building for — and everything since is green with no annotations |
 | **The release workflow ran end to end** | `v0.1.0`: verify → build → smoke-test the image about to be published → push to GHCR → assemble → attach. First attempt, no fixes needed |
+| **…and again, for `v0.2.0`** | The whole body of work below cut as one release: CI green (499 tests, 1m27s), the image built, smoke-tested and pushed as `ghcr.io/christianh99/kitchenapp:0.2.0`, and the release carrying a 76 MB `docker load` tarball, a compose file pinned to `0.2.0` (not `latest`), `env.example` and `SHA256SUMS`. The compose file's checksum verified against that list after downloading it back. Run 31265013619, 2m08s |
 | **The published release carries all four assets** | `kitchen-0.1.0-linux-amd64.tar.gz` (75.6 MB), `docker-compose.yml`, `env.example`, `SHA256SUMS` — and the notes rendered with the deployment instructions above GitHub's generated changelog |
 | **The whole consumer path, as the NAS would do it** | In a clean directory: `gh release download` → `sha256sum -c` all three → `docker load` from the tarball → rename `env.example` to `.env` and fill it in → `docker compose up -d`. Container healthy, `/healthz` → `ok`, `/` → 302 to the login, the database written into the bind mount |
 | The registry path | `docker logout ghcr.io`, then an anonymous `docker pull ghcr.io/christianh99/kitchenapp:0.1.0` — **succeeds**. The package took the repository's public visibility, so the NAS needs no credentials. DEPLOYMENT.md §8 had guessed the opposite and has been corrected |
@@ -127,10 +128,11 @@ the NAS.
   so far has run against an empty or development database. The first update that
   carries a schema change to a `/data` with the household's real collection in
   it is the one to take a copy before — see DEPLOYMENT.md §7.
-- **A second release, and therefore an *update*.** v0.1.0 was installed from
-  nothing. Replacing a running container with a newer image — the path in §7,
-  including whether the version in the sidebar actually changes — has not been
-  done.
+- **An *update* of a running container.** v0.2.0 now exists and was built,
+  published and attached (§1), but nothing has been installed from it.
+  Replacing a running container with a newer image — the path in §7, including
+  whether the version in the sidebar actually changes — has still not been
+  done, because v0.1.0 was never put anywhere either.
 - **Anything on the DS723+ itself.** Everything below §1's container rows was
   observed on the development machine with Docker Desktop, not on the NAS: the
   bind mount at `/volume1/docker/kitchen/data`, the uid-1000 ownership rule, the
@@ -273,7 +275,7 @@ list exists so it is re-opened knowingly.
 
 ## 5. Worth doing next, roughly in order
 
-1. **Put v0.1.0 on the actual NAS.** Everything up to the container is now
+1. **Put v0.2.0 on the actual NAS.** Everything up to the container is now
    known good (§1) and nothing past it is. DEPLOYMENT.md §1–§5 in order: the
    data folder and its uid-1000 ownership, the reverse-proxy rule with its two
    custom headers (§2 — this is the step that breaks the login), the SSO client
