@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- The same lidded pot as templates/_brand.html, and deliberately a second
+       copy of those five paths rather than an include.
+
+       The partial is drawn with stroke="currentColor" so it can sit on the
+       green sidebar and the white login card without a second asset. A favicon
+       has no inherited colour to take: it is fetched on its own, by the
+       browser, outside any page. So this one carries the palette itself — the
+       herb green and terracotta from the token block at the top of
+       static/css/main.css, written out because a favicon cannot read a CSS
+       custom property either.
+
+       If the mark is ever redrawn, both files change. That is the cost, and it
+       is smaller than the alternative: a favicon that renders as a black
+       silhouette on a tab strip nobody can pick this app out of. -->
+  <rect width="32" height="32" rx="7" fill="#24402F"/>
+  <g fill="none" stroke="#FAF6F0" stroke-width="2"
+     stroke-linecap="round" stroke-linejoin="round">
+    <!-- the lid, with its knob -->
+    <path d="M9 12h14"/>
+    <path d="M16 12V9.5"/>
+    <!-- the body of the pot, tapering slightly, with a handle each side -->
+    <path d="M8.5 14.5h15l-1.35 8a2.5 2.5 0 0 1-2.5 2.1h-7.3a2.5 2.5 0 0 1-2.5-2.1z"/>
+    <path d="M23.5 16.2h2a1.3 1.3 0 0 1 0 2.6h-2.5"/>
+    <path d="M8.5 16.2h-2a1.3 1.3 0 0 0 0 2.6h2.5"/>
+  </g>
+</svg>

@@ -31,7 +31,7 @@
       handshake is a redirect the browser follows — there is nothing to post.{% endcomment %}
       <div class="login-sso">
         <a class="button button--big" href="{% url 'oidc_authentication_init' %}?next={{ next|urlencode }}">
-          {% translate "Sign in with Synology" %}
+          {% translate "Sign in with SSO" %}
         </a>
       </div>
       {% if not show_local %}

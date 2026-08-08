@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% load static i18n %}
+{% block title %}{% translate "My settings" %} – {% translate "Kitchen" %}{% endblock %}
+{% block topbar_title %}{% translate "My settings" %}{% endblock %}
+
+{% block topbar_actions %}
+  <button type="submit" class="button button--small" form="preferences-form">{% translate "Save" %}</button>
+{% endblock %}
+
+{% block content %}
+  <h1>{% translate "My settings" %}</h1>
+  <p class="page-lead">{% translate "Yours, not the household’s. The recipes and the pantry are shared; this page is about how the app behaves for you." %}</p>
+
+  <form method="post" id="preferences-form" data-unsaved-guard>
+    {% csrf_token %}
+
+    <h2 class="form-section">{% translate "Kitchen timer" %}</h2>
+    <p class="help">{% translate "What a step’s timer does when it reaches nought. Press a name to hear it — a sound is only useful if it cuts through your kitchen, and there is no way to know that from its name." %}</p>
+
+    {% comment %}data-sound-choice is what static/js/sound_preview.js binds to.
+    The tones are generated in the browser (static/js/recipe_cook.js does the
+    same for the real thing) rather than played from files: an audio file would
+    be a binary asset in the repository, a request the CSP has to allow, and a
+    decode a sleeping phone may not have finished by the time the bread is
+    ready.{% endcomment %}
+    <ul class="sound-choices" data-sound-choices>
+      {% for choice in form.timer_sound %}
+        <li class="sound-choice">
+          {{ choice.tag }}
+          <label for="{{ choice.id_for_label }}">{{ choice.choice_label }}</label>
+          {% if choice.data.value != "none" %}
+            <button type="button" class="link-button" data-sound-play="{{ choice.data.value }}">
+              {% translate "Play" %}
+            </button>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+    <span class="field-error">{{ form.timer_sound.errors|striptags }}</span>
+
+    <div class="form-actions">
+      <button type="submit" class="button">{% translate "Save" %}</button>
+    </div>
+  </form>
+{% endblock %}
+
+{% block scripts %}
+  {% comment %}sound_preview.js is only the button; the tones are in
+  timer_sounds.js, which base.html now loads on every page for the timer card.
+  Without it `window.kitchenSounds` is undefined and the handler returns on its
+  second line — a Play button that does nothing at all, silently, which is
+  exactly how it was reported.{% endcomment %}
+  <script src="{% static 'js/sound_preview.js' %}"></script>
+{% endblock %}

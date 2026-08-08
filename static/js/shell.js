@@ -383,3 +383,36 @@ window.modalController = function modalController(modal, options) {
     notice.appendChild(close);
   });
 })();
+
+/* The Settings disclosure in the sidebar footer.
+ *
+ * Only the *memory*. The opening and closing is <details>, which works with no
+ * script at all — this remembers which way it was left so it does not shut on
+ * every navigation, which for a menu somebody is working through (People, then
+ * Sign-in) means re-opening it at every step.
+ *
+ * The server's own `open` wins on load. It is set when one of the pages inside
+ * the group is the current one, and a menu that hides the page you are looking
+ * at reads as broken however it was left last time.
+ */
+(function () {
+  const group = document.querySelector("[data-shell-settings]");
+  if (!group) return;
+  const KEY = "kitchen.settings-open";
+
+  if (!group.open) {
+    try {
+      if (window.localStorage.getItem(KEY) === "1") group.open = true;
+    } catch (err) {
+      /* storage off; the group simply starts closed */
+    }
+  }
+
+  group.addEventListener("toggle", () => {
+    try {
+      window.localStorage.setItem(KEY, group.open ? "1" : "0");
+    } catch (err) {
+      /* nothing to do; the state just does not outlive the page */
+    }
+  });
+})();

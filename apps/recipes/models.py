@@ -27,11 +27,13 @@ who may *edit* it is apps/recipes/views.py's business, not the model's.
 from decimal import Decimal
 
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.urls import reverse
 from django.utils.text import slugify
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext, gettext_lazy as _
 
+from apps.pantry import units
 from apps.recipes.images import recipe_image_path
 
 
@@ -163,10 +165,32 @@ class RecipeStep(models.Model):
     # sequence on the page and the sequence in the diagram cannot drift apart.
     position = models.PositiveSmallIntegerField(default=0)
 
-    # Short on purpose: this is the text inside a table cell that may be one
-    # column wide. "verrühren", "bei 180 °C 45 min backen". Anything longer is
-    # what `detail` and the recipe's own instructions are for.
-    text = models.CharField(_("step"), max_length=120)
+    # One box of the diagram, and it may hold **more than one thing to do**.
+    #
+    # It was a 120-character CharField, on the reasoning that this is the text
+    # inside a table cell that may be one column wide. The first real recipe
+    # typed into this app broke that immediately: "Topf in Ofen stellen" and
+    # "Ofen vorheizen" are two actions that happen at one point in the flow,
+    # and the household wrote them as two dashed lines inside one box because
+    # that is what they are. Splitting them into two steps would have been
+    # wrong — they are not two boxes of the diagram — and the field simply took
+    # the newline and said nothing.
+    #
+    # So a step is one or more lines. ``parts`` below is what pages render; the
+    # column stays a single field because the lines have no identity of their
+    # own — nothing points at one, they are not reordered independently, and a
+    # second table would be a primary key per bullet point.
+    text = models.TextField(_("step"))
+
+    # What the oven is set to, when this step is the one that heats it. Two
+    # columns rather than a sentence inside `text`, because "180 °C" is a
+    # number a page can put an icon beside and a cooking view can shout — and
+    # because "Ober-/Unterhitze" written by hand comes out four ways.
+    oven_celsius = models.PositiveSmallIntegerField(
+        _("oven temperature"), null=True, blank=True,
+        help_text=_("In °C."),
+    )
+    oven_mode = models.CharField(_("oven mode"), max_length=12, blank=True)
     detail = models.TextField(
         _("detail"), blank=True,
         help_text=_("Shown in the cooking view when this step is the current one."),
@@ -174,8 +198,45 @@ class RecipeStep(models.Model):
 
     # What the cooking view counts down. Distinct from Recipe.cook_minutes,
     # which is the whole dish: this is "45 minutes in the oven" for one box.
+    #
+    # Two columns rather than one of total seconds, and that is the way round it
+    # is for the *editing*: almost every step of almost every recipe is a round
+    # number of minutes, and asking somebody to type 2700 for "45 min" — or
+    # offering one box that means minutes here and seconds there — is a mistake
+    # waiting to be made in the direction that burns something. `seconds` is the
+    # remainder, 0–59, and empty on nearly every row.
+    #
+    # Everything that *reads* a duration reads ``timer_seconds`` below, so no
+    # page and no script ever adds the two up itself.
     minutes = models.PositiveIntegerField(_("duration"), null=True, blank=True,
                                           help_text=_("In minutes. Offers a timer while cooking."))
+    seconds = models.PositiveSmallIntegerField(
+        _("seconds"), null=True, blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(59)],
+        help_text=_("On top of the minutes, for a step measured more finely than that."),
+    )
+
+    # How far a *standing instruction* reaches across the table, as a 1-based
+    # column range. Null on both means the whole width, which is the reference
+    # diagram's "Preheat oven to 350°F" band and stays the default.
+    #
+    # It exists because a band across everything says the wrong thing about a
+    # step that runs alongside only part of the recipe. "Heat the oven" while
+    # the dough proves is parallel to *those* steps and not to the mixing that
+    # came before them, and a reader who has to be told that in prose is a
+    # reader the diagram has failed.
+    #
+    # Column *numbers*, not foreign keys to the steps they sit over. The column
+    # a step occupies is derived from the tree and changes as the recipe is
+    # edited, so either choice can go stale; a number is clamped into range at
+    # render time (``diagram._band_span``) and the worst it can do is draw a
+    # band a column too wide. A relation would need the same clamping plus a
+    # migration every time somebody deleted a step.
+    #
+    # Meaningless on a step that has anything flowing into it — that step's
+    # geometry is decided by its own subtree — and simply not read there.
+    span_from = models.PositiveSmallIntegerField(null=True, blank=True)
+    span_to = models.PositiveSmallIntegerField(null=True, blank=True)
 
     class Meta:
         verbose_name = _("step")
@@ -183,7 +244,100 @@ class RecipeStep(models.Model):
         ordering = ["position", "id"]
 
     def __str__(self):
-        return self.text
+        return self.headline
+
+    @property
+    def parts(self):
+        """The things to do in this step, one per line.
+
+        A leading "- " is stripped: it is how somebody writes a list by hand,
+        and rendering it inside a `<li>` gives "- - Topf in Ofen stellen". Blank
+        lines go too, so a stray Enter at the end is not an empty bullet.
+        """
+        lines = []
+        for raw in (self.text or "").replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+            line = raw.strip()
+            if line.startswith(("- ", "* ", "• ")):
+                line = line[2:].strip()
+            elif line in ("-", "*", "•"):
+                line = ""
+            if line:
+                lines.append(line)
+        return lines
+
+    @property
+    def headline(self):
+        """One line for the places that have room for exactly one.
+
+        A page title, a select, an admin listing. Joined with " · " rather than
+        truncated to the first part, because "Topf in Ofen stellen" alone is a
+        different instruction from the pair.
+        """
+        return " · ".join(self.parts)
+
+    @property
+    def is_multipart(self):
+        return len(self.parts) > 1
+
+    OVEN_MODES = {
+        # Stored short, shown in the page's language. The set is closed for the
+        # same reason the portion sizes are: "Umluft", "umluft" and "Heißluft"
+        # written by hand are three settings for one oven.
+        "top_bottom": _("top and bottom heat"),
+        "fan": _("fan"),
+        "top": _("top heat"),
+        "bottom": _("bottom heat"),
+        "grill": _("grill"),
+        "fan_grill": _("fan grill"),
+    }
+
+    @property
+    def timer_seconds(self):
+        """The whole duration, in seconds, or None when there is none.
+
+        The one place the two columns are added together. Every page, and the
+        cooking view's script, reads this rather than `minutes` — a template
+        that reads `minutes` says "1 min" for a step somebody set to 1:30, and
+        a countdown that reads it runs thirty seconds short, which is a
+        difference nobody sees until something is under-baked.
+        """
+        total = (self.minutes or 0) * 60 + (self.seconds or 0)
+        return total or None
+
+    @property
+    def timer_display(self):
+        """The duration as a clock reads it — "45:00", "1:30", "0:20"."""
+        total = self.timer_seconds
+        if not total:
+            return ""
+        return "%d:%02d" % divmod(total, 60)
+
+    @property
+    def duration_label(self):
+        """The duration in words, for the places that show it beside a step.
+
+        Three shapes, because "0:45 min" for three quarters of a minute and
+        "45:00 min" for three quarters of an hour are both worse than what
+        somebody would write by hand.
+        """
+        total = self.timer_seconds
+        if not total:
+            return ""
+        minutes, seconds = divmod(total, 60)
+        if not seconds:
+            return gettext("%(n)s min") % {"n": minutes}
+        if not minutes:
+            return gettext("%(n)s s") % {"n": seconds}
+        return gettext("%(m)s:%(s)s min") % {"m": minutes, "s": "%02d" % seconds}
+
+    @property
+    def oven_mode_label(self):
+        return self.OVEN_MODES.get(self.oven_mode, self.oven_mode)
+
+    @property
+    def heats_the_oven(self):
+        """Whether this step is the one that sets the oven."""
+        return bool(self.oven_celsius or self.oven_mode)
 
 
 class RecipeIngredient(models.Model):
@@ -223,14 +377,42 @@ class RecipeIngredient(models.Model):
     # the binary-float surprise a FloatField would bring to a number people read.
     amount = models.DecimalField(_("amount"), max_digits=9, decimal_places=3,
                                  null=True, blank=True)
-    unit = models.CharField(_("unit"), max_length=30, blank=True)
+
+    # A code from apps/pantry/units.py, not free text. 30 characters was what a
+    # free-text column needed; a code is at most a handful, and the width is
+    # taken from the catalogue so a unit added there cannot outgrow it.
+    unit = models.CharField(_("unit"), max_length=units.MAX_CODE_LENGTH, blank=True)
+
     name = models.CharField(_("ingredient"), max_length=120)
+
+    # The catalogue row this line is about. Nullable, and it has to stay that
+    # way: every line written before the catalogue existed has none, a recipe
+    # pasted in at midnight should not be blocked on tidying one up, and the
+    # name column remains what the recipe actually *says* — "festkochende
+    # Kartoffeln" is the line, "Kartoffel" is the substance. Only lines that
+    # have one take part in the pantry matching, and the rest are reported as
+    # "cannot tell" rather than as missing.
+    ingredient = models.ForeignKey(
+        "pantry.Ingredient", verbose_name=_("in the catalogue"),
+        null=True, blank=True, on_delete=models.SET_NULL, related_name="used_in",
+    )
+
     note = models.CharField(_("note"), max_length=120, blank=True,
                             help_text=_("e.g. “finely chopped”, “at room temperature”."))
 
     optional = models.BooleanField(
         _("optional"), default=False,
         help_text=_("The recipe works without it."),
+    )
+
+    # "Salz", "Pfeffer", "etwas Öl" — a real line with no quantity, and the
+    # reason the amount stays nullable. It is a *flag* rather than simply an
+    # empty amount because the form now refuses to save a line whose amount was
+    # left blank: without somewhere to say "there isn't one", that rule would
+    # make salt unrecordable, and the way out people would find is typing 1.
+    no_amount = models.BooleanField(
+        _("no fixed amount"), default=False,
+        help_text=_("To taste — salt, pepper, a little oil."),
     )
 
     # A substitute for another line of the same recipe. Self-referential rather
@@ -247,7 +429,20 @@ class RecipeIngredient(models.Model):
         ordering = ["position", "id"]
 
     def __str__(self):
-        return " ".join(part for part in (self.amount_display, self.unit, self.name) if part)
+        return " ".join(
+            str(part) for part in (self.amount_display, self.unit_label, self.name) if part
+        )
+
+    @property
+    def unit_label(self):
+        """The unit as this page's language writes it — "EL" or "tbsp".
+
+        The column holds a language-neutral code, so nothing may render
+        ``unit`` directly; apps/pantry/units.py says why the two are separate.
+        A value the catalogue does not know is shown exactly as it was typed,
+        which is what keeps a line written before the catalogue readable.
+        """
+        return units.label(self.unit)
 
     @property
     def amount_display(self):

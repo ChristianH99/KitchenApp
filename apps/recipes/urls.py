@@ -14,7 +14,10 @@ urlpatterns = [
     path("recipes/<slug:slug>/delete/", views.recipe_delete, name="delete"),
     path("recipes/<slug:slug>/cook/", views.recipe_cook, name="cook"),
     path("recipes/<slug:slug>/cooked/", views.recipe_cooked, name="cooked"),
+    path("recipes/<slug:slug>/cooked/<int:pk>/", views.cook_log_edit,
+         name="cook-log-edit"),
     path("recipes/<slug:slug>/cooked/<int:pk>/delete/", views.cook_log_delete,
          name="cook-log-delete"),
+    path("cooked/", views.cook_history, name="history"),
     path("tags/", views.tag_list, name="tags"),
 ]

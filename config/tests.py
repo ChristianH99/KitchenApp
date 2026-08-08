@@ -115,6 +115,13 @@ class TestNothingIsReachableWithoutASession:
         assert body.strip() == "ok"
         assert len(body) < 16
 
+    def test_the_site_icon_answers_without_a_session(self, anon, db):
+        """A browser asks for it before anybody has signed in — the login page
+        wants an icon too — and an icon is not household data."""
+        response = anon.get("/favicon.ico")
+        assert response.status_code == 301
+        assert "icons/favicon" in response["Location"]
+
     def test_uploaded_photographs_are_behind_the_login(self, anon, db):
         """/media/ serves files somebody uploaded. "Not linked from anywhere"
         has never been access control."""
@@ -221,6 +228,76 @@ class TestEveryScriptIsWhole:
         source = path.read_text(encoding="utf-8")
         assert "{%" not in source, f"{path.name} contains Django template syntax"
         assert "{{" not in source, f"{path.name} contains Django template syntax"
+
+
+def test_no_page_loads_a_script_without_what_it_reaches_for():
+    """A script that uses another script's global must be loaded after it.
+
+    The failure is completely silent, which is why it is worth a test. The
+    settings page loaded ``sound_preview.js`` and not ``timer_sounds.js``, so
+    ``window.kitchenSounds`` was undefined, so the handler returned on its
+    second line — and the Play buttons sat there doing nothing at all, with no
+    error and nothing to see. Nobody finds that by reading the page.
+
+    Discovered from the files rather than listed: each entry is a global and
+    the script that defines it, and every *other* script mentioning that global
+    declares the dependency. A template loading one of those must load the
+    definer too, and first — a script tag runs when it is reached.
+    """
+    provided = {
+        "window.kitchenSounds": "timer_sounds.js",
+        "window.kitchenTimers": "timer_watch.js",
+    }
+
+    for name, definer in provided.items():
+        users = sorted(
+            path.name for path in SCRIPTS
+            if path.name != definer and name in path.read_text(encoding="utf-8")
+        )
+        assert users, f"nothing uses {name}; drop it from this test or from the app"
+        for path in TEMPLATES:
+            order = _scripts_loaded_by(path)
+            for user in users:
+                if user not in order:
+                    continue
+                assert definer in order, (
+                    f"{path.name} loads {user}, which reads {name}, but never "
+                    f"loads {definer} — the page is silently inert"
+                )
+                assert order.index(definer) < order.index(user), (
+                    f"{path.name} loads {definer} after {user}, so {name} is "
+                    "still undefined when it is read"
+                )
+
+
+# Only real ``<script src>`` tags. A file named in a ``{% comment %}`` — and
+# several are, because these files point at each other in prose — is not a file
+# the page loads, and counting those made the check above fail on a template
+# whose only mention of a script was a sentence about it.
+_SCRIPT_TAG = re.compile(r"<script[^>]*\bsrc=\"\{%\s*static\s*'js/([\w.-]+)'")
+_EXTENDS = re.compile(r"\{%\s*extends\s*\"([^\"]+)\"")
+
+
+def _scripts_loaded_by(path, seen=None):
+    """Every script a rendered page ends up with, in the order it gets them.
+
+    Follows ``{% extends %}``, because a page's scripts are not all in its own
+    file: base.html loads the shell's and the timer's before it reaches
+    ``{% block scripts %}``, so a child template that reads one of those globals
+    without naming the file is correct and must not be reported. Parent first,
+    which is the order the markup puts them in.
+    """
+    seen = seen if seen is not None else set()
+    if path in seen or not path.exists():
+        return []                     # a cycle, or an {% extends %} we cannot resolve
+    seen.add(path)
+    markup = path.read_text(encoding="utf-8")
+    parent = _EXTENDS.search(markup)
+    inherited = (
+        _scripts_loaded_by(BASE_DIR / "templates" / parent.group(1), seen)
+        if parent else []
+    )
+    return inherited + _SCRIPT_TAG.findall(markup)
 
 
 def test_only_the_shell_defines_the_dialog_helpers():
@@ -468,6 +545,15 @@ def test_a_checkout_claims_no_version(client, db, settings):
     printing one that looks official is worse than printing nothing."""
     settings.KITCHEN_VERSION = ""
     assert "shell-version" not in client.get("/").content.decode()
+
+
+def test_every_page_names_its_icon(client, db):
+    """Without a `<link rel="icon">` a browser asks for /favicon.ico by itself,
+    per origin, and the log fills with `Not Found: /favicon.ico` — which is how
+    the warnings worth reading end up buried among ones that are not."""
+    response = client.get(reverse("recipes:home"))
+    body = response.content.decode()
+    assert 'rel="icon"' in body, "base.html no longer names an icon"
 
 
 def test_the_dialog_markup_is_present_on_every_page(client, db):

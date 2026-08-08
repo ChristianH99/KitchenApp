@@ -163,14 +163,30 @@ def build(recipe, ingredients=None, steps=None):
         return laid
 
     blocks = []
+    # Where each step sits vertically, so the cooking order can read the
+    # diagram the way a person does. Filled as the blocks are laid out, because
+    # that is the only pass that knows which row a step's cell begins on.
+    placed = {}
+    at_block = 0
+
+    def note_rows(laid, index):
+        for row_at, row in enumerate(laid):
+            for cell in row:
+                if cell.kind == "step" and cell.step.id not in placed:
+                    placed[cell.step.id] = (index, row_at)
+
     for root in roots:
         if not children[root.id] and not inputs.get(root.id):
             # A standing instruction with nothing flowing into it: the two rows
             # across the top of the reference diagram, "Butter and flour an
-            # 8x8-in pan" and "Preheat oven to 350°F". Full width.
-            blocks.append([[Cell("step", step=root, colspan=total)]])
+            # 8x8-in pan" and "Preheat oven to 350°F". Full width by default,
+            # and narrower when it has been given a span — see _band_span.
+            laid = [_band(root, total)]
         else:
-            blocks.append(block(root, total))
+            laid = block(root, total)
+        note_rows(laid, at_block)
+        blocks.append(laid)
+        at_block += 1
 
     if unplaced:
         # Ingredients nobody has assigned to an operation yet. Last, so the
@@ -183,8 +199,54 @@ def build(recipe, ingredients=None, steps=None):
             trailing.append(row)
         blocks.append(trailing)
 
-    return Diagram(columns=total, blocks=blocks,
-                   order=_cook_order(roots, children, inputs), unplaced=unplaced)
+    return Diagram(
+        columns=total, blocks=blocks, unplaced=unplaced,
+        order=_cook_order(steps, children, inputs, column, placed, total,
+                          {root.id for root in roots}),
+    )
+
+
+def _band(step, total):
+    """One row for a standing instruction: the step, and the empty space beside it.
+
+    "Heat the oven" across the whole width is right when it is done first and
+    the rest of the recipe waits for it. It is wrong when it happens *during*
+    something — while the dough proves — because a band over every column says
+    it runs alongside all of them, including the steps that came before it.
+
+    So the band can be given a column range, and what is outside that range is
+    a filler cell. Filler and not an omitted cell: a table row that simply
+    leaves the columns out is a row that has silently moved everything after it
+    one column left, which is the same rule the ingredient rows above obey.
+    """
+    start, end = _band_span(step, total)
+    row = []
+    if start > 1:
+        row.append(Cell("filler", colspan=start - 1))
+    row.append(Cell("step", step=step, colspan=end - start + 1))
+    if end < total:
+        row.append(Cell("filler", colspan=total - end))
+    return row
+
+
+def _band_span(step, total):
+    """The 1-based column range a standing instruction covers. Always valid.
+
+    Clamped rather than trusted. The stored numbers are a layout hint against a
+    geometry that is *derived* — add a step and the table grows a column, delete
+    one and it loses it — so a span recorded last month can name columns that no
+    longer exist. Clamping means the worst outcome is a band a column wider or
+    narrower than somebody intended, rather than a colspan of zero (which
+    collapses the row) or one past the end (which drags the table wider than its
+    own header and shifts every row below it).
+    """
+    start = step.span_from or 1
+    end = step.span_to or total
+    start = max(1, min(start, total))
+    end = max(1, min(end, total))
+    if end < start:
+        start, end = end, start
+    return start, end
 
 
 def _column(step, children, memo):
@@ -225,25 +287,59 @@ def _terminates(step, by_id, limit):
     return True
 
 
-def _cook_order(roots, children, inputs):
-    """The steps in the order somebody would do them: children before parents.
+def _cook_order(steps, children, inputs, column, placed, total, root_ids):
+    """The steps in the order somebody would do them: **as the diagram reads**.
 
-    Post-order, roots in their own order. That puts "preheat the oven" (a root
-    with nothing feeding it) wherever it was placed on the form, and every
-    merge after both of the things it merges.
+    Column by column from the left, and top to bottom within a column. That is
+    how the table is laid out, so it is how it is read — and a walk-through
+    whose order disagrees with the picture beside it is a walk-through nobody
+    trusts twice.
+
+    This replaced a post-order walk (children before parents, roots in their own
+    order). Post-order is *a* valid topological order and it kept every merge
+    after the things it merges — but on a recipe with two arms it interleaves
+    them, finishing one arm entirely before starting the other, when in a
+    kitchen you do the first thing in each column and move on. It also put
+    every standing instruction first, whatever its place on the page.
+
+    **A standing instruction is pulled one column earlier than the one it
+    covers.** Preheating is something you start *before* the step it serves, so
+    a band over the baking column belongs before the step that shapes the loaf,
+    not between the shaping and the baking. A band with no span covers
+    everything, is pulled to column 0, and comes first — which is the behaviour
+    every recipe written before spans existed already had.
+
+    Ties inside a column break towards the band, then down the page. Two
+    ordinary steps never tie: they are at different heights by construction.
     """
-    order = []
+    ranked = []
+    for step in steps:
+        # A band is a **root** with nothing going into it. The "is it a root"
+        # half is not decoration: a step in the middle of a chain can also have
+        # no ingredients and no children — "bring a pan of water to the boil"
+        # before "cook the pasta in it", or the "Vormischen" in the household's
+        # own bread recipe — and treating one of those as a standing
+        # instruction ranks it by a span it does not have and sends it to the
+        # front of the recipe.
+        band = (step.id in root_ids
+                and not inputs.get(step.id)
+                and not children[step.id])
+        if band:
+            start, _end = _band_span(step, total)
+            rank = start - 1
+        else:
+            rank = column[step.id]
+        block_at, row_at = placed.get(step.id, (0, 0))
+        # (which column, band first, then down the page)
+        ranked.append(((rank, 0 if band else 1, block_at, row_at), step))
 
-    def walk(step):
-        for child in children[step.id]:
-            walk(child)
-        order.append(CookStep(
+    ranked.sort(key=lambda pair: pair[0])
+    return [
+        CookStep(
             step=step,
-            number=len(order) + 1,
+            number=at + 1,
             ingredients=list(inputs.get(step.id, [])),
             from_steps=list(children[step.id]),
-        ))
-
-    for root in roots:
-        walk(root)
-    return order
+        )
+        for at, (_key, step) in enumerate(ranked)
+    ]

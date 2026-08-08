@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Cooked" %} – {% translate "Kitchen" %}{% endblock %}
+{% block topbar_title %}{% translate "Cooked" %}{% endblock %}
+{% block topbar_sub %}{% blocktranslate count n=total %}{{ n }} cooking recorded{% plural %}{{ n }} cookings recorded{% endblocktranslate %}{% endblock %}
+
+{% block content %}
+  <h1>{% translate "What has been cooked" %}</h1>
+  {% comment %}The page that makes the portion counts worth recording. One
+  evening's entry on one recipe answers nothing; the same entry beside the last
+  six answers "how often do we actually make this" and "does four really feed
+  us".{% endcomment %}
+  <p class="page-lead">{% translate "Every evening somebody wrote down, newest first. How far a dish went is usually clearer the next day — open an entry to correct it." %}</p>
+
+  {% if logs %}
+    <ul class="cook-log-list">
+      {% for log in logs %}
+        <li class="cook-log">
+          <div class="cook-log-head">
+            <span class="cook-log-date">{{ log.cooked_at|date:"SHORT_DATE_FORMAT" }}</span>
+            <a class="cook-log-recipe" href="{{ log.recipe.get_absolute_url }}">{{ log.recipe.title }}</a>
+            {% if log.cooked_by %}
+              <span class="cook-log-who">{% firstof log.cooked_by.get_short_name log.cooked_by.get_username %}</span>
+            {% endif %}
+            {% if log.minutes %}<span class="pill">{{ log.minutes }} {% translate "min" %}</span>{% endif %}
+            <span class="pill pill--herb">{% blocktranslate count n=log.servings_made %}{{ n }} serving{% plural %}{{ n }} servings{% endblocktranslate %}</span>
+          </div>
+          {% if log.portions_display %}
+            <div class="cook-log-portions">
+              {% for count, label in log.portions_display %}
+                <span class="pill pill--saffron">{{ count }} × {{ label }}</span>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="hint">{% translate "No portions recorded." %}</p>
+          {% endif %}
+          {% if log.notes %}<p class="cook-log-note">{{ log.notes }}</p>{% endif %}
+          {% comment %}Editing is not tied to who may edit the *recipe*: a
+          cooking is somebody's own record of their own evening.{% endcomment %}
+          {% if user.is_staff or log.cooked_by_id == user.id %}
+            <a class="link-button" href="{% url 'recipes:cook-log-edit' log.recipe.slug log.pk %}">{% translate "Edit" %}</a>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+    {% if more %}
+      <p class="hint">{% blocktranslate count n=more %}and {{ n }} earlier cooking{% plural %}and {{ n }} earlier cookings{% endblocktranslate %}</p>
+    {% endif %}
+  {% else %}
+    <p class="hint">{% translate "Nothing has been recorded yet. The cooking view offers to note it down when a recipe is finished." %}</p>
+  {% endif %}
+{% endblock %}

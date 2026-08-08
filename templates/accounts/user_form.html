@@ -9,7 +9,7 @@
   <h1>{% if person %}{% firstof person.get_full_name person.get_username %}{% else %}{% translate "New account" %}{% endif %}</h1>
 
   {% if is_sso %}
-    <p class="notice">{% translate "This account signs in through Synology. Its name and e-mail address come from DSM and are refreshed at every sign-in, so they cannot be changed here. What this page can change is whether they may sign in at all, and what they may do once they are in." %}</p>
+    <p class="notice">{% translate "This account signs in through SSO. Its name and e-mail address come from the identity provider and are refreshed at every sign-in, so they cannot be changed here. What this page can change is whether they may sign in at all, and what they may do once they are in." %}</p>
   {% endif %}
 
   {% if form.non_field_errors %}
@@ -87,7 +87,7 @@
     {% endif %}
 
     {% if is_sso and person %}
-      <p class="help">{% translate "If a Synology group is configured as the administrator group, DSM decides this at every sign-in and anything set here is replaced." %}</p>
+      <p class="help">{% translate "If a provider group is configured as the administrator group, the provider decides this at every sign-in and anything set here is replaced." %}</p>
     {% endif %}
 
     <div class="form-actions">

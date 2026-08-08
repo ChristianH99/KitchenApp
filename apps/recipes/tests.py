@@ -297,30 +297,74 @@ class TestRemovingAnIngredient:
         client.post(reverse("recipes:edit", args=[recipe.slug]), data)
         assert [i.name for i in recipe.ingredients.all()] == ["Kartoffeln"]
 
-    def test_a_row_carries_its_whole_form(self, client, recipe, db):
+    def test_every_way_to_add_a_row_lives_on_the_card(self, client, recipe, db):
+        """The three "add" controls are on the *card*, not on the canvas.
+
+        The canvas grows hover "+" buttons between its cells, and for a while
+        those were the only way to add a step *beside* another one — a sibling,
+        same parent and same column, its own ingredients. That put the one
+        gesture needed to build a branching recipe behind a mode the form does
+        not open in: the Steps list is the default, and it had no such control
+        at all. The household hit it twice, on the same recipe, and reported it
+        as "I still can't add a step below Zerbröseln".
+
+        So the rule is that the card carries every way to add a row, and the
+        canvas's hover buttons are a shortcut on top of it. This test is
+        deliberately about the *markup the server sends*, because that is what
+        is mode-independent — anything asserted after JavaScript has run would
+        pass in whichever mode the test happened to leave the page in, which is
+        exactly how the gap survived being checked by hand.
+        """
+        # The shared fixture is an ingredients-only recipe, so the steps this
+        # test is about have to be put there.
+        RecipeStep.objects.create(recipe=recipe, position=0, text="Kartoffeln kochen")
+        RecipeStep.objects.create(recipe=recipe, position=1, text="Abkühlen lassen")
+        body = client.get(reverse("recipes:edit", args=[recipe.slug])).content.decode()
+        steps = recipe.steps.count()
+        assert steps == 2
+        for control in ["data-step-add-line", "data-step-add-after", "data-step-add-beside"]:
+            # One per real card, plus the blank <template> the "+ Step" button
+            # clones — so strictly more than the number of steps.
+            assert body.count(control) > steps, (
+                f"{control} is missing from the step card: a recipe with {steps} "
+                f"steps rendered it {body.count(control)} times"
+            )
+
+    @pytest.mark.parametrize("marker, prefix, extra", [
+        ("data-ingredient-row", "ingredients", ["step_index", "alt_index", "position"]),
+        ("data-step-row", "steps", ["parent_index", "position"]),
+    ])
+    def test_a_card_carries_its_whole_form(self, client, recipe, db, marker, prefix, extra):
         """The structural half of the rule, and the one worth pinning.
 
-        Removal operates on the row element: it ticks that row's DELETE box and
-        hides it. So every field belonging to the form — the pk included — has
-        to be *inside* the row. A pk rendered beside the rows (which is what
-        ``{{ formset }}`` and most hand-written templates do) is a field the
-        operation leaves behind, and the row that comes back has lost its
-        identity.
+        The canvas *moves* a card into the cell it belongs in, and removal ticks
+        that card's DELETE box and hides it. Both operate on the element, so
+        every field of the form — the pk, the DELETE box and the three hidden
+        fields that carry the structure — has to be *inside* it. A field
+        rendered beside the cards (which is what ``{{ formset }}`` and most
+        hand-written templates do) is one that both operations leave behind:
+        the row that comes back has lost its identity, or its place.
+
+        Split on the marker rather than matched with a regex over the
+        surrounding markup, so this keeps testing the rule and not the layout
+        that happens to be around it. The <template> holding the blank form
+        carries the same marker and comes after the real cards, which is why
+        only the first few are read.
         """
         body = client.get(reverse("recipes:edit", args=[recipe.slug])).content.decode()
-        rows = re.findall(
-            r'<div class="ingredient-row"[^>]*>(.*?)(?=<div class="ingredient-row"|</div>\s*<p>)',
-            body, flags=re.S,
-        )
-        assert len(rows) >= recipe.ingredients.count()
-        for index, row in enumerate(rows[:recipe.ingredients.count()]):
-            assert f'name="ingredients-{index}-id"' in row, (
-                f"row {index} does not carry its own pk field"
-            )
-            assert f'name="ingredients-{index}-DELETE"' in row, (
-                f"row {index} does not carry its own DELETE box, so removing it "
-                "cannot mark it deleted"
-            )
+        cards = body.split(marker)[1:]
+        # The real rows, whatever there are of them. This used to assume one
+        # step even on a recipe with none, because the formset always rendered a
+        # spare blank row — it does not any more (`extra=0`), since a blank card
+        # on the canvas is a cell in the tray that cannot be got rid of.
+        count = (recipe.ingredients.count() if prefix == "ingredients"
+                 else recipe.steps.count())
+        assert len(cards) > count, "the blank form template is missing from the page"
+        for index, card in enumerate(cards[:count]):
+            for field in ["id", "DELETE"] + extra:
+                assert f'name="{prefix}-{index}-{field}"' in card, (
+                    f"{prefix} card {index} does not carry its own {field} field"
+                )
 
 
 # --------------------------------------------------------------------------
@@ -528,6 +572,109 @@ class TestTheFormWiresTheDiagramUp:
     first time nothing has a primary key yet, so the page refers to a step by
     its row number and forms.py turns that into a foreign key after saving."""
 
+    def test_a_row_that_was_only_arranged_is_not_a_row_somebody_typed(self, client, db):
+        """The trap the canvas walks into, and the reason the hidden fields
+        say they never change.
+
+        A formset validates and saves an extra row only when something in it
+        changed. The canvas writes to every blank card it lays out — dragging a
+        line past one renumbers its ``position``, and "+ Ingredient here"
+        stamps a ``step_index`` onto a card before a single letter is in it. If
+        those counted as edits, the blank card would be saved: a line on the
+        recipe with no name, no amount and nothing to say where it came from.
+        """
+        client.post(reverse("recipes:add"), _post_data(**{
+            **_management("ingredients", 2),
+            "ingredients-1-id": "",
+            "ingredients-1-amount": "", "ingredients-1-unit": "",
+            "ingredients-1-name": "", "ingredients-1-note": "",
+            # Everything the canvas would have written, and nothing a person
+            # would have.
+            "ingredients-1-step_index": "0",
+            "ingredients-1-position": "5",
+            "ingredients-0-position": "0",
+            # The real line has to be wired into the step, or the completeness
+            # check refuses the page before this one gets a chance to be
+            # wrongly saved — which would pass the test for the wrong reason.
+            "ingredients-0-step_index": "0",
+            **_management("steps", 1),
+            "steps-0-id": "", "steps-0-text": "bake", "steps-0-minutes": "",
+            "steps-0-detail": "", "steps-0-parent_index": "",
+        }))
+        recipe = Recipe.objects.get(title="Ofengemüse")
+        assert [line.name for line in recipe.ingredients.all()] == ["Kartoffeln"]
+
+    def test_the_arrangement_is_saved_even_when_nothing_else_changed(self, client, recipe, db):
+        """A drag that only moved things is still a change worth keeping.
+
+        The mirror of the test above, and the reason the order is applied in
+        ``wire_diagram`` rather than left to ``save()``: the same
+        ``has_changed`` that stops a blank row being saved also stops Django
+        saving a row whose *only* difference is where it sits. Without a pass of
+        its own, dragging two lines into a new order would look saved and be
+        back the way it was on the next load.
+        """
+        first, second = list(recipe.ingredients.all())[:2]
+        client.post(reverse("recipes:edit", args=[recipe.slug]), _post_data(**{
+            "title": recipe.title,
+            **_management("ingredients", 2, initial=2),
+            "ingredients-0-id": str(first.pk),
+            "ingredients-0-amount": first.amount or "", "ingredients-0-unit": first.unit,
+            "ingredients-0-name": first.name, "ingredients-0-note": first.note,
+            "ingredients-0-position": "1",
+            "ingredients-1-id": str(second.pk),
+            "ingredients-1-amount": second.amount or "", "ingredients-1-unit": second.unit,
+            "ingredients-1-name": second.name, "ingredients-1-note": second.note,
+            "ingredients-1-position": "0",
+            # "Salz und Pfeffer" has no amount and says so. Posting it without
+            # the flag is now an invalid line, and the page would come back
+            # unsaved — which this test would then read as "the order was not
+            # kept" rather than as the validation error it is.
+            "ingredients-1-no_amount": "on",
+            **_management("steps", 0),
+        }))
+        assert [line.name for line in recipe.ingredients.all()][:2] == [second.name, first.name]
+
+    def test_a_standing_instruction_keeps_the_place_it_was_left_in(self, client, db):
+        """"Heat the oven" is *drawn* where somebody put it.
+
+        A step with nothing going into it draws as a band, and which band comes
+        where on the page is its ``position``. Nothing else pins the order of
+        two roots.
+
+        Where it is *cooked* is a separate question, and the answer changed:
+        the walk-through now reads the diagram column by column and pulls a band
+        one column left of the one it covers, so a band with no span — which
+        covers everything — is asked for first however far down the page it is
+        drawn. That is deliberate. You start the oven before you need it, and
+        the household that asked for this ordering also asked for the band to
+        be placeable over just part of the width so it can say *when*.
+        ``TestHowFarAStandingInstructionReaches`` covers the narrowed case.
+        """
+        client.post(reverse("recipes:add"), _with_steps(**{
+            **_management("steps", 3),
+            "steps-2-id": "", "steps-2-text": "heat the oven",
+            "steps-2-minutes": "", "steps-2-detail": "", "steps-2-parent_index": "",
+            # After both of the others, which is the whole point.
+            "steps-0-position": "0", "steps-1-position": "1", "steps-2-position": "2",
+        }))
+        recipe = Recipe.objects.get(title="Ofengemüse")
+        oven = recipe.steps.get(text="heat the oven")
+        assert oven.parent_id is None
+
+        diagram = diagram_module.build(recipe)
+        _assert_rectangular(diagram)
+        # Its own block, last, and the full width of the table.
+        assert len(diagram.blocks) == 2
+        band = diagram.blocks[-1][0][0]
+        assert band.step.pk == oven.pk
+        assert band.colspan == diagram.columns
+        # Drawn last — and cooked first, because a band with no span covers
+        # every column and is pulled to the left of all of them. Both halves
+        # asserted together, because it is the *difference* between them that
+        # is easy to break by accident.
+        assert [entry.step.text for entry in diagram.order][0] == "heat the oven"
+
     def test_a_new_recipe_saves_its_tree(self, client, db):
         client.post(reverse("recipes:add"), _with_steps())
         recipe = Recipe.objects.get(title="Ofengemüse")
@@ -570,15 +717,24 @@ class TestTheFormWiresTheDiagramUp:
         melt.refresh_from_db()
         assert melt.parent_id == bake.pk
 
-    def test_an_index_naming_a_row_that_is_gone_becomes_unassigned(self, client, db):
-        """Not an error. The only way to produce one is by hand-crafting a
-        POST, and dropping the reference loses nothing while raising would lose
-        the whole recipe."""
-        client.post(reverse("recipes:add"), _with_steps(**{
+    def test_an_index_naming_a_row_that_is_gone_is_refused(self, client, db):
+        """An ingredient pointing at a step that is not there is a line in no step.
+
+        This used to be tolerated and silently unassigned. It is refused now,
+        because the same shape is produced by an ordinary edit — removing a
+        step leaves every line that fed it pointing at nothing — and quietly
+        dropping those lines out of the method is exactly the thing the
+        household asked to be stopped from doing.
+
+        ``wire_diagram`` still tolerates it (below), which is not redundant:
+        that is the last line of defence for anything reaching the model by
+        another road, and a dangling foreign key is a page that never renders.
+        """
+        response = client.post(reverse("recipes:add"), _with_steps(**{
             "ingredients-0-step_index": "7",
         }))
-        recipe = Recipe.objects.get(title="Ofengemüse")
-        assert recipe.ingredients.get(name="Kartoffeln").step_id is None
+        assert response.status_code == 200
+        assert not Recipe.objects.filter(title="Ofengemüse").exists()
 
     def test_a_loop_in_the_post_is_broken_rather_than_stored(self, client, db):
         """A cycle reaching the database is a recipe whose page never returns."""
@@ -614,10 +770,10 @@ class TestTheFormWiresTheDiagramUp:
         client.post(reverse("recipes:add"), _with_steps(**{
             **_management("ingredients", 3),
             "ingredients-1-id": "", "ingredients-1-name": "Süßkartoffeln",
-            "ingredients-1-amount": "", "ingredients-1-unit": "",
+            "ingredients-1-amount": "800", "ingredients-1-unit": "g",
             "ingredients-1-note": "", "ingredients-1-alt_index": "0",
             "ingredients-2-id": "", "ingredients-2-name": "Pastinaken",
-            "ingredients-2-amount": "", "ingredients-2-unit": "",
+            "ingredients-2-amount": "800", "ingredients-2-unit": "g",
             "ingredients-2-note": "", "ingredients-2-alt_index": "1",
         }))
         recipe = Recipe.objects.get(title="Ofengemüse")
@@ -643,12 +799,148 @@ class TestTheFormWiresTheDiagramUp:
         client.post(reverse("recipes:add"), _with_steps(**{
             **_management("ingredients", 2),
             "ingredients-1-id": "", "ingredients-1-name": "Süßkartoffeln",
-            "ingredients-1-amount": "", "ingredients-1-unit": "",
+            "ingredients-1-amount": "800", "ingredients-1-unit": "g",
             "ingredients-1-note": "", "ingredients-1-alt_index": "0",
         }))
         listing = client.get(reverse("recipes:list"))
         card = next(r for r in listing.context["recipes"] if r.title == "Ofengemüse")
         assert card.ingredient_count == 1
+
+
+class TestRemovingAStepTakesItOutOfTheChain:
+    """A step that has been removed is not "no parent" — it is a step taken out
+    of the middle of something, and what fed it now feeds whatever it fed.
+
+    The household found this the short way round: add a step beside
+    "Zerbröseln", change your mind, delete it again — and the recipe came apart.
+    "+ Step after this" rewires A → new → B, so removing the new one left A
+    pointing at a row that no longer exists, A and its whole subtree broke off
+    as a second block, and the ingredients under it went with them. The delete
+    has to undo the insert and touch nothing else.
+
+    Both halves are here because they fail differently. A step that was never
+    saved is deleted by *clearing* the card, which used to blank the very field
+    the answer is in; a saved one keeps its fields and only ticks DELETE.
+    """
+
+    def test_deleting_a_step_that_was_just_added_puts_the_chain_back(self, client, db):
+        client.post(reverse("recipes:add"), _with_steps(**{
+            **_management("steps", 3),
+            # "+ Step after this" on "melt": the new row takes melt's parent,
+            # and melt is pointed at the new row.
+            "steps-0-parent_index": "2",
+            "steps-2-id": "", "steps-2-text": "", "steps-2-minutes": "",
+            "steps-2-detail": "", "steps-2-parent_index": "1",
+            # ...and then removed again. static/js/recipe_form.js clears what
+            # somebody typed and keeps where the row sat, which is what the
+            # line above is.
+            "steps-2-DELETE": "on",
+        }))
+        recipe = Recipe.objects.get(title="Ofengemüse")
+        assert recipe.steps.count() == 2
+        melt, bake = recipe.steps.get(text="melt"), recipe.steps.get(text="bake")
+        assert melt.parent_id == bake.pk, "melt was left pointing at nothing"
+        assert bake.parent_id is None
+
+    def test_deleting_a_saved_step_rejoins_what_fed_it(self, client, db):
+        """The same rule on a recipe that already exists.
+
+        Without it, taking one box out of the middle of a chain detaches
+        everything above it — and ``validate_structure`` then refuses the whole
+        page for a branch that is not joined up, which is a save that fails and
+        cannot be made to succeed without re-drawing the diagram by hand.
+        """
+        client.post(reverse("recipes:add"), _with_steps(**{
+            **_management("steps", 3),
+            "steps-0-parent_index": "2",
+            "steps-2-id": "", "steps-2-text": "mix", "steps-2-minutes": "",
+            "steps-2-detail": "", "steps-2-parent_index": "1",
+        }))
+        recipe = Recipe.objects.get(title="Ofengemüse")
+        melt = recipe.steps.get(text="melt")
+        mix = recipe.steps.get(text="mix")
+        bake = recipe.steps.get(text="bake")
+        assert melt.parent_id == mix.pk
+
+        line = recipe.ingredients.get(name="Kartoffeln")
+        response = client.post(reverse("recipes:edit", args=[recipe.slug]), _post_data(**{
+            "title": recipe.title,
+            **_management("ingredients", 1, initial=1),
+            "ingredients-0-id": str(line.pk), "ingredients-0-amount": "800",
+            "ingredients-0-unit": "g", "ingredients-0-name": "Kartoffeln",
+            "ingredients-0-note": "", "ingredients-0-step_index": "0",
+            **_management("steps", 3, initial=3),
+            "steps-0-id": str(melt.pk), "steps-0-text": "melt", "steps-0-minutes": "",
+            "steps-0-detail": "", "steps-0-parent_index": "2",
+            "steps-1-id": str(bake.pk), "steps-1-text": "bake", "steps-1-minutes": "45",
+            "steps-1-detail": "", "steps-1-parent_index": "",
+            "steps-2-id": str(mix.pk), "steps-2-text": "mix", "steps-2-minutes": "",
+            "steps-2-detail": "", "steps-2-parent_index": "1",
+            "steps-2-DELETE": "on",
+        }))
+        assert response.status_code == 302, "the save was refused"
+        melt.refresh_from_db()
+        assert not recipe.steps.filter(pk=mix.pk).exists()
+        assert melt.parent_id == bake.pk
+
+
+class TestHowLongAStepTakes:
+    """A duration is minutes *and* seconds, and nothing reads either alone.
+
+    Two columns because almost every step is a round number of minutes and
+    typing 2700 for three quarters of an hour is a mistake in the direction
+    that burns something. One property to read them by, because a page that
+    reads ``minutes`` says "1 min" for a step set to 1:30 and a countdown that
+    reads it runs thirty seconds short — neither of which looks wrong.
+    """
+
+    def test_minutes_alone(self, recipe, db):
+        step = RecipeStep.objects.create(recipe=recipe, text="backen", minutes=45)
+        assert step.timer_seconds == 45 * 60
+        assert step.duration_label == "45 min"
+        assert step.timer_display == "45:00"
+
+    def test_seconds_alone(self, recipe, db):
+        step = RecipeStep.objects.create(recipe=recipe, text="mixen", seconds=45)
+        assert step.timer_seconds == 45
+        assert step.duration_label == "45 s"
+        assert step.timer_display == "0:45"
+
+    def test_both(self, recipe, db):
+        step = RecipeStep.objects.create(recipe=recipe, text="rühren", minutes=1, seconds=30)
+        assert step.timer_seconds == 90
+        assert step.duration_label == "1:30 min"
+        assert step.timer_display == "1:30"
+
+    def test_neither_is_no_timer_rather_than_a_zero_one(self, recipe, db):
+        step = RecipeStep.objects.create(recipe=recipe, text="abkühlen")
+        assert step.timer_seconds is None
+        assert step.duration_label == ""
+
+    def test_the_form_saves_a_duration_finer_than_a_minute(self, client, db):
+        client.post(reverse("recipes:add"), _with_steps(**{
+            "steps-1-minutes": "1", "steps-1-seconds": "30",
+        }))
+        assert Recipe.objects.get(title="Ofengemüse").steps.get(text="bake").timer_seconds == 90
+
+    def test_seconds_alone_are_enough_to_make_it_a_step(self, client, db):
+        """The mirror of the "a duration needs a step name" rule: a row with
+        only seconds on it is still a row somebody put a duration on."""
+        response = client.post(reverse("recipes:add"), _post_data(**{
+            **_management("steps", 1),
+            "steps-0-id": "", "steps-0-text": "", "steps-0-minutes": "",
+            "steps-0-seconds": "20", "steps-0-detail": "", "steps-0-parent_index": "",
+        }))
+        assert response.status_code == 200
+        assert not Recipe.objects.filter(title="Ofengemüse").exists()
+
+    def test_the_cooking_view_counts_the_whole_duration(self, client, recipe, db):
+        """One attribute holding the total, so the browser never adds two up —
+        the day one of them is missing the countdown is quietly short."""
+        RecipeStep.objects.create(recipe=recipe, text="rühren", minutes=1, seconds=30)
+        body = client.get(recipe.get_cook_url()).content.decode()
+        assert 'data-cook-seconds="90"' in body
+        assert "data-cook-minutes" not in body
 
 
 # --------------------------------------------------------------------------
@@ -877,3 +1169,472 @@ def _writes(captured):
         if query["sql"] and query["sql"].strip().split()[0].upper()
         in ("INSERT", "UPDATE", "DELETE")
     ]
+
+
+# --------------------------------------------------------------------------
+# What a recipe has to say before it may be saved
+# --------------------------------------------------------------------------
+
+class TestARecipeMustBeJoinedUp:
+    """The rules the household asked for, and the two exceptions that stop them
+    making perfectly ordinary recipes unsaveable.
+
+    Each of these refuses a page that used to save, which is the point: the
+    failures they catch — butter with no amount, a line in no step, a branch
+    wired to nothing — all produced a recipe that *looked* complete and could
+    not then be shopped for, scaled, or cooked from.
+    """
+
+    def test_a_line_with_no_amount_is_refused(self, client, db):
+        response = client.post(reverse("recipes:add"), _post_data(**{
+            "ingredients-0-amount": "",
+        }))
+        assert response.status_code == 200
+        assert not Recipe.objects.filter(title="Ofengemüse").exists()
+
+    def test_unless_it_says_it_has_none(self, client, db):
+        """"Salz", "etwas Öl" — the escape hatch, without which the rule above
+        makes them unrecordable and the way round it people find is typing 1."""
+        client.post(reverse("recipes:add"), _post_data(**{
+            "ingredients-0-amount": "", "ingredients-0-no_amount": "on",
+        }))
+        line = Recipe.objects.get(title="Ofengemüse").ingredients.get()
+        assert line.amount is None and line.no_amount
+
+    def test_an_amount_and_no_fixed_amount_together_are_refused(self, client, db):
+        """A line that contradicts itself — the scaler would have to pick one."""
+        response = client.post(reverse("recipes:add"), _post_data(**{
+            "ingredients-0-amount": "800", "ingredients-0-no_amount": "on",
+        }))
+        assert response.status_code == 200
+        assert not Recipe.objects.filter(title="Ofengemüse").exists()
+
+    def test_an_ingredient_in_no_step_is_refused(self, client, db):
+        """The Milch case: a line left in the tray while the recipe has a
+        method is a line that will not be cooked."""
+        response = client.post(reverse("recipes:add"), _with_steps(**{
+            **_management("ingredients", 2),
+            "ingredients-1-id": "", "ingredients-1-name": "Milch",
+            "ingredients-1-amount": "200", "ingredients-1-unit": "ml",
+            "ingredients-1-note": "",
+            # ...and deliberately no step_index.
+        }))
+        assert response.status_code == 200
+        assert not Recipe.objects.filter(title="Ofengemüse").exists()
+
+    def test_but_a_recipe_with_no_steps_at_all_is_still_a_recipe(self, client, db):
+        """A title and a list of ingredients has always been a perfectly good
+        entry. It is a recipe *with* a method where one line was left out of it
+        that is the mistake."""
+        client.post(reverse("recipes:add"), _post_data())
+        assert Recipe.objects.get(title="Ofengemüse").ingredients.count() == 1
+
+    def test_a_disconnected_branch_is_refused(self, client, db):
+        """The other half of the Brot case: "verkneten" typed but never wired
+        to the two doughs. Two roots that both produce something are two halves
+        of a recipe that never meet."""
+        response = client.post(reverse("recipes:add"), _post_data(**{
+            **_management("ingredients", 2),
+            "ingredients-0-step_index": "0",
+            "ingredients-1-id": "", "ingredients-1-name": "Milch",
+            "ingredients-1-amount": "200", "ingredients-1-unit": "ml",
+            "ingredients-1-note": "", "ingredients-1-step_index": "1",
+            **_management("steps", 2),
+            "steps-0-id": "", "steps-0-text": "Vorteig", "steps-0-minutes": "",
+            "steps-0-detail": "", "steps-0-parent_index": "",
+            "steps-1-id": "", "steps-1-text": "verkneten", "steps-1-minutes": "",
+            "steps-1-detail": "", "steps-1-parent_index": "",
+        }))
+        assert response.status_code == 200
+        assert not Recipe.objects.filter(title="Ofengemüse").exists()
+
+    def test_two_arms_meeting_at_a_third_step_is_fine(self, client, db):
+        """The Brot case done right — and the shape the whole diagram exists
+        for. Both arms feed step 2, which is then the only root that produces
+        anything."""
+        client.post(reverse("recipes:add"), _post_data(**{
+            **_management("ingredients", 3),
+            "ingredients-0-step_index": "0",
+            "ingredients-1-id": "", "ingredients-1-name": "Hefe",
+            "ingredients-1-amount": "1", "ingredients-1-unit": "cube",
+            "ingredients-1-note": "", "ingredients-1-step_index": "1",
+            "ingredients-2-id": "", "ingredients-2-name": "Milch",
+            "ingredients-2-amount": "200", "ingredients-2-unit": "ml",
+            "ingredients-2-note": "", "ingredients-2-step_index": "2",
+            **_management("steps", 3),
+            "steps-0-id": "", "steps-0-text": "Vorteig ansetzen", "steps-0-minutes": "",
+            "steps-0-detail": "", "steps-0-parent_index": "2",
+            "steps-1-id": "", "steps-1-text": "Hefe ansetzen", "steps-1-minutes": "",
+            "steps-1-detail": "", "steps-1-parent_index": "2",
+            "steps-2-id": "", "steps-2-text": "verkneten", "steps-2-minutes": "",
+            "steps-2-detail": "", "steps-2-parent_index": "",
+        }))
+        recipe = Recipe.objects.get(title="Ofengemüse")
+        knead = recipe.steps.get(text="verkneten")
+        assert {s.text for s in recipe.steps.filter(parent=knead)} == {
+            "Vorteig ansetzen", "Hefe ansetzen",
+        }
+        # And it lays out: "verkneten" sits a column to the right of both arms.
+        diagram = diagram_module.build(recipe)
+        _assert_rectangular(diagram)
+        assert diagram.columns == 3
+
+    def test_a_standing_instruction_is_still_allowed_beside_the_dish(self, client, db):
+        """"Heat the oven" has nothing feeding it and feeds nothing, and that
+        is what it *is*. The rule above must not catch it."""
+        client.post(reverse("recipes:add"), _with_steps(**{
+            **_management("steps", 3),
+            "steps-2-id": "", "steps-2-text": "Ofen vorheizen",
+            "steps-2-minutes": "", "steps-2-detail": "", "steps-2-parent_index": "",
+        }))
+        recipe = Recipe.objects.get(title="Ofengemüse")
+        assert recipe.steps.get(text="Ofen vorheizen").parent_id is None
+
+
+class TestHowFarAStandingInstructionReaches:
+    """"Heat the oven" across the whole width is right when everything waits
+    for it, and wrong when it happens *during* something — a band over every
+    column claims it runs alongside the steps that came before it too."""
+
+    def _recipe_with_a_band(self, client, span=None):
+        client.post(reverse("recipes:add"), _with_steps(**{
+            **_management("steps", 3),
+            "steps-2-id": "", "steps-2-text": "Ofen vorheizen",
+            "steps-2-minutes": "", "steps-2-detail": "", "steps-2-parent_index": "",
+            **({"steps-2-span_from": str(span[0]), "steps-2-span_to": str(span[1])}
+               if span else {}),
+        }))
+        return Recipe.objects.get(title="Ofengemüse")
+
+    def test_by_default_it_still_spans_the_whole_width(self, client, db):
+        """The reference diagram's band, and the behaviour every recipe written
+        before the span existed must keep."""
+        recipe = self._recipe_with_a_band(client)
+        oven = recipe.steps.get(text="Ofen vorheizen")
+        assert (oven.span_from, oven.span_to) == (None, None)
+        diagram = diagram_module.build(recipe)
+        _assert_rectangular(diagram)
+        band = diagram.blocks[-1][0]
+        assert len(band) == 1
+        assert band[0].colspan == diagram.columns
+
+    def test_a_span_puts_filler_either_side(self, client, db):
+        """Filler, not omitted cells: a row that simply leaves the columns out
+        has silently moved everything after it one column left."""
+        recipe = self._recipe_with_a_band(client, span=(2, 2))
+        oven = recipe.steps.get(text="Ofen vorheizen")
+        assert (oven.span_from, oven.span_to) == (2, 2)
+        diagram = diagram_module.build(recipe)
+        _assert_rectangular(diagram)
+        band = diagram.blocks[-1][0]
+        assert [(c.kind, c.colspan) for c in band] == [
+            ("filler", 1), ("step", 1), ("filler", diagram.columns - 2),
+        ]
+
+    def test_a_span_wider_than_the_recipe_is_clamped(self, recipe, db):
+        """The numbers are a layout hint against a geometry that is *derived*.
+        Add a step and the table grows a column; delete one and it shrinks. A
+        colspan of zero collapses the row and one past the end drags the table
+        wider than its own header."""
+        step = RecipeStep.objects.create(
+            recipe=recipe, position=0, text="Ofen vorheizen",
+            span_from=9, span_to=99,
+        )
+        diagram = diagram_module.build(recipe)
+        _assert_rectangular(diagram)
+        assert step.span_from > diagram.columns          # the stored value is untouched
+        band = diagram.blocks[-1][0]
+        assert sum(c.colspan for c in band) == diagram.columns
+
+    def test_the_ends_may_be_given_the_wrong_way_round(self, recipe, db):
+        RecipeStep.objects.create(
+            recipe=recipe, position=0, text="Ofen vorheizen", span_from=3, span_to=1,
+        )
+        diagram = diagram_module.build(recipe)
+        _assert_rectangular(diagram)
+
+    def test_a_span_survives_a_save_that_changed_nothing_else(self, client, db):
+        """``_SpanField.has_changed`` is always False, so ``formset.save()``
+        never reaches a row whose only difference is its span — which is why
+        ``wire_diagram`` applies it in a pass of its own."""
+        recipe = self._recipe_with_a_band(client, span=(2, 2))
+        oven = recipe.steps.get(text="Ofen vorheizen")
+        melt, bake = recipe.steps.get(text="melt"), recipe.steps.get(text="bake")
+        line = recipe.ingredients.get(name="Kartoffeln")
+
+        client.post(reverse("recipes:edit", args=[recipe.slug]), _post_data(**{
+            "title": recipe.title,
+            **_management("ingredients", 1, initial=1),
+            "ingredients-0-id": str(line.pk), "ingredients-0-amount": "800",
+            "ingredients-0-unit": "g", "ingredients-0-name": "Kartoffeln",
+            "ingredients-0-note": "", "ingredients-0-step_index": "0",
+            **_management("steps", 3, initial=3),
+            "steps-0-id": str(melt.pk), "steps-0-text": "melt", "steps-0-minutes": "",
+            "steps-0-detail": "", "steps-0-parent_index": "1",
+            "steps-1-id": str(bake.pk), "steps-1-text": "bake", "steps-1-minutes": "45",
+            "steps-1-detail": "", "steps-1-parent_index": "",
+            "steps-2-id": str(oven.pk), "steps-2-text": "Ofen vorheizen",
+            "steps-2-minutes": "", "steps-2-detail": "", "steps-2-parent_index": "",
+            "steps-2-span_from": "2", "steps-2-span_to": "2",
+        }))
+        oven.refresh_from_db()
+        assert (oven.span_from, oven.span_to) == (2, 2)
+
+    def test_it_is_cleared_when_the_step_stops_standing_alone(self, client, db):
+        """A stale span is what would draw a band across half the table the day
+        somebody took the last ingredient back out of a step."""
+        recipe = self._recipe_with_a_band(client, span=(2, 2))
+        oven = recipe.steps.get(text="Ofen vorheizen")
+        melt, bake = recipe.steps.get(text="melt"), recipe.steps.get(text="bake")
+        line = recipe.ingredients.get(name="Kartoffeln")
+
+        client.post(reverse("recipes:edit", args=[recipe.slug]), _post_data(**{
+            "title": recipe.title,
+            **_management("ingredients", 1, initial=1),
+            "ingredients-0-id": str(line.pk), "ingredients-0-amount": "800",
+            "ingredients-0-unit": "g", "ingredients-0-name": "Kartoffeln",
+            "ingredients-0-note": "", "ingredients-0-step_index": "0",
+            **_management("steps", 3, initial=3),
+            "steps-0-id": str(melt.pk), "steps-0-text": "melt", "steps-0-minutes": "",
+            "steps-0-detail": "", "steps-0-parent_index": "1",
+            "steps-1-id": str(bake.pk), "steps-1-text": "bake", "steps-1-minutes": "45",
+            "steps-1-detail": "", "steps-1-parent_index": "",
+            "steps-2-id": str(oven.pk), "steps-2-text": "Ofen vorheizen",
+            "steps-2-minutes": "", "steps-2-detail": "", "steps-2-parent_index": "1",
+            # ...and the canvas sends no span for a step that is no longer a band.
+        }))
+        oven.refresh_from_db()
+        assert (oven.span_from, oven.span_to) == (None, None)
+
+
+class TestTheCookingViewReadsTheDiagram:
+    """The walk-through goes column by column from the left, top to bottom
+    within a column — because that is how the table beside it is laid out, and
+    a walk-through whose order disagrees with the picture is one nobody trusts
+    twice."""
+
+    def _chain(self, recipe, *names):
+        """Steps in a straight chain, first feeding second and so on."""
+        made = [RecipeStep.objects.create(recipe=recipe, position=n, text=name)
+                for n, name in enumerate(names)]
+        for earlier, later in zip(made, made[1:]):
+            earlier.parent = later
+            earlier.save(update_fields=["parent"])
+        return made
+
+    def test_two_arms_are_interleaved_by_column(self, recipe, db):
+        """The old post-order walk finished one arm entirely before starting
+        the other. In a kitchen you do the first thing in each column and move
+        on."""
+        left = self._chain(recipe, "chop", "fry")
+        right = RecipeStep.objects.create(recipe=recipe, position=9, text="whisk")
+        right.parent = left[1]
+        right.save(update_fields=["parent"])
+        RecipeIngredient.objects.create(recipe=recipe, position=8, amount=Decimal(1),
+                                        unit="pc", name="Ei", step=right)
+
+        order = [entry.step.text for entry in diagram_module.build(recipe).order]
+        # "chop" and "whisk" are both column 1; "fry" is column 2 and comes
+        # after both of them rather than straight after "chop".
+        assert order.index("fry") > order.index("whisk")
+
+    def test_a_step_with_no_ingredients_is_not_mistaken_for_a_band(self, recipe, db):
+        """A step in the middle of a chain can have nothing going into it —
+        "bring a pan of water to the boil" — and is *not* a standing
+        instruction. Ranking one as a band sends it to the front of the recipe,
+        which is what happened to the household's "Vormischen"."""
+        first, second, third = self._chain(recipe, "dissolve", "premix", "stir")
+        RecipeIngredient.objects.create(recipe=recipe, position=8, amount=Decimal(1),
+                                        unit="g", name="Hefe", step=first)
+        # `premix` has no ingredients and no children of its own.
+        order = [entry.step.text for entry in diagram_module.build(recipe).order]
+        assert order.index("dissolve") < order.index("premix") < order.index("stir")
+
+    def test_a_narrowed_band_is_pulled_one_column_left_of_what_it_covers(self, recipe, db):
+        """You start the oven before you need it, so a band over the baking
+        column belongs before the step that shapes the loaf."""
+        shape, bake = self._chain(recipe, "shape", "bake")
+        RecipeIngredient.objects.create(recipe=recipe, position=8, amount=Decimal(1),
+                                        unit="g", name="Mehl", step=shape)
+        columns = diagram_module.build(recipe).columns
+        oven = RecipeStep.objects.create(
+            recipe=recipe, position=9, text="heat the oven",
+            span_from=columns, span_to=columns,
+        )
+        order = [entry.step.text for entry in diagram_module.build(recipe).order]
+        assert order.index("heat the oven") < order.index("bake")
+        assert order.index("shape") < order.index("heat the oven")
+        assert oven.parent_id is None
+
+    def test_the_numbers_run_from_one_with_no_gaps(self, recipe, db):
+        self._chain(recipe, "a", "b", "c")
+        order = diagram_module.build(recipe).order
+        assert [entry.number for entry in order] == list(range(1, len(order) + 1))
+
+
+class TestAStepCanHoldSeveralThingsToDo:
+    """The first real recipe typed into this app put two actions in one box —
+    "- Topf in Ofen stellen / - Ofen vorheizen" — because that is what they
+    are: two things done at one point in the flow, not two boxes."""
+
+    def test_the_lines_are_split_and_their_dashes_taken_off(self, recipe, db):
+        step = RecipeStep.objects.create(
+            recipe=recipe, position=0,
+            text="- Topf in Ofen stellen\r\n- Ofen vorheizen",
+        )
+        assert step.parts == ["Topf in Ofen stellen", "Ofen vorheizen"]
+        assert step.is_multipart
+
+    def test_blank_lines_do_not_become_empty_bullets(self, recipe, db):
+        step = RecipeStep.objects.create(recipe=recipe, position=0,
+                                         text="mix\n\n  \n- rest\n-\n")
+        assert step.parts == ["mix", "rest"]
+
+    def test_a_plain_step_is_one_part(self, recipe, db):
+        step = RecipeStep.objects.create(recipe=recipe, position=0, text="verrühren")
+        assert step.parts == ["verrühren"]
+        assert not step.is_multipart
+        assert step.headline == "verrühren"
+
+    def test_the_headline_keeps_every_part(self, recipe, db):
+        """Truncating to the first line would make "Topf in Ofen stellen" a
+        different instruction from the pair it belongs to."""
+        step = RecipeStep.objects.create(recipe=recipe, position=0, text="- a\n- b")
+        assert step.headline == "a · b"
+
+
+class TestTheCatalogueLearnsFromASavedRecipe:
+    def test_a_typed_name_becomes_an_ingredient(self, client, db):
+        """Which is how the catalogue fills with what this household actually
+        cooks, rather than only what it was shipped knowing."""
+        from apps.pantry.models import Ingredient
+
+        client.post(reverse("recipes:add"), _post_data(**{
+            "ingredients-0-name": "Pastinakenpüree",
+        }))
+        line = Recipe.objects.get(title="Ofengemüse").ingredients.get()
+        assert line.ingredient == Ingredient.objects.get(name="Pastinakenpüree")
+
+    def test_a_name_the_catalogue_knows_is_matched_not_duplicated(self, client, db):
+        from apps.pantry.models import Ingredient
+
+        client.post(reverse("recipes:add"), _post_data(**{"ingredients-0-name": "Butter"}))
+        assert Ingredient.objects.filter(name__iexact="Butter").count() == 1
+
+
+class TestTheUnitIsShownInThePagesLanguage:
+    def test_the_stored_code_is_never_what_is_rendered(self, client, recipe, db):
+        """The column holds a language-neutral code. A template rendering it
+        directly writes "tbsp" onto a German page — not obviously wrong, only
+        wrong, and it stays that way until a German reader notices."""
+        RecipeIngredient.objects.create(
+            recipe=recipe, position=2, amount=Decimal(2), unit="tbsp", name="Essig",
+        )
+        line = recipe.ingredients.get(name="Essig")
+        assert line.unit == "tbsp"
+        assert str(line.unit_label) == "tbsp"          # English, per conftest
+        assert "Essig" in client.get(recipe.get_absolute_url()).content.decode()
+
+    @pytest.mark.parametrize("page", ["detail", "cook"])
+    def test_every_page_that_shows_a_unit_translates_it(self, client, recipe, db, page):
+        """Rendered in German and checked for the raw code.
+
+        Three templates were rendering `{{ item.unit }}` directly — the
+        diagram, the cooking view twice over — so a German page read
+        "20 cube Test" where it should have said "20 Würfel". Nothing caught
+        it: the page renders, the value is right, and only the word is wrong.
+        This is the check that would have.
+        """
+        from django.utils import translation
+
+        step = RecipeStep.objects.create(recipe=recipe, position=0, text="verrühren")
+        RecipeIngredient.objects.create(
+            recipe=recipe, position=2, amount=Decimal(1), unit="cube",
+            name="Hefe", step=step,
+        )
+        url = recipe.get_absolute_url() if page == "detail" else recipe.get_cook_url()
+        with translation.override("de"):
+            body = client.get(url, headers={"accept-language": "de"}).content.decode()
+        assert "Würfel" in body, "the unit was not rendered in German"
+        # The code itself must not reach the page. Guarded against a false pass
+        # from some unrelated occurrence by checking it next to its amount.
+        assert "cube" not in body, "the raw unit code reached the page"
+
+
+# --------------------------------------------------------------------------
+# The cooking history
+# --------------------------------------------------------------------------
+
+class TestEditingACookingAfterTheFact:
+    """How far a dish went is known the *next* day. Before this page the only
+    way to correct it was to delete the entry, which took the date and the
+    measured time with it."""
+
+    def _log(self, client, recipe):
+        client.post(reverse("recipes:cooked", args=[recipe.slug]), {
+            "servings_made": "4", "minutes": "55", "notes": "",
+            "portion_regular": "2", "portion_togo": "1",
+        })
+        return recipe.cook_logs.get()
+
+    def test_the_form_comes_back_carrying_the_portions(self, client, recipe):
+        """Rendering it empty would mean that saving it to fix the *time*
+        silently took the portions away."""
+        log = self._log(client, recipe)
+        response = client.get(reverse("recipes:cook-log-edit", args=[recipe.slug, log.pk]))
+        assert response.context["form"].initial["portion_regular"] == 2
+
+    def test_a_corrected_count_replaces_the_old_one(self, client, recipe):
+        log = self._log(client, recipe)
+        client.post(reverse("recipes:cook-log-edit", args=[recipe.slug, log.pk]), {
+            "servings_made": "4", "minutes": "55", "notes": "",
+            "portion_regular": "3", "portion_togo": "1",
+        })
+        assert dict(log.portions.values_list("size", "count")) == {"regular": 3, "togo": 1}
+
+    def test_a_count_set_to_nothing_removes_the_row(self, client, recipe):
+        """"No portions to take away" and "a row saying nought" are the same
+        claim, and only one of them belongs on the page."""
+        log = self._log(client, recipe)
+        client.post(reverse("recipes:cook-log-edit", args=[recipe.slug, log.pk]), {
+            "servings_made": "4", "minutes": "55", "notes": "",
+            "portion_regular": "2", "portion_togo": "",
+        })
+        assert dict(log.portions.values_list("size", "count")) == {"regular": 2}
+
+    def test_the_date_survives_the_edit(self, client, recipe):
+        log = self._log(client, recipe)
+        before = log.cooked_at
+        client.post(reverse("recipes:cook-log-edit", args=[recipe.slug, log.pk]), {
+            "servings_made": "6", "minutes": "60", "notes": "mehr Salz",
+            "portion_regular": "2",
+        })
+        log.refresh_from_db()
+        assert log.cooked_at == before
+        assert (log.servings_made, log.minutes, log.notes) == (6, 60, "mehr Salz")
+
+    def test_somebody_else_may_not_edit_it(self, client, other_user, recipe):
+        """A cooking is somebody's own record of their own evening — a
+        different question from who may edit the recipe."""
+        from django.test import Client
+
+        log = self._log(client, recipe)
+        other = Client()
+        other.force_login(other_user)
+        assert other.get(
+            reverse("recipes:cook-log-edit", args=[recipe.slug, log.pk])
+        ).status_code == 404
+
+
+class TestTheHistoryPage:
+    def test_it_lists_cookings_across_every_recipe(self, client, recipe, db):
+        CookLog.objects.create(recipe=recipe, servings_made=4, minutes=50)
+        response = client.get(reverse("recipes:history"))
+        assert response.status_code == 200
+        assert [log.recipe_id for log in response.context["logs"]] == [recipe.pk]
+
+    def test_it_does_not_write(self, client, recipe, db):
+        CookLog.objects.create(recipe=recipe, servings_made=4, minutes=50)
+        with CaptureQueriesContext(connection) as queries:
+            client.get(reverse("recipes:history"))
+        assert not _writes(queries), f"the history page writes on a GET: {_writes(queries)}"

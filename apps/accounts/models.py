@@ -56,7 +56,7 @@ class SSOConfiguration(models.Model):
     id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
 
     enabled = models.BooleanField(
-        _("offer Synology sign-in"), default=False,
+        _("offer single sign-on"), default=False,
         help_text=_("With this off, the local password form is the only way in."),
     )
 
@@ -91,7 +91,7 @@ class SSOConfiguration(models.Model):
     )
     groups_claim = models.CharField(
         _("group claim"), max_length=100, default="groups",
-        help_text=_("The claim the group names arrive in. Some DSM versions send none at all."),
+        help_text=_("The claim the group names arrive in. Some providers send none at all."),
     )
     staff_group = models.CharField(
         _("administrator group"), max_length=200, blank=True,
@@ -243,3 +243,65 @@ class SSOConfiguration(models.Model):
             and endpoints["authorization"]
             and endpoints["token"]
         )
+
+
+class TimerSound(models.TextChoices):
+    """What a step timer does when it reaches nought.
+
+    A closed set, and every one of them is *generated* in the browser rather
+    than fetched — static/js/recipe_cook.js builds them with the Web Audio API.
+    That is not cleverness for its own sake: an audio file would be a binary
+    asset in the repository, a request the Content-Security-Policy has to allow,
+    and a decode that a phone with the screen off may not have done yet when the
+    bread is ready. A tone synthesised on the spot has none of those problems
+    and is four lines.
+    """
+
+    CHIME = "chime", _("chime — two soft notes")
+    BELL = "bell", _("bell — one long ring")
+    BEEPS = "beeps", _("beeps — three short tones")
+    ALARM = "alarm", _("alarm — insistent, for a noisy kitchen")
+    NONE = "none", _("no sound")
+
+
+class Preferences(models.Model):
+    """One person's own settings.
+
+    Per person and not per household, because this is about a body rather than
+    about the food: which noise cuts through *your* kitchen, and whether you
+    want one at all at six in the morning. The recipes are shared; this is not.
+
+    Created on demand by ``for_user`` rather than by a signal on User. A signal
+    would put a write inside every login — including the OIDC callback, where
+    an exception means a sign-in that fails with no explanation — for a row
+    that most people never change.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="preferences",
+    )
+    timer_sound = models.CharField(
+        _("timer sound"), max_length=10,
+        choices=TimerSound.choices, default=TimerSound.CHIME,
+        help_text=_("Played when a step’s timer reaches nought."),
+    )
+
+    class Meta:
+        verbose_name = _("preferences")
+        verbose_name_plural = _("preferences")
+
+    def __str__(self):
+        return f"preferences for {self.user_id}"
+
+    @classmethod
+    def for_user(cls, user):
+        """The row for this person, without writing one on a read.
+
+        Returns an unsaved instance for somebody who has never opened the
+        settings page — the defaults are the defaults, and a GET that creates a
+        row would take SQLite's one write lock to answer "no, you have not
+        changed anything".
+        """
+        if not user or not user.is_authenticated:
+            return cls()
+        return cls.objects.filter(user=user).first() or cls(user=user)

@@ -1,0 +1,30 @@
+{% load i18n %}
+{% comment %}What the oven is set to, wherever a step says so.
+
+An icon and two values rather than a sentence inside the step text. "180 °C" is
+a number, and a number is the thing somebody standing at the oven is looking
+for — it wants to be findable at a glance rather than read out of a phrase. The
+mode is a closed set for the same reason the portion sizes are: "Umluft",
+"umluft" and "Heißluft" written by hand are three settings for one oven.
+
+Included by the diagram cell, the step tile in the editor and the cooking view,
+which is why it is a partial rather than the same markup three times.{% endcomment %}
+<span class="oven-setting">
+  {% comment %}An oven: a box with a door line and the two heating elements.
+  Inline SVG so it takes `currentColor` and needs no second asset for the
+  green tile and the white cooking card.{% endcomment %}
+  <svg class="oven-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <rect x="3.5" y="3" width="17" height="18" rx="2.5"></rect>
+    <path d="M3.5 8.5h17"></path>
+    <path d="M7 5.75h5"></path>
+    <path d="M7.5 12h9"></path>
+    <path d="M7.5 17.5h9"></path>
+  </svg>
+  {% if step.oven_celsius %}
+    <span class="oven-temp">{{ step.oven_celsius }}&nbsp;°C</span>
+  {% endif %}
+  {% if step.oven_mode %}
+    <span class="oven-mode">{{ step.oven_mode_label }}</span>
+  {% endif %}
+</span>

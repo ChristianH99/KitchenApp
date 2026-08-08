@@ -16,7 +16,7 @@
   </div>
 
   {% if sso_count %}
-    <p class="hint">{% blocktranslate count n=sso_count %}{{ n }} of these signs in through Synology. Their name and e-mail come from DSM and are refreshed at every sign-in.{% plural %}{{ n }} of these sign in through Synology. Their names and e-mail addresses come from DSM and are refreshed at every sign-in.{% endblocktranslate %}</p>
+    <p class="hint">{% blocktranslate count n=sso_count %}{{ n }} of these signs in through SSO. Their name and e-mail come from the identity provider and are refreshed at every sign-in.{% plural %}{{ n }} of these sign in through SSO. Their names and e-mail addresses come from the identity provider and are refreshed at every sign-in.{% endblocktranslate %}</p>
   {% endif %}
 
   <div class="table-card">
@@ -37,12 +37,12 @@
           <tr{% if not person.is_active %} class="is-inactive"{% endif %}>
             <th scope="row">
               <a href="{% url 'accounts:user-edit' person.pk %}">{% firstof person.get_full_name person.get_username %}</a>
-              {% comment %}A Synology account's username is the provider's `sub`
+              {% comment %}An SSO account's username is the provider's `sub`
               — an opaque string, never an e-mail (apps/accounts/oidc.py). Shown
               small and only when it is not already the name above it, because
               it is an identifier rather than something to read.{% endcomment %}
               {% if person.is_sso %}
-                <span class="people-sub" title="{% translate 'Synology identity' %}">{{ person.get_username|truncatechars:22 }}</span>
+                <span class="people-sub" title="{% translate 'Identity from the provider' %}">{{ person.get_username|truncatechars:22 }}</span>
               {% elif person.get_full_name %}
                 <span class="people-sub">{{ person.get_username }}</span>
               {% endif %}
@@ -50,7 +50,7 @@
             </th>
             <td>
               {% if person.is_sso %}
-                <span class="pill pill--herb">{% translate "Synology" %}</span>
+                <span class="pill pill--herb">{% translate "SSO" %}</span>
               {% else %}
                 <span class="pill">{% translate "Password" %}</span>
               {% endif %}
@@ -109,10 +109,10 @@
       <h2 class="modal-title" id="help-title">{% translate "Accounts in this app" %}</h2>
       <div class="modal-body">
         <h3>{% translate "Two kinds" %}</h3>
-        <p>{% translate "An account marked “Synology” is the local end of a DSM identity. Its name and e-mail are copied from DSM at every sign-in, so changing them here would be undone; its password lives in DSM and cannot be set from this app at all." %}</p>
-        <p>{% translate "An account marked “Password” was created here. Use one for somebody who cooks in this house but has no DSM account — and keep one as the way back in when SSO is the thing that is broken." %}</p>
+        <p>{% translate "An account marked “SSO” is the local end of an identity held by the provider. Its name and e-mail are copied from there at every sign-in, so changing them here would be undone; its password lives with the provider and cannot be set from this app at all." %}</p>
+        <p>{% translate "An account marked “Password” was created here. Use one for somebody who cooks in this house but has no account with the provider — and keep one as the way back in when SSO is the thing that is broken." %}</p>
         <h3>{% translate "Why somebody is missing" %}</h3>
-        <p>{% translate "This app has no way to read the list of DSM accounts. A Synology account appears here the first time it signs in, and not before." %}</p>
+        <p>{% translate "This app has no way to read the provider’s list of accounts. An SSO account appears here the first time it signs in, and not before." %}</p>
         <h3>{% translate "Switching off, or deleting" %}</h3>
         <p>{% translate "Switching an account off is reversible and keeps their name on the recipes they added. Deleting is not: the recipes stay in the collection but no longer say who contributed them." %}</p>
       </div>

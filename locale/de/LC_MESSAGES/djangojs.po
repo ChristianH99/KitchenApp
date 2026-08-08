@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kitchenapp 0.1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-05 22:26+0200\n"
+"POT-Creation-Date: 2026-08-08 17:19+0200\n"
 "PO-Revision-Date: 2026-08-05 12:00+0200\n"
 "Last-Translator: KitchenApp\n"
 "Language-Team: German\n"
@@ -17,49 +17,126 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: .\static\js\recipe_cook.js:89
+#: .\static\js\ingredient_suggest.js:220
+msgid "keep your wording, count it as this"
+msgstr "deine Schreibweise behalten, als dies zählen"
+
+#: .\static\js\recipe_cook.js:90
 msgid "Pause"
 msgstr "Pause"
 
-#: .\static\js\recipe_cook.js:89
+#: .\static\js\recipe_cook.js:90
 msgid "Start"
 msgstr "Start"
 
-#: .\static\js\recipe_cook.js:116
+#: .\static\js\recipe_cook.js:117
 msgid "Start again?"
 msgstr "Von vorn anfangen?"
 
-#: .\static\js\recipe_cook.js:117
+#: .\static\js\recipe_cook.js:118
 msgid "The stopwatch goes back to zero and you return to the first step."
 msgstr "Die Stoppuhr geht auf null zurück und es geht wieder beim ersten Schritt los."
 
-#: .\static\js\recipe_cook.js:118
+#: .\static\js\recipe_cook.js:119
 msgid "Start again"
 msgstr "Von vorn anfangen"
 
-#: .\static\js\recipe_cook.js:186
+#: .\static\js\recipe_cook.js:187
 msgid "Step %(n)s of %(total)s"
 msgstr "Schritt %(n)s von %(total)s"
 
-#: .\static\js\recipe_cook.js:277
-msgid "Time is up"
-msgstr "Zeit ist um"
+#: .\static\js\recipe_cook.js:423 .\static\js\timer_watch.js:284
+msgid "The timer has finished."
+msgstr "Der Timer ist abgelaufen."
 
-#: .\static\js\recipe_cook.js:290
-msgid "Running"
-msgstr "Läuft"
+#: .\static\js\recipe_cook.js:430 .\static\js\timer_watch.js:281
+msgid "Stop the alarm"
+msgstr "Alarm ausschalten"
 
-#: .\static\js\recipe_diagram.js:136
+#: .\static\js\recipe_diagram.js:485
+msgid "Takes in what comes out of: %(steps)s"
+msgstr "Nimmt auf, was herauskommt aus: %(steps)s"
+
+#: .\static\js\recipe_diagram.js:488 .\static\js\recipe_diagram.js:714
+#: .\static\js\recipe_diagram.js:736 .\static\js\recipe_diagram.js:1292
 msgid "Step %(n)s"
 msgstr "Schritt %(n)s"
 
-#: .\static\js\recipe_diagram.js:138
+#: .\static\js\recipe_diagram.js:685 .\static\js\recipe_diagram.js:1292
 msgid "Line %(n)s"
 msgstr "Zeile %(n)s"
 
-#: .\static\js\recipe_diagram.js:273
-msgid "Not in any step yet: %(names)s"
-msgstr "Noch in keinem Schritt: %(names)s"
+#: .\static\js\recipe_diagram.js:1297
+msgid "%(line)s is now in “%(step)s”"
+msgstr "%(line)s liegt jetzt in „%(step)s“"
+
+#: .\static\js\recipe_diagram.js:1302
+msgid "%(line)s is not in any step"
+msgstr "%(line)s liegt in keinem Schritt"
+
+#: .\static\js\recipe_diagram.js:1307
+msgid "%(step)s now feeds into “%(parent)s”"
+msgstr "%(step)s mündet jetzt in „%(parent)s“"
+
+#: .\static\js\recipe_diagram.js:1312
+msgid "%(step)s no longer feeds into anything"
+msgstr "%(step)s mündet in nichts mehr"
+
+#: .\static\js\recipe_diagram.js:1319
+msgid "%(step)s is now %(n)s of %(total)s"
+msgstr "%(step)s ist jetzt %(n)s von %(total)s"
+
+#: .\static\js\recipe_diagram.js:1541 .\static\js\recipe_diagram.js:1542
+msgid "Drag to change which ingredients go into this step"
+msgstr "Ziehen, um zu ändern, welche Zutaten in diesen Schritt gehen"
+
+#: .\static\js\recipe_diagram.js:1567
+msgid "Drag to change where this step starts"
+msgstr "Ziehen, um zu ändern, wo dieser Schritt beginnt"
+
+#: .\static\js\recipe_diagram.js:1568
+msgid "Drag to change how far this step reaches"
+msgstr "Ziehen, um zu ändern, wie weit dieser Schritt reicht"
+
+#: .\static\js\recipe_diagram.js:1914
+msgid "Add an ingredient here"
+msgstr "Hier eine Zutat einfügen"
+
+#: .\static\js\recipe_diagram.js:1921
+msgid "Add a step after this one"
+msgstr "Danach einen Schritt einfügen"
+
+#: .\static\js\recipe_diagram.js:1931
+msgid "Add a step below, in the same column"
+msgstr "Darunter einen Schritt in derselben Spalte einfügen"
+
+#: .\static\js\recipe_diagram.js:1962
+msgid "top and bottom heat"
+msgstr "Ober-/Unterhitze"
+
+#: .\static\js\recipe_diagram.js:1963
+msgid "fan"
+msgstr "Umluft"
+
+#: .\static\js\recipe_diagram.js:1964
+msgid "top heat"
+msgstr "Oberhitze"
+
+#: .\static\js\recipe_diagram.js:1965
+msgid "bottom heat"
+msgstr "Unterhitze"
+
+#: .\static\js\recipe_diagram.js:1966
+msgid "grill"
+msgstr "Grill"
+
+#: .\static\js\recipe_diagram.js:1967
+msgid "fan grill"
+msgstr "Umluftgrill"
+
+#: .\static\js\recipe_diagram.js:2003
+msgid "An oven temperature is a whole number between %(min)s and %(max)s °C."
+msgstr "Eine Ofentemperatur ist eine ganze Zahl zwischen %(min)s und %(max)s °C."
 
 #: .\static\js\shell.js:175 .\static\js\shell.js:184
 msgid "OK"
@@ -72,3 +149,19 @@ msgstr "Weiter"
 #: .\static\js\shell.js:380
 msgid "Dismiss"
 msgstr "Schließen"
+
+#: .\static\js\timer_watch.js:164
+msgid "Kitchen timers"
+msgstr "Küchentimer"
+
+#: .\static\js\timer_watch.js:186
+msgid "Timer"
+msgstr "Timer"
+
+#: .\static\js\timer_watch.js:279
+msgid "Time is up"
+msgstr "Zeit ist um"
+
+#: .\static\js\timer_watch.js:281
+msgid "Stop"
+msgstr "Stopp"

@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% load static i18n l10n pantry_tags %}
+{% block title %}{% translate "Pantry" %} – {% translate "Kitchen" %}{% endblock %}
+{% block topbar_title %}{% translate "Pantry" %}{% endblock %}
+{% block topbar_sub %}{% blocktranslate count n=item_count %}{{ n }} thing in the house{% plural %}{{ n }} things in the house{% endblocktranslate %}{% endblock %}
+
+{% block topbar_actions %}
+  <a class="button button--secondary button--small" href="{% url 'pantry:catalogue' %}">{% translate "Catalogue" %}</a>
+  <button type="button" class="topbar-help" data-help-open
+          aria-label="{% translate 'Help for this page' %}" title="{% translate 'Help for this page' %}">?</button>
+{% endblock %}
+
+{% block content %}
+  <h1>{% translate "What is in the house" %}</h1>
+  <p class="page-lead">{% translate "Recipes are measured against this list: what can be cooked now, and what would have to be bought first." %}</p>
+
+  {% comment %}Adding is its own form and its own POST, separate from the one
+  that saves the amounts below. Nesting them is not possible in HTML, and the
+  version where one form does both means a stray Enter in the "add" box saves
+  the whole cupboard.{% endcomment %}
+  <form method="post" action="{% url 'pantry:add' %}" class="pantry-add">
+    {% csrf_token %}
+    <div class="pantry-add-fields">
+      <p class="pantry-add-name">
+        <label for="{{ add_form.name.id_for_label }}">{% translate "Add something" %}</label>
+        {% comment %}The combobox attributes and the pointer at the unit control
+        beside it ride on the widget — apps/pantry/forms.py.{% endcomment %}
+        {{ add_form.name }}
+      </p>
+      <p class="pantry-add-amount">
+        <label for="{{ add_form.amount.id_for_label }}">{% translate "Amount" %}</label>
+        {{ add_form.amount }}
+      </p>
+      <p class="pantry-add-unit">
+        <label for="pantry-add-unit">{% translate "Unit" %}</label>
+        {% unit_select "unit" element_id="pantry-add-unit" %}
+      </p>
+      <button type="submit" class="button button--small">{% translate "Add" %}</button>
+    </div>
+    <p class="help">{% translate "Leave the amount empty for something you always have — salt, oil. It then counts as “enough”." %}</p>
+  </form>
+
+  {% if groups %}
+    {% comment %}One form around every row, so six corrections after the shopping
+    are one save. Each row's fields are named with its own primary key rather
+    than through a formset: the rows are not a sequence anybody reorders and a
+    management form would be machinery for nothing.{% endcomment %}
+    <form method="post" action="{% url 'pantry:save' %}" data-unsaved-guard>
+      {% csrf_token %}
+      {% for label, items in groups %}
+        <section class="pantry-group">
+          <h2 class="pantry-group-title">{{ label }}</h2>
+          <ul class="pantry-rows">
+            {% for item in items %}
+              <li class="pantry-row{% if item.is_unmeasured %} is-unmeasured{% endif %}">
+                <span class="pantry-name">
+                  <a href="{% url 'pantry:ingredient-edit' item.ingredient.slug %}">{{ item.ingredient.name }}</a>
+                  {% if item.ingredient.purchase_sizes.all %}
+                    <span class="pantry-sold">
+                      {% translate "sold as" %}
+                      {% for size in item.ingredient.purchase_sizes.all %}{% if not forloop.first %}, {% endif %}{{ size.amount_display }}&nbsp;{{ size.unit|unit_label }}{% endfor %}
+                    </span>
+                  {% endif %}
+                </span>
+                <span class="pantry-amount">
+                  <label class="sr-only" for="pantry-amount-{{ item.pk }}">{% translate "Amount" %}</label>
+                  {% comment %}`amount_display`, not the raw column. The field is
+                  a fixed-scale Decimal, so two kilos render as "2.000" — and
+                  German localisation then writes that as "2,000", which reads as
+                  two thousand. amount_display trims it to "2" and is already a
+                  string, so nothing localises it on the way out.{% endcomment %}
+                  <input type="number" step="any" min="0" id="pantry-amount-{{ item.pk }}"
+                         name="amount-{{ item.pk }}" value="{{ item.amount_display }}"
+                         placeholder="{% translate 'some' %}">
+                </span>
+                <span class="pantry-unit">
+                  {% unit_select "unit-" selected=item.unit suffix=item.pk label=_("Unit") %}
+                </span>
+                <span class="pantry-remove">
+                  {% comment %}A link rather than a nested form — a form inside a
+                  form is not valid HTML and the browser drops the inner one, so
+                  the button would silently submit the outer save instead. The
+                  removal has its own form at the foot of the page.{% endcomment %}
+                  <button type="submit" class="link-button" form="remove-{{ item.pk }}">{% translate "Remove" %}</button>
+                </span>
+              </li>
+            {% endfor %}
+          </ul>
+        </section>
+      {% endfor %}
+
+      <div class="form-actions">
+        <button type="submit" class="button">{% translate "Save amounts" %}</button>
+      </div>
+    </form>
+
+    {% comment %}The removal forms, one per row, outside the save form and
+    referenced from it by id. This is what makes a "Remove" button inside a
+    bigger form legal.{% endcomment %}
+    {% for label, items in groups %}
+      {% for item in items %}
+        <form method="post" id="remove-{{ item.pk }}" hidden
+              action="{% url 'pantry:remove' item.ingredient.slug %}"
+              data-confirm-title="{% translate 'Take this out of the pantry?' %}"
+              data-confirm="{% blocktranslate with name=item.ingredient.name %}“{{ name }}” will no longer count as something in the house. It stays in the catalogue.{% endblocktranslate %}"
+              data-confirm-accept="{% translate 'Remove' %}"
+              data-confirm-danger>{% csrf_token %}</form>
+      {% endfor %}
+    {% endfor %}
+  {% else %}
+    <p class="hint">{% translate "The pantry is empty. Add what is in the cupboard above, and recipes will start saying whether they can be made." %}</p>
+  {% endif %}
+
+  {{ suggestions|json_script:"ingredient-catalogue" }}
+{% endblock %}
+
+{% block help_modal %}
+  <div class="modal-overlay help-modal" hidden data-help-modal>
+    <div class="modal help-panel" role="dialog" aria-modal="true" aria-labelledby="help-title">
+      <button type="button" class="modal-close" data-help-close aria-label="{% translate 'Close' %}">&times;</button>
+      <h2 class="modal-title" id="help-title">{% translate "The pantry" %}</h2>
+      <div class="modal-body">
+        <p>{% translate "This is what the house has in it. Recipes are measured against it, so the list page can show what can be cooked tonight and a recipe can say what is missing." %}</p>
+        <h3>{% translate "Amounts you do not measure" %}</h3>
+        <p>{% translate "Leave the amount blank for salt, pepper or oil. A blank amount means “some, not counted” and is treated as enough — which is the truth, and better than a number nobody maintains." %}</p>
+        <h3>{% translate "Why the unit matters" %}</h3>
+        <p>{% translate "A kilo in the cupboard answers a recipe asking for 500 g only because both are weights. Units that cannot be converted into each other — grams against tablespoons — are reported as “cannot tell” rather than guessed at." %}</p>
+        <h3>{% translate "Sold as" %}</h3>
+        <p>{% translate "Each ingredient can record the sizes it is bought in. A shopping list then says “one 500 g pack” rather than “800 g”, which is what is useful in a shop." %}</p>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{% static 'js/ingredient_suggest.js' %}"></script>
+  <script src="{% static 'js/unit_typeahead.js' %}"></script>
+{% endblock %}

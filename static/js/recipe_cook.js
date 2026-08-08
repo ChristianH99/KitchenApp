@@ -30,6 +30,7 @@
   const resetEl = root.querySelector("[data-cook-reset]");
   const progressEl = root.querySelector("[data-cook-progress]");
   const navEl = root.querySelector("[data-cook-nav]");
+  const finishRowEl = root.querySelector("[data-cook-finish-row]");
   const finishEl = root.querySelector("[data-cook-finish]");
 
   const STORE = "kitchen.cook." + (root.dataset.recipe || "0");
@@ -192,32 +193,40 @@
     const prev = root.querySelector("[data-cook-prev]");
     const next = root.querySelector("[data-cook-next]");
     const done = root.querySelector("[data-cook-done]");
+    // Disabled rather than hidden at either end: these are pinned to the sides
+    // of the page, and one of them vanishing leaves the other looking like it
+    // moved.
     if (prev) prev.disabled = state.index === 0;
-    if (next) next.hidden = last;
+    if (next) next.disabled = last;
     if (done) done.hidden = !last;
+    if (finishRowEl) finishRowEl.hidden = !last;
   }
 
   const nextButton = root.querySelector("[data-cook-next]");
   const prevButton = root.querySelector("[data-cook-prev]");
   const doneButton = root.querySelector("[data-cook-done]");
 
-  if (nextButton) {
-    nextButton.addEventListener("click", () => {
-      start();                       // the automatic half of "measured automatically"
-      if (state.index < steps.length - 1) state.index += 1;
-      store();
-      show();
-      scrollToStep();
-    });
+  // One implementation per move, so a button and a swipe cannot come to mean
+  // two slightly different things.
+  function goNext() {
+    if (state.index >= steps.length - 1) return;
+    start();                         // the automatic half of "measured automatically"
+    state.index += 1;
+    store();
+    show();
+    scrollToStep();
   }
-  if (prevButton) {
-    prevButton.addEventListener("click", () => {
-      if (state.index > 0) state.index -= 1;
-      store();
-      show();
-      scrollToStep();
-    });
+
+  function goPrev() {
+    if (state.index <= 0) return;
+    state.index -= 1;
+    store();
+    show();
+    scrollToStep();
   }
+
+  if (nextButton) nextButton.addEventListener("click", goNext);
+  if (prevButton) prevButton.addEventListener("click", goPrev);
   if (doneButton) {
     doneButton.addEventListener("click", () => {
       pause();
@@ -255,42 +264,248 @@
   const finishForm = finishEl && finishEl.querySelector("form");
   if (finishForm) finishForm.addEventListener("submit", forget);
 
-  /* ---- a step's own timer ---- */
+  /* ---- a step's own timer ----------------------------------------------
+   *
+   * A countdown off a **wall-clock deadline**, not a tick count. A phone in a
+   * kitchen locks its screen, and a backgrounded tab has its timers throttled
+   * to once a minute or stopped altogether — so anything that counted its own
+   * ticks would come back from a locked screen claiming the bread had four
+   * minutes left when it had been out for ten. The deadline is a timestamp; the
+   * interval only repaints it, and being throttled costs a stale reading and
+   * nothing else.
+   *
+   * It is written to localStorage for the same reason the walk-through's own
+   * position is: the page gets reloaded, the browser gets closed, and a timer
+   * that forgot is worse than no timer.
+   *
+   * The store itself belongs to static/js/timer_watch.js, which base.html
+   * loads on every page — because a timer you have to stay on this page to hear
+   * is not a kitchen timer. This page writes the deadline and the few words
+   * needed to say *which* timer it is; every other page reads the same rows and
+   * puts a card in the corner. One store, so the card cannot show a countdown
+   * this page has already stopped.
+   */
+
+  const RECIPE = String(root.dataset.recipe || "");
+
+  function deadlineFor(id) {
+    if (!window.kitchenTimers) return null;
+    const found = window.kitchenTimers.all().find(
+      (timer) => timer.recipe === RECIPE && String(timer.stepId) === String(id)
+    );
+    return found ? found.ends : null;
+  }
+
+  function rememberDeadline(id, endsAt, label) {
+    if (!window.kitchenTimers) return;
+    if (!endsAt) {
+      window.kitchenTimers.clear(RECIPE, id);
+      return;
+    }
+    // The sound is recorded with the timer rather than looked up when it rings:
+    // the page that ends up ringing it may be the pantry, which has no reason
+    // to have asked the server what this person chose.
+    window.kitchenTimers.set(RECIPE, id, {
+      ends: endsAt,
+      step: label || "",
+      recipe: root.dataset.recipeName || "",
+      url: root.dataset.cookUrl || window.location.pathname,
+      sound: root.dataset.timerSound || "chime",
+    });
+  }
+
+  /* ---- the sound ----
+   *
+   * From static/js/timer_sounds.js, which the settings page uses too — so the
+   * tone somebody picked while comparing them is the tone that rings here. The
+   * context is woken inside the press of Start, which is the last moment a
+   * gesture is still in hand and a browser will still let a page make a noise.
+   *
+   * **It rings until it is stopped.** A single chime is a chime you miss by
+   * being in the next room or by running a tap, which is the one thing a
+   * kitchen timer exists to prevent — and the bread carries on baking. So the
+   * tone repeats, the phone keeps buzzing, and both stop on the one press that
+   * also puts the timer back to where it started.
+   *
+   * `ringingId` is which step's timer is making the noise, so that stopping a
+   * *different* step's countdown does not silence it. Only one at a time: a
+   * second timer reaching nought takes the alarm over, which is the same sound
+   * for the same reason and nothing anybody could tell apart anyway.
+   */
+
+  let ringingId = null;
+  let buzz = null;
+
+  function ring(id) {
+    const named = root.dataset.timerSound || "chime";
+    ringingId = id;
+    if (window.kitchenSounds) window.kitchenSounds.ring(named);
+    // A vibration as well as the tone: a phone face-down on a worktop in a
+    // noisy kitchen is the case the sound alone does not cover. Repeated on the
+    // same reasoning, and ignored silently where it is not supported.
+    if (!navigator.vibrate) return;
+    const buzzOnce = () => navigator.vibrate([200, 100, 200]);
+    buzzOnce();
+    buzz = window.setInterval(buzzOnce, 3000);
+  }
+
+  function silence(id) {
+    // Only the step that is actually ringing may stop the noise. Pressing Stop
+    // on a countdown still running elsewhere is not an answer to the alarm.
+    if (id !== undefined && ringingId !== id) return;
+    ringingId = null;
+    if (window.kitchenSounds) window.kitchenSounds.silence();
+    if (buzz) window.clearInterval(buzz);
+    buzz = null;
+    if (navigator.vibrate) navigator.vibrate(0);
+  }
+
+  function wakeAudio() {
+    if (window.kitchenSounds) window.kitchenSounds.wake();
+  }
 
   steps.forEach((section) => {
+    const holder = section.querySelector("[data-cook-step-timer]");
     const button = section.querySelector("[data-cook-step-start]");
+    const stopButton = section.querySelector("[data-cook-step-stop]");
     const readout = section.querySelector("[data-cook-remaining]");
-    const minutes = parseInt(section.dataset.cookMinutes || "", 10);
-    if (!button || !readout || !minutes) return;
+    const status = section.querySelector("[data-cook-timer-status]");
+    // Seconds, not minutes: a step may be "1:30" — see RecipeStep.timer_seconds,
+    // which is what puts the whole duration in one attribute so the browser
+    // never has to add two of them up.
+    const seconds = parseInt(section.dataset.cookSeconds || "", 10);
+    if (!holder || !button || !readout || !seconds) return;
 
+    const id = holder.dataset.cookStepId || section.dataset.cookStep;
+    const label = holder.dataset.cookStepLabel || "";
+    const startLabel = button.textContent;
+    const stopLabel = stopButton ? stopButton.textContent : "";
     let endsAt = null;
     let ticker = null;
+    let rang = false;
+
+    function stopTicking() {
+      if (ticker) window.clearInterval(ticker);
+      ticker = null;
+    }
+
+    function reset() {
+      stopTicking();
+      silence(id);
+      endsAt = null;
+      rang = false;
+      rememberDeadline(id, null);
+      section.classList.remove("is-ready", "is-running");
+      readout.textContent = clock(seconds * 1000);
+      button.textContent = startLabel;
+      button.hidden = false;
+      if (stopButton) {
+        stopButton.textContent = stopLabel;
+        stopButton.hidden = true;
+      }
+    }
 
     function tick() {
       const left = endsAt - Date.now();
       readout.textContent = clock(Math.max(0, left));
       if (left > 0) return;
-      window.clearInterval(ticker);
-      ticker = null;
-      endsAt = null;
+      stopTicking();
+      section.classList.remove("is-running");
       section.classList.add("is-ready");
-      button.textContent = gettext("Time is up");
-      // A page cannot make a sound without a file to play and cannot ask for
-      // one without a gesture; a vibration is the one alert a phone in a
-      // kitchen will actually deliver, and it is silently ignored elsewhere.
-      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      // The row is deliberately **left in the store**. It used to be cleared
+      // the instant the countdown reached nought, which meant walking away from
+      // a ringing alarm silenced it — the deadline was gone, so no other page
+      // knew there was anything to ring. An expired timer is an alarm nobody
+      // has answered yet, and it stays one until Stop is pressed (or twelve
+      // hours pass, which timer_watch.js calls abandoned rather than missed).
+      if (rang) return;
+      rang = true;
+      if (status) status.textContent = gettext("The timer has finished.");
+      // The alarm keeps going, so the one control on screen is the one that
+      // stops it. Start is hidden meanwhile: a button reading "Time is up" that
+      // silently restarts the countdown when pressed — which is what was here —
+      // is the wrong answer to the only question being asked.
+      button.hidden = true;
+      if (stopButton) {
+        stopButton.textContent = gettext("Stop the alarm");
+        stopButton.hidden = false;
+      }
+      ring(id);
+    }
+
+    function run(deadline) {
+      endsAt = deadline;
+      rang = false;
+      rememberDeadline(id, endsAt, label);
+      section.classList.remove("is-ready");
+      section.classList.add("is-running");
+      button.hidden = true;
+      if (stopButton) {
+        stopButton.textContent = stopLabel;
+        stopButton.hidden = false;
+      }
+      stopTicking();
+      ticker = window.setInterval(tick, 250);
+      tick();
     }
 
     button.addEventListener("click", () => {
-      start();
-      section.classList.remove("is-ready");
-      endsAt = Date.now() + minutes * 60000;
-      if (ticker) window.clearInterval(ticker);
-      ticker = window.setInterval(tick, 250);
-      button.textContent = gettext("Running");
-      tick();
+      start();                       // the walk-through's own stopwatch
+      wakeAudio();                   // while we still have the gesture
+      run(Date.now() + seconds * 1000);
+    });
+    if (stopButton) stopButton.addEventListener("click", reset);
+
+    // Left running when the page was closed. A deadline already past shows
+    // "time is up" rather than a negative number — and rings, because nobody
+    // saw it the first time.
+    const saved = deadlineFor(id);
+    if (saved) run(saved);
+    else readout.textContent = clock(seconds * 1000);
+
+    // Throttled tabs stop repainting. Catching up on the way back means the
+    // reading is right the moment somebody looks at it.
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden && endsAt) tick();
     });
   });
+
+  /* ---- swiping, on a touch screen -------------------------------------
+   *
+   * The same two moves as the arrows, because on a phone the arrows are hidden:
+   * a 44px target pinned to the edge of a phone screen is a mis-tap, and the
+   * thumb is already there.
+   *
+   * Only for `touch`. A mouse drag across the page is a text selection and a
+   * trackpad's inertia would fire this on an ordinary scroll — so the gesture
+   * is read from touch pointers alone, and only when it is decisively sideways:
+   * more than 60px across and more than twice as far across as down, or every
+   * attempt to scroll a long step turns the page.
+   */
+
+  let swipe = null;
+
+  root.addEventListener("pointerdown", (event) => {
+    if (event.pointerType !== "touch") return;
+    // Not from inside something the finger is meant to be using.
+    if (event.target.closest("input, textarea, select, button, a, .diagram-scroll")) {
+      swipe = null;
+      return;
+    }
+    swipe = { x: event.clientX, y: event.clientY, id: event.pointerId };
+  });
+
+  root.addEventListener("pointerup", (event) => {
+    if (!swipe || event.pointerId !== swipe.id) return;
+    const dx = event.clientX - swipe.x;
+    const dy = event.clientY - swipe.y;
+    swipe = null;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 2) return;
+    if (dx < 0) goNext();
+    else goPrev();
+  });
+
+  root.addEventListener("pointercancel", () => { swipe = null; });
 
   /* ---- go ---- */
 

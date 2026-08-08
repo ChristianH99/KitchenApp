@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{{ recipe.title }} – {% translate "Kitchen" %}{% endblock %}
+{% block topbar_title %}{% translate "Edit this cooking" %}{% endblock %}
+{% block topbar_sub %}{{ recipe.title }} · {{ log.cooked_at|date:"SHORT_DATE_FORMAT" }}{% endblock %}
+
+{% block topbar_actions %}
+  <button type="submit" class="button button--small" form="cook-log-form">{% translate "Save" %}</button>
+{% endblock %}
+
+{% block content %}
+  <a class="back-link" href="{{ recipe.get_absolute_url }}">&larr; {{ recipe.title }}</a>
+
+  <h1>{% translate "What came out of it" %}</h1>
+  {% comment %}The whole reason this page exists. The number typed while
+  standing over the washing-up is a guess; whether the box in the fridge got
+  eaten at lunchtime is known the next day. Before this, correcting it meant
+  deleting the entry — and losing the date and the measured time with it.{% endcomment %}
+  <p class="page-lead">{% blocktranslate with when=log.cooked_at|date:"SHORT_DATE_FORMAT" %}Cooked on {{ when }}. Portions are usually clearer a day later — correct them here rather than starting again.{% endblocktranslate %}</p>
+
+  {% if form.non_field_errors %}
+    <p class="notice notice--error">{{ form.non_field_errors|striptags }}</p>
+  {% endif %}
+
+  <form method="post" id="cook-log-form" data-unsaved-guard novalidate>
+    {% csrf_token %}
+
+    <div class="form-grid">
+      <p>
+        <label for="{{ form.servings_made.id_for_label }}">{% translate "Servings made" %}</label>
+        {{ form.servings_made }}
+        <span class="field-error">{{ form.servings_made.errors|striptags }}</span>
+      </p>
+      <p>
+        <label for="{{ form.minutes.id_for_label }}">{% translate "Time taken (min)" %}</label>
+        {{ form.minutes }}
+        <span class="field-error">{{ form.minutes.errors|striptags }}</span>
+      </p>
+    </div>
+
+    <h2 class="form-section">{% translate "Portions it made" %}</h2>
+    <p class="help">{% translate "A portion put in a box for tomorrow counts as a whole one: it was made, and somebody eats it. Set a size to nothing to remove it." %}</p>
+    <div class="portion-grid">
+      {% for field in form.portion_fields %}
+        <p class="portion-field">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          <span class="field-error">{{ field.errors|striptags }}</span>
+        </p>
+      {% endfor %}
+    </div>
+
+    <p>
+      <label for="{{ form.notes.id_for_label }}">{% translate "Notes" %}</label>
+      {{ form.notes }}
+      <span class="help">{% translate "What you would do differently — more salt, smaller tin, half the chilli." %}</span>
+    </p>
+
+    <div class="form-actions">
+      <button type="submit" class="button">{% translate "Save" %}</button>
+      <a class="link-button" href="{{ recipe.get_absolute_url }}">{% translate "Cancel" %}</a>
+    </div>
+  </form>
+
+  <form method="post" action="{% url 'recipes:cook-log-delete' recipe.slug log.pk %}"
+        class="form-actions"
+        data-confirm-title="{% translate 'Remove this entry?' %}"
+        data-confirm="{% translate 'The record of this cooking will be removed. The recipe itself is untouched.' %}"
+        data-confirm-accept="{% translate 'Remove' %}"
+        data-confirm-danger>
+    {% csrf_token %}
+    <button type="submit" class="button button--danger button--small">{% translate "Remove entry" %}</button>
+  </form>
+{% endblock %}

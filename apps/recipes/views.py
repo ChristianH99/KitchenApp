@@ -23,10 +23,13 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 
+from apps.accounts.models import Preferences
+from apps.pantry import catalogue, matching
+from apps.pantry.models import PantryItem
 from apps.recipes import diagram as diagram_module
 from apps.recipes.forms import (
     CookLogForm, IngredientFormSet, RecipeForm, StepFormSet,
-    prime_diagram_indices, wire_diagram,
+    prime_diagram_indices, validate_structure, wire_diagram,
 )
 from apps.recipes.models import CookLog, CookPortion, Recipe, Tag
 
@@ -35,6 +38,11 @@ from apps.recipes.models import CookLog, CookPortion, Recipe, Tag
 # renders all of them grows without bound while the query count — which is what
 # the cost tests pin — stays perfectly flat.
 COOK_LOG_SHOWN = 10
+
+# The same bound on the history page, which lists cookings across every recipe
+# rather than one. Larger because that page is the history — but still bounded,
+# for the same reason: the question it answers is about the recent past.
+HISTORY_SHOWN = 100
 
 
 def _visible_recipes():
@@ -117,13 +125,64 @@ def recipe_list(request):
     ordering = {"title": "title", "new": "-created_at", "time": "prep_minutes"}
     recipes = recipes.order_by(ordering.get(order, "title"))
 
+    have = (request.GET.get("have") or "").strip()
+    recipes, pantry_ready, pantry_size = _apply_pantry_filter(recipes, have)
+
     return render(request, "recipes/recipe_list.html", {
         "recipes": recipes,
         "query": query,
         "active_tag": active_tag,
         "order": order if order in ordering else "title",
         "tags": Tag.objects.annotate(n=Count("recipes")).filter(n__gt=0).order_by("name"),
+        "have": have if have in ("now", "nearly") else "",
+        "pantry_size": pantry_size,
+        # {recipe id: RecipeVerdict} for whatever is being listed, so a card can
+        # say "2 missing" without asking again.
+        "pantry_ready": pantry_ready,
     })
+
+
+def _apply_pantry_filter(recipes, have):
+    """Narrow a listing to what the cupboard can actually produce.
+
+    Done in Python over the rows already fetched, not in SQL. The question is
+    "is 500 g of flour covered by 1 kg in the cupboard" — a unit conversion,
+    per line, with substitutes and optional lines to consider — and expressing
+    that as a query means either putting the conversion table into the database
+    or answering it wrongly. A household collection is a few hundred recipes;
+    the cost that matters is the number of *queries*, and this adds three
+    however long the list is.
+
+    An empty pantry returns the listing untouched and says so. Filtering to
+    nothing would be reading "nobody has filled the cupboard in" as "there is
+    no food in this house".
+    """
+    pantry = list(PantryItem.objects.select_related("ingredient"))
+    if not pantry:
+        return recipes, {}, 0
+
+    rows = list(
+        recipes.prefetch_related("ingredients__ingredient__purchase_sizes")
+    )
+    by_ingredient = matching.pantry_by_ingredient(pantry)
+
+    verdicts = {}
+    for recipe in rows:
+        lines = diagram_module.top_level(list(recipe.ingredients.all()))
+        verdict = matching.check_recipe(lines, by_ingredient)
+        verdicts[recipe.pk] = verdict
+        # Hung on the object as well as kept in the map, so the shared card
+        # partial can read it without a dictionary lookup Django's template
+        # language cannot do by key. The landing page passes recipes with no
+        # such attribute and the card guards on it.
+        recipe.pantry = verdict
+
+    if have == "now":
+        rows = [r for r in rows if verdicts[r.pk].can_be_made]
+    elif have == "nearly":
+        rows = [r for r in rows if verdicts[r.pk].can_be_made or verdicts[r.pk].nearly]
+
+    return rows, verdicts, len(pantry)
 
 
 def _loaded_recipe(slug):
@@ -137,7 +196,12 @@ def _loaded_recipe(slug):
     """
     return get_object_or_404(
         Recipe.objects.select_related("created_by").prefetch_related(
-            "tags", "ingredients", "steps",
+            "tags", "steps",
+            # The catalogue row and its packet sizes come along with the lines.
+            # Without them the pantry check walks the ingredients and touches
+            # the database twice per line — which is invisible on a recipe with
+            # six and is the shape the cost tests exist to catch.
+            "ingredients__ingredient__purchase_sizes",
         ),
         slug=slug,
     )
@@ -155,19 +219,50 @@ def recipe_detail(request, slug):
     )
     log_count = recipe.cook_logs.count()
 
+    # top_level() attaches each line's substitutes and drops the substitute
+    # rows themselves — the plain list and the diagram must agree about what a
+    # line is, so they are derived from one call.
+    lines = diagram_module.top_level(ingredients)
+
     return render(request, "recipes/recipe_detail.html", {
         "recipe": recipe,
-        # top_level() attaches each line's substitutes and drops the substitute
-        # rows themselves — the plain list and the diagram must agree about
-        # what a line is, so they are derived from one call.
-        "ingredients": diagram_module.top_level(ingredients),
+        "ingredients": lines,
         "diagram": diagram_module.build(recipe, ingredients=ingredients, steps=steps),
         "logs": logs,
         "log_count": log_count,
         "log_more": max(0, log_count - len(logs)),
         "typical_minutes": _typical_minutes(logs),
         "may_edit": _may_edit(request.user, recipe),
+        **_pantry_context(lines),
     })
+
+
+def _pantry_context(lines):
+    """What the cupboard says about this recipe, or nothing at all.
+
+    An empty pantry means the whole section is left off the page rather than
+    rendered as "everything is missing". Somebody who has not filled the
+    cupboard in has not said they have nothing; they have said nothing, and a
+    page that reads the second as the first is a page that is wrong for
+    everybody who has not opted in.
+
+    Two queries: the ingredients that appear on this recipe, and their purchase
+    sizes. Flat in the number of lines, which is what the cost tests pin.
+    """
+    ids = [line.ingredient_id for line in lines if line.ingredient_id]
+    for line in lines:
+        ids.extend(alt.ingredient_id for alt in line.substitutes if alt.ingredient_id)
+    if not ids or not PantryItem.objects.exists():
+        return {"pantry_verdict": None, "shopping": []}
+
+    items = PantryItem.objects.filter(ingredient_id__in=set(ids)).select_related("ingredient")
+    verdict = matching.check_recipe(lines, matching.pantry_by_ingredient(items))
+    return {
+        "pantry_verdict": verdict,
+        # The packet sizes turn "380 g short" into "one 500 g pack", which is
+        # what is useful standing in a shop.
+        "shopping": matching.shopping_list([(None, verdict)]),
+    }
 
 
 def _typical_minutes(logs):
@@ -192,7 +287,11 @@ def recipe_add(request):
         blank = Recipe()
         formset = IngredientFormSet(request.POST, instance=blank)
         steps = StepFormSet(request.POST, instance=blank)
-        if form.is_valid() and formset.is_valid() and steps.is_valid():
+        # `and` would short-circuit and leave the second and third formsets
+        # unvalidated, so a page with a bad title comes back with every other
+        # error still hidden. Evaluated first, combined after.
+        valid = [form.is_valid(), formset.is_valid(), steps.is_valid()]
+        if all(valid) and validate_structure(steps, formset):
             with transaction.atomic():
                 recipe = form.save(commit=False)
                 recipe.created_by = request.user
@@ -205,6 +304,7 @@ def recipe_add(request):
                 formset.instance = recipe
                 formset.save()
                 wire_diagram(steps, formset)
+                _link_catalogue(recipe, request.user)
             messages.success(request, _("“%(title)s” was added.") % {"title": recipe.title})
             return redirect(recipe.get_absolute_url())
     else:
@@ -213,10 +313,7 @@ def recipe_add(request):
         formset = IngredientFormSet(instance=blank)
         steps = StepFormSet(instance=blank)
 
-    prime_diagram_indices(steps, formset)
-    return render(request, "recipes/recipe_form.html", {
-        "form": form, "formset": formset, "steps": steps, "recipe": None,
-    })
+    return _render_form(request, form, formset, steps, None)
 
 
 @login_required
@@ -232,12 +329,14 @@ def recipe_edit(request, slug):
         form = RecipeForm(request.POST, request.FILES, instance=recipe)
         formset = IngredientFormSet(request.POST, instance=recipe)
         steps = StepFormSet(request.POST, instance=recipe)
-        if form.is_valid() and formset.is_valid() and steps.is_valid():
+        valid = [form.is_valid(), formset.is_valid(), steps.is_valid()]
+        if all(valid) and validate_structure(steps, formset):
             with transaction.atomic():
                 form.save()
                 steps.save()
                 formset.save()
                 wire_diagram(steps, formset)
+                _link_catalogue(recipe, request.user)
             messages.success(request, _("“%(title)s” was saved.") % {"title": recipe.title})
             return redirect(recipe.get_absolute_url())
     else:
@@ -245,10 +344,35 @@ def recipe_edit(request, slug):
         formset = IngredientFormSet(instance=recipe)
         steps = StepFormSet(instance=recipe)
 
+    return _render_form(request, form, formset, steps, recipe)
+
+
+def _render_form(request, form, formset, steps, recipe):
+    """One place, so the add and edit pages cannot drift apart.
+
+    ``prime_diagram_indices`` in particular has to run for both and after any
+    failed save — without it an edit page comes back with an empty diagram and
+    pressing Save flattens what was there.
+    """
     prime_diagram_indices(steps, formset)
     return render(request, "recipes/recipe_form.html", {
         "form": form, "formset": formset, "steps": steps, "recipe": recipe,
+        # The ingredient autosuggest reads this out of a json_script block.
+        # apps/pantry/catalogue.py::suggestions says why it is embedded rather
+        # than fetched.
+        "suggestions": catalogue.suggestions(),
     })
+
+
+def _link_catalogue(recipe, user):
+    """Give every line of a just-saved recipe a catalogue row.
+
+    Runs inside the same transaction as the save. The autosuggest has already
+    linked whatever somebody picked from the list; this is for the names typed
+    straight through — which is how the catalogue learns what this household
+    actually cooks with, rather than only what it was shipped knowing.
+    """
+    catalogue.resolve_lines(list(recipe.ingredients.all()), user=user)
 
 
 @login_required
@@ -293,6 +417,11 @@ def recipe_cook(request, slug):
 
 def _cook_context(request, recipe, diagram, ingredients, log_form, invalid=False):
     return {
+        # Which noise a finished step timer makes, chosen on the person's own
+        # settings page. Read here rather than in the template so the page has
+        # it before any script runs — a timer that finished while the tab was
+        # backgrounded should ring the moment it is looked at.
+        "timer_sound": Preferences.for_user(request.user).timer_sound,
         "recipe": recipe,
         "diagram": diagram,
         "ingredients": ingredients,
@@ -343,6 +472,77 @@ def recipe_cooked(request, slug):
 
 
 @login_required
+def cook_history(request):
+    """Everything the household has cooked, newest first.
+
+    The page that makes the portion counts worth recording. One evening's entry
+    on one recipe answers nothing; the same entry beside the last six answers
+    "how often do we actually make this" and "does four really feed us".
+
+    Bounded rather than paginated. A household cooking once a day fills a year
+    with three hundred and sixty-five rows, and the question this page answers
+    is about the recent past — "when did we last have this" — not about 2019.
+    The count says what is not shown, so nothing is silently missing.
+    """
+    logs = list(
+        CookLog.objects
+        .select_related("recipe", "cooked_by")
+        .prefetch_related("portions")
+        .order_by("-cooked_at")[:HISTORY_SHOWN]
+    )
+    total = CookLog.objects.count()
+    return render(request, "recipes/cook_history.html", {
+        "logs": logs,
+        "total": total,
+        "more": max(0, total - len(logs)),
+    })
+
+
+def _may_edit_log(user, log):
+    """Who may change a record of a cooking.
+
+    The person who made it, or staff — deliberately *not* whoever may edit the
+    recipe. A cooking is somebody's own record of their own evening, and the
+    person who typed "small portion" by mistake is the person who should be
+    able to take it back.
+    """
+    return user.is_staff or log.cooked_by_id == user.id
+
+
+@login_required
+def cook_log_edit(request, slug, pk):
+    """Correct an entry after the fact.
+
+    The reason this exists: how far a dish went is known the *next* day. The
+    box in the fridge either got eaten at lunchtime or it did not, and the
+    number typed while standing over the washing-up is a guess. Without this
+    page the only way to fix it was to delete the entry and lose the date and
+    the measured time with it.
+    """
+    log = get_object_or_404(
+        CookLog.objects.select_related("recipe").prefetch_related("portions"),
+        pk=pk, recipe__slug=slug,
+    )
+    if not _may_edit_log(request.user, log):
+        raise Http404
+
+    if request.method == "POST":
+        form = CookLogForm(request.POST, instance=log)
+        if form.is_valid():
+            with transaction.atomic():
+                saved = form.save()
+                form.save_portions(saved)
+            messages.success(request, _("The entry was updated."))
+            return redirect(log.recipe.get_absolute_url())
+    else:
+        form = CookLogForm(instance=log)
+
+    return render(request, "recipes/cook_log_form.html", {
+        "form": form, "log": log, "recipe": log.recipe,
+    })
+
+
+@login_required
 @require_POST
 def cook_log_delete(request, slug, pk):
     """Remove one entry from the history — the person who made it, or staff.
@@ -352,7 +552,7 @@ def cook_log_delete(request, slug, pk):
     is the person who should be able to take it back.
     """
     log = get_object_or_404(CookLog, pk=pk, recipe__slug=slug)
-    if not (request.user.is_staff or log.cooked_by_id == request.user.id):
+    if not _may_edit_log(request.user, log):
         raise Http404
     log.delete()
     messages.success(request, _("The entry was removed."))

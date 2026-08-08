@@ -42,9 +42,26 @@ from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
+from apps.pantry import catalogue, units
 from apps.recipes.models import (
     CookLog, CookPortion, PortionSize, Recipe, RecipeIngredient, RecipeStep, Tag,
 )
+
+
+def _amount_and_unit(amount, unit):
+    """The three columns an ingredient line's quantity actually needs.
+
+    ``no_amount`` rather than merely a null amount: the form refuses a line that
+    answers neither, so a seed that left it off would produce a collection every
+    page of which comes back with an error the first time somebody opens it to
+    fix a typo. A line with no amount in this table means "to taste", which is
+    exactly what the flag says.
+    """
+    return {
+        "amount": Decimal(amount) if amount is not None else None,
+        "no_amount": amount is None,
+        "unit": units.normalise(unit),
+    }
 
 DEV_USERNAME = "claude"
 DEV_PASSWORD = "kitchen-dev-pass"
@@ -160,7 +177,12 @@ RECIPES = [
         ],
         "diagram": [
             {"text": "al dente kochen", "into": 2, "minutes": 10},   # 0
-            {"text": "mixen", "into": 2},                            # 1
+            # The one step in the seed that is not a whole number of minutes.
+            # It is here for the same reason Zwetschgenkuchen's 1,5 kg is: a
+            # duration of 45 s is what makes a page that reads `minutes`
+            # instead of `timer_seconds` visibly wrong ("0 min", or a countdown
+            # that never starts), and a seed without one hides the whole class.
+            {"text": "mixen", "into": 2, "seconds": 45},              # 1
             {"text": "cremig rühren", "into": None,
              "detail": "Etwas Kochwasser auffangen und nach und nach zugeben."},  # 2
         ],
@@ -232,6 +254,7 @@ class Command(BaseCommand):
                 RecipeStep.objects.create(
                     recipe=recipe, position=position, text=entry["text"],
                     detail=entry.get("detail", ""), minutes=entry.get("minutes"),
+                    seconds=entry.get("seconds"),
                 )
                 for position, entry in enumerate(spec.get("diagram", []))
             ]
@@ -247,8 +270,12 @@ class Command(BaseCommand):
                 into = row[4] if len(row) > 4 else None
                 lines[name] = RecipeIngredient.objects.create(
                     recipe=recipe, position=position,
-                    amount=Decimal(amount) if amount is not None else None,
-                    unit=unit, name=name, note=note,
+                    # The table above is written the way somebody writing a
+                    # recipe writes it — "EL", "Bund", "Würfel". The column
+                    # holds a code, so it goes through the same normalisation
+                    # recipes/0003 used on the rows that predate the catalogue.
+                    **_amount_and_unit(amount, unit),
+                    name=name, note=note,
                     optional=name in optional,
                     step=steps[into] if into is not None else None,
                 )
@@ -258,12 +285,18 @@ class Command(BaseCommand):
             ):
                 RecipeIngredient.objects.create(
                     recipe=recipe, position=len(spec["ingredients"]) + offset,
-                    amount=Decimal(amount) if amount is not None else None,
-                    unit=unit, name=name, note=note,
+                    **_amount_and_unit(amount, unit),
+                    name=name, note=note,
                     # A substitute has no step of its own: it takes its place in
                     # the diagram from the line it replaces.
                     alternative_for=lines[replaces],
                 )
+
+            # Point the lines at the ingredient catalogue, exactly as saving the
+            # form does. Without it the seeded collection is the one thing in
+            # the app that cannot answer "what can I cook" — which is a poor
+            # demonstration of a feature.
+            catalogue.resolve_lines(list(recipe.ingredients.all()), user=user)
             added += 1
 
         cooked = self._add_cookings(user)

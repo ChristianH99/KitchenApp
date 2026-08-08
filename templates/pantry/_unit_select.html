@@ -1,0 +1,13 @@
+{% load i18n %}{% comment %}One unit dropdown. Rendered from {% unit_select %} in
+apps/pantry/templatetags/pantry_tags.py, which is also where the option list is
+built — including the "As typed" group that carries a value the catalogue does
+not know, so a save cannot silently rewrite it.{% endcomment %}
+<select name="{{ name }}" id="{{ element_id }}" data-unit-select{% if label %} aria-label="{{ label }}"{% endif %}>
+  {% for group, options in groups %}
+    {% if group %}<optgroup label="{{ group }}">{% endif %}
+    {% for value, text in options %}
+      <option value="{{ value }}"{% if value == selected %} selected{% endif %}>{{ text }}</option>
+    {% endfor %}
+    {% if group %}</optgroup>{% endif %}
+  {% endfor %}
+</select>

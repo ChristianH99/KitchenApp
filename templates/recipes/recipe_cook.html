@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static i18n l10n %}
+{% load static i18n l10n pantry_tags %}
 {% block title %}{% blocktranslate with title=recipe.title %}Cooking {{ title }}{% endblocktranslate %} – {% translate "Kitchen" %}{% endblock %}
 {% block topbar_title %}{{ recipe.title }}{% endblock %}
 {% comment %}Not "Cooking": that msgid is already the recipe card's *cooking
@@ -15,7 +15,14 @@ and the reason a shared msgid is a trap rather than a saving.{% endcomment %}
 {% block content %}
   {% comment %}The whole page is one component so the script can find its parts
   without the template and the script agreeing on a dozen separate ids.{% endcomment %}
-  <div class="cook" data-cook data-recipe="{{ recipe.pk }}">
+  {% comment %}The name and the URL ride along because they are written into the
+  timer when one is started, and the page that ends up *ringing* it may be the
+  pantry — which has no idea which bread this was or where to send somebody to
+  look at it.{% endcomment %}
+  <div class="cook" data-cook data-recipe="{{ recipe.pk }}"
+       data-recipe-name="{{ recipe.title }}"
+       data-cook-url="{{ recipe.get_cook_url }}"
+       data-timer-sound="{{ timer_sound }}">
 
     {% comment %}Sticky, because in a kitchen the phone is on the worktop and
     the thing you look at from two steps away is the clock and which step you
@@ -55,17 +62,33 @@ and the reason a shared msgid is a trap rather than a saving.{% endcomment %}
       <div class="cook-steps" data-cook-steps>
         {% for entry in diagram.order %}
           <section class="cook-step" data-cook-step="{{ entry.step.id }}" data-cook-number="{{ entry.number }}"
-                   {% if entry.step.minutes %}data-cook-minutes="{{ entry.step.minutes }}"{% endif %}>
+                   {% comment %}The whole duration in one attribute, in seconds.
+                   Two attributes for a minutes-and-seconds step would be two
+                   numbers for the script to add up, and the day one of them is
+                   missing the countdown is quietly short.{% endcomment %}
+                   {% if entry.step.timer_seconds %}data-cook-seconds="{{ entry.step.timer_seconds }}"{% endif %}>
             <p class="cook-step-count">{% blocktranslate with n=entry.number total=diagram.order|length %}Step {{ n }} of {{ total }}{% endblocktranslate %}</p>
-            <h2 class="cook-step-text">{{ entry.step.text }}</h2>
+            {% comment %}One step, and it may be several things to do. A single
+            line stays a heading; two or more become a list, because "- Topf in
+            Ofen stellen / - Ofen vorheizen" is a checklist at the hob and a
+            run-on sentence is not.{% endcomment %}
+            {% if entry.step.is_multipart %}
+              <ul class="cook-step-parts">
+                {% for part in entry.step.parts %}<li>{{ part }}</li>{% endfor %}
+              </ul>
+            {% else %}
+              <h2 class="cook-step-text">{{ entry.step.headline }}</h2>
+            {% endif %}
+            {% if entry.step.heats_the_oven %}
+              {% include "recipes/_oven.html" with step=entry.step %}
+            {% endif %}
             {% if entry.step.detail %}<p class="cook-step-detail">{{ entry.step.detail }}</p>{% endif %}
 
-            {% if entry.from_steps %}
-              <p class="cook-step-from">
-                {% translate "With what you made in:" %}
-                {% for from in entry.from_steps %}<span class="pill">{{ from.text }}</span>{% endfor %}
-              </p>
-            {% endif %}
+            {% comment %}"With what you made in: …" used to list the steps
+            feeding this one. It is gone on purpose: the whole diagram is on the
+            same page, directly below, and it says which cells reach into this
+            one far better than a row of pills repeating their names. One fact,
+            one place.{% endcomment %}
 
             {% if entry.ingredients %}
               <ul class="cook-step-ingredients">
@@ -73,14 +96,14 @@ and the reason a shared msgid is a trap rather than a saving.{% endcomment %}
                   <li{% if item.optional %} class="is-optional"{% endif %}>
                     <span class="ingredient-amount" data-amount="{{ item.amount|default_if_none:''|unlocalize }}">{{ item.amount_display }}</span>
                     <span class="ingredient-name">
-                      {% if item.unit %}{{ item.unit }} {% endif %}{{ item.name }}
+                      {% if item.unit %}{{ item.unit|unit_label }} {% endif %}{{ item.name }}
                       {% if item.optional %}<span class="ingredient-flag">{% translate "optional" %}</span>{% endif %}
                       {% if item.note %}<span class="ingredient-note">{{ item.note }}</span>{% endif %}
                       {% for alt in item.substitutes %}
                         <span class="ingredient-alt">
                           {% translate "or" %}
                           <span class="ingredient-amount" data-amount="{{ alt.amount|default_if_none:''|unlocalize }}">{{ alt.amount_display }}</span>
-                          {{ alt.unit }} {{ alt.name }}
+                          {{ alt.unit|unit_label }} {{ alt.name }}
                         </span>
                       {% endfor %}
                     </span>
@@ -89,21 +112,79 @@ and the reason a shared msgid is a trap rather than a saving.{% endcomment %}
               </ul>
             {% endif %}
 
-            {% if entry.step.minutes %}
-              <div class="cook-step-timer" data-cook-step-timer>
-                <span class="cook-step-remaining" data-cook-remaining>{{ entry.step.minutes }}:00</span>
+            {% if entry.step.timer_seconds %}
+              {% comment %}A countdown, not a stopwatch: what somebody wants to
+              know at the oven is how long is left. It runs off a wall-clock
+              deadline in localStorage rather than a tick count, so it survives
+              the phone locking, the tab being backgrounded and the page being
+              reloaded — none of which a setInterval survives.{% endcomment %}
+              <div class="cook-step-timer" data-cook-step-timer
+                   data-cook-step-id="{{ entry.step.id }}"
+                   data-cook-step-label="{{ entry.step.headline }}">
+                {% comment %}The same clock as the one on the step card in the
+                editor, so the thing you set and the thing that counts down are
+                recognisably one feature.{% endcomment %}
+                <svg class="cook-step-timer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="13" r="8"></circle>
+                  <path d="M12 9v4l2.5 1.5"></path>
+                  <path d="M9 2h6"></path>
+                </svg>
+                <span class="cook-step-remaining" data-cook-remaining
+                      role="timer" aria-live="off">{{ entry.step.timer_display }}</span>
                 <button type="button" class="button button--secondary button--small" data-cook-step-start>
-                  {% blocktranslate with n=entry.step.minutes %}Start {{ n }} min{% endblocktranslate %}
+                  {% blocktranslate with n=entry.step.duration_label %}Start {{ n }}{% endblocktranslate %}
                 </button>
+                {% comment %}Also what stops the alarm once the countdown has
+                run out — static/js/recipe_cook.js relabels it, because when
+                something is ringing it is the only thing anybody wants to
+                press.{% endcomment %}
+                <button type="button" class="button button--secondary button--small" data-cook-step-stop hidden>
+                  {% translate "Stop" %}
+                </button>
+                {% comment %}Announced once when it finishes. `aria-live` on the
+                countdown itself would read every second out loud.{% endcomment %}
+                <span class="sr-only" role="status" data-cook-timer-status></span>
               </div>
             {% endif %}
           </section>
         {% endfor %}
       </div>
 
+      {% comment %}Back and Next are pinned to the sides of the content column
+      rather than sitting under the step. A step box changes height with every
+      step — two ingredients here, six and a timer there — and a button below it
+      moves each time, so the thing you press with a floury hand is never twice
+      in the same place. Fixed to the viewport, vertically centred, they are.
+
+      They are also `position: fixed`, which is why they are outside
+      `.cook-steps`: nesting them inside a box that scrolls would pin them to
+      the box rather than to the screen.
+
+      On a phone they are hidden and a swipe does the same thing — see
+      static/js/recipe_cook.js. Both exist because a swipe is undiscoverable and
+      a 44px target at the edge of a phone screen is a mis-tap.{% endcomment %}
       <div class="cook-nav" data-cook-nav hidden>
-        <button type="button" class="button button--secondary" data-cook-prev>&larr; {% translate "Back" %}</button>
-        <button type="button" class="button" data-cook-next>{% translate "Next" %} &rarr;</button>
+        {% comment %}An SVG chevron rather than the "←" character. A text glyph
+        carries its own side bearings, so flex centring centres the *line box*
+        and the ink sits visibly off to one side — which is what it did. A path
+        drawn in a square viewBox has no such thing.{% endcomment %}
+        <button type="button" class="cook-arrow cook-arrow--prev" data-cook-prev
+                aria-label="{% translate 'Previous step' %}" title="{% translate 'Previous step' %}">
+          <svg class="cook-arrow-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M15 5 8 12l7 7"></path>
+          </svg>
+        </button>
+        <button type="button" class="cook-arrow cook-arrow--next" data-cook-next
+                aria-label="{% translate 'Next step' %}" title="{% translate 'Next step' %}">
+          <svg class="cook-arrow-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 5l7 7-7 7"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="cook-finish-row" data-cook-finish-row hidden>
         <button type="button" class="button" data-cook-done hidden>{% translate "Done — record it" %}</button>
       </div>
 
@@ -122,7 +203,7 @@ and the reason a shared msgid is a trap rather than a saving.{% endcomment %}
               <li{% if item.optional %} class="is-optional"{% endif %}>
                 <span class="ingredient-amount" data-amount="{{ item.amount|default_if_none:''|unlocalize }}">{{ item.amount_display }}</span>
                 <span class="ingredient-name">
-                  {% if item.unit %}{{ item.unit }} {% endif %}{{ item.name }}
+                  {% if item.unit %}{{ item.unit|unit_label }} {% endif %}{{ item.name }}
                   {% if item.optional %}<span class="ingredient-flag">{% translate "optional" %}</span>{% endif %}
                   {% if item.note %}<span class="ingredient-note">{{ item.note }}</span>{% endif %}
                 </span>
@@ -199,6 +280,10 @@ and the reason a shared msgid is a trap rather than a saving.{% endcomment %}
 {% endblock %}
 
 {% block scripts %}
+  {% comment %}timer_sounds.js and timer_watch.js come from base.html — they are
+  on every page now. Loading the tones again here would run their file a second
+  time and leave the page with a *second* AudioContext, so the tone somebody
+  stopped would be the one that carried on.{% endcomment %}
   <script src="{% static 'js/recipe_scale.js' %}"></script>
   <script src="{% static 'js/recipe_cook.js' %}"></script>
 {% endblock %}

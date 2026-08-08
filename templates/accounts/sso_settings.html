@@ -2,7 +2,7 @@
 {% load i18n %}
 {% block title %}{% translate "Sign-in" %} – {% translate "Kitchen" %}{% endblock %}
 {% block topbar_title %}{% translate "Sign-in" %}{% endblock %}
-{% block topbar_sub %}{% translate "Synology SSO" %}{% endblock %}
+{% block topbar_sub %}{% translate "Single sign-on" %}{% endblock %}
 
 {% block topbar_actions %}
   <button type="button" class="topbar-help" data-help-open
@@ -10,15 +10,15 @@
 {% endblock %}
 
 {% block content %}
-  <h1>{% translate "Signing in with Synology" %}</h1>
-  <p class="page-lead">{% translate "Everything this app needs in order to hand sign-in over to the Synology SSO Server. The other half — creating the application on the SSO server itself — is a page in DSM, and the address below is what it has to be told." %}</p>
+  <h1>{% translate "Signing in through SSO" %}</h1>
+  <p class="page-lead">{% translate "Everything this app needs in order to hand sign-in over to an OpenID Connect provider. The other half — registering this app as a client on the provider itself — is done there, and the address below is what it has to be told." %}</p>
 
   {% comment %}The callback is fixed by config/urls.py and has to be registered
   in the SSO server byte for byte, trailing slash included. Shown first because
   it is the value people go and fetch from this page, and mistyping it produces
   a login loop with no error message anywhere.{% endcomment %}
   <div class="callback-box">
-    <span class="callback-label">{% translate "Redirect URI to register in DSM" %}</span>
+    <span class="callback-label">{% translate "Redirect URI to register with the provider" %}</span>
     <code class="callback-url">{{ callback_url }}</code>
     <span class="help">{% translate "Must match exactly, trailing slash included." %}</span>
   </div>
@@ -66,7 +66,7 @@
 
     <p class="checkbox-row">
       {{ form.enabled }}
-      <label for="{{ form.enabled.id_for_label }}">{% translate "Offer “Sign in with Synology”" %}</label>
+      <label for="{{ form.enabled.id_for_label }}">{% translate "Offer the single sign-on button" %}</label>
     </p>
     <span class="help">{{ form.enabled.help_text }}</span>
     <span class="field-error">{{ form.enabled.errors|striptags }}</span>
@@ -79,7 +79,7 @@
       <span class="field-error">{{ form.op_base.errors|striptags }}</span>
     </p>
 
-    <p class="help">{% translate "Do not trust any endpoint address written down anywhere, including this app’s own defaults — Synology has moved them between DSM versions. Read them off the server instead:" %}</p>
+    <p class="help">{% translate "Do not trust any endpoint address written down anywhere, including this app’s own defaults — providers move them between versions. Read them off the discovery document instead:" %}</p>
 
     <div class="form-grid">
       <p>
@@ -105,7 +105,7 @@
     </div>
     <p class="hint">{% blocktranslate with url=configuration.discovery_url %}Blank fields are derived from the address above. Discovery document: {{ url }}{% endblocktranslate %}</p>
 
-    <h2 class="form-section">{% translate "The application in DSM" %}</h2>
+    <h2 class="form-section">{% translate "The registered client" %}</h2>
     <div class="form-grid">
       <p>
         <label for="{{ form.client_id.id_for_label }}">{% translate "Client ID" %}</label>
@@ -191,13 +191,13 @@
   <div class="modal-overlay help-modal" hidden data-help-modal>
     <div class="modal help-panel" role="dialog" aria-modal="true" aria-labelledby="help-title">
       <button type="button" class="modal-close" data-help-close aria-label="{% translate 'Close' %}">&times;</button>
-      <h2 class="modal-title" id="help-title">{% translate "Setting up Synology sign-in" %}</h2>
+      <h2 class="modal-title" id="help-title">{% translate "Setting up single sign-on" %}</h2>
       <div class="modal-body">
-        <h3>{% translate "In DSM, once" %}</h3>
-        <p>{% translate "SSO Server → OIDC → Applications → Add. Give it a name and paste the redirect URI from the top of this page in as it is written, trailing slash included. DSM then shows a client ID and a client secret; those two go in the form here." %}</p>
+        <h3>{% translate "On the provider, once" %}</h3>
+        <p>{% translate "Register this app as a new OpenID Connect client. Give it a name and paste the redirect URI from the top of this page in as it is written, trailing slash included. The provider then shows a client ID and a client secret; those two go in the form here." %}</p>
         <h3>{% translate "The order that cannot lock you out" %}</h3>
-        <p>{% translate "Fill everything in with the switch at the top still off, save, press “Check the connection”, and only then switch it on. The local password form stays available either way — it is at /accounts/login/?local=1 even when the Synology button is the only thing on the page." %}</p>
-        <h3>{% translate "If the login gets to DSM and then fails" %}</h3>
+        <p>{% translate "Fill everything in with the switch at the top still off, save, press “Check the connection”, and only then switch it on. The local password form stays available either way — it is at /accounts/login/?local=1 even when the single sign-on button is the only thing on the page." %}</p>
+        <h3>{% translate "If the login reaches the provider and then fails" %}</h3>
         <p>{% translate "That is almost always the container being unable to reach the SSO server itself, which it has to do for the token exchange. “Check the connection” asks that question from inside the container. If the browser can reach the server and this cannot, it is your router not sending internal traffic back to itself." %}</p>
         <h3>{% translate "Where the secret is kept" %}</h3>
         <p>{% translate "In the database, encrypted with a key derived from DJANGO_SECRET_KEY — so a copy of the database alone does not reveal it, but a backup taken together with the environment does. Change DJANGO_SECRET_KEY and the secret has to be entered again." %}</p>

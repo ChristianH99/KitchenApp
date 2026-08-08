@@ -95,6 +95,11 @@ def recipe(user, db):
     r.tags.add(Tag.objects.create(name="Beilage"))
     RecipeIngredient.objects.create(recipe=r, position=0, amount=Decimal("1000"),
                                     unit="g", name="Kartoffeln")
-    RecipeIngredient.objects.create(recipe=r, position=1, amount=None,
+    # no_amount, not merely a null amount: "to taste" is now a thing a line
+    # says rather than something inferred from a blank, because the form
+    # refuses a line that answers neither. apps/recipes/forms.py explains the
+    # trade, and recipes/migrations/0003 set the flag on every line already
+    # written this way.
+    RecipeIngredient.objects.create(recipe=r, position=1, amount=None, no_amount=True,
                                     unit="", name="Salz und Pfeffer")
     return r

@@ -218,9 +218,9 @@ class TestTheLocalLogin:
         assert response["Location"] == "/recipes/"
 
     def test_the_sso_button_is_offered_only_when_it_is_configured(self, anon, db):
-        assert b"Sign in with Synology" not in anon.get(reverse("accounts:login")).content
+        assert b"Sign in with SSO" not in anon.get(reverse("accounts:login")).content
         configured_sso()
-        assert b"Sign in with Synology" in anon.get(reverse("accounts:login")).content
+        assert b"Sign in with SSO" in anon.get(reverse("accounts:login")).content
 
     def test_switching_it_on_half_configured_offers_no_button(self, anon, db):
         """A button that leads to the provider's error page is worse than no
@@ -228,7 +228,7 @@ class TestTheLocalLogin:
         that somebody ticked the box before filling the form in — and this is
         the page they will come back to in order to fix it."""
         configured_sso(client_id="", enabled=True)
-        assert b"Sign in with Synology" not in anon.get(reverse("accounts:login")).content
+        assert b"Sign in with SSO" not in anon.get(reverse("accounts:login")).content
 
     def test_a_secret_that_cannot_be_decrypted_withdraws_the_button(self, anon, db, settings):
         """DJANGO_SECRET_KEY has changed, so the stored secret is unreadable.
@@ -237,7 +237,7 @@ class TestTheLocalLogin:
         configured_sso()
         settings.SECRET_KEY = "a-completely-different-signing-key-000000"
         sso.invalidate()
-        assert b"Sign in with Synology" not in anon.get(reverse("accounts:login")).content
+        assert b"Sign in with SSO" not in anon.get(reverse("accounts:login")).content
 
     def test_the_local_form_is_always_reachable(self, anon, db):
         """The whole point of the fallback: it has to be there when SSO is
@@ -311,7 +311,7 @@ class TestSigningOut:
 
     def test_an_sso_session_is_handed_to_the_provider(self, client, user, db):
         """A local logout only drops this app's cookie — the Synology session
-        is still live, so the next click on "Sign in with Synology" goes
+        is still live, so the next click on "Sign in with SSO" goes
         straight back in without a prompt, which is not signing out."""
         configured_sso()
         session = client.session

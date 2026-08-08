@@ -137,6 +137,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'mozilla_django_oidc',
     'apps.accounts',
+    'apps.pantry',
     'apps.recipes',
 ]
 

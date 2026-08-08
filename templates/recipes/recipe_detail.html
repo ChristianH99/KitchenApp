@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static i18n l10n %}
+{% load static i18n l10n pantry_tags %}
 {% block title %}{{ recipe.title }} – {% translate "Kitchen" %}{% endblock %}
 {% block topbar_title %}{{ recipe.title }}{% endblock %}
 {% block topbar_sub %}{% if recipe.created_by %}{% blocktranslate with who=recipe.created_by.get_short_name|default:recipe.created_by.get_username %}added by {{ who }}{% endblocktranslate %}{% endif %}{% endblock %}
@@ -70,8 +70,36 @@ to the one people press every day is one somebody will press by accident.{% endc
     {% endif %}
   </div>
 
+  {% comment %}Preparing and cooking, never both at once — and that is what
+  ended the duplication. The ingredients used to be on the page twice: once as
+  the list down the left, and again inside the diagram beside it, which is where
+  the diagram *puts* them. Two answers to "what goes in this" on one screen, and
+  the scaler rewriting both, is one answer too many.
+
+  So they are split by the question being asked. Preparing is what to buy and
+  get out: the list, scaled, measured against the cupboard. Cooking is the
+  method, which already carries each line beside the step that consumes it.
+
+  Both are rendered and one is hidden, rather than being two pages: switching is
+  something somebody does with wet hands halfway through, and a round trip there
+  loses the servings they had scaled to.{% endcomment %}
+  <div class="view-switch-bar">
+    <div class="view-switch" role="group" data-recipe-views
+         aria-label="{% translate 'What to show' %}">
+      {% comment %}`context` on both, and it is load-bearing on the second. The
+      page already says "Cooking" a few lines above as the *label of the cooking
+      time*, translated as "Garzeit" — one msgid, one translation, and this
+      button came out reading "Cooking time" in German. Two different words in
+      one language are two msgids.{% endcomment %}
+      <button type="button" class="view-switch-option" data-recipe-view="prep"
+              aria-pressed="true">{% translate "Preparing" context "recipe view" %}</button>
+      <button type="button" class="view-switch-option" data-recipe-view="cook"
+              aria-pressed="false">{% translate "Cooking" context "recipe view" %}</button>
+    </div>
+  </div>
+
   <div class="recipe-body">
-    <aside class="recipe-ingredients">
+    <aside class="recipe-ingredients" data-recipe-panel="prep">
       <h2>{% translate "Ingredients" %}</h2>
       {% if ingredients %}
         {% comment %}The servings stepper rewrites every amount on the page in
@@ -108,14 +136,18 @@ to the one people press every day is one somebody will press by accident.{% endc
                 {% if item.amount_display %}{{ item.amount_display }}{% endif %}
               </span>
               <span class="ingredient-name">
-                {% if item.unit %}{{ item.unit }} {% endif %}{{ item.name }}
+                {% comment %}`unit_label`, never the raw column: it holds a
+                language-neutral code and rendering it directly writes "tbsp"
+                onto a German page. apps/pantry/units.py says why they are
+                separate.{% endcomment %}
+                {% if item.unit %}{{ item.unit|unit_label }} {% endif %}{{ item.name }}
                 {% if item.optional %}<span class="ingredient-flag">{% translate "optional" %}</span>{% endif %}
                 {% if item.note %}<span class="ingredient-note">{{ item.note }}</span>{% endif %}
                 {% for alt in item.substitutes %}
                   <span class="ingredient-alt">
                     {% translate "or" %}
                     <span class="ingredient-amount" data-amount="{{ alt.amount|default_if_none:''|unlocalize }}">{{ alt.amount_display }}</span>
-                    {{ alt.unit }} {{ alt.name }}{% if alt.note %} <span class="ingredient-note">{{ alt.note }}</span>{% endif %}
+                    {{ alt.unit|unit_label }} {{ alt.name }}{% if alt.note %} <span class="ingredient-note">{{ alt.note }}</span>{% endif %}
                   </span>
                 {% endfor %}
               </span>
@@ -125,18 +157,41 @@ to the one people press every day is one somebody will press by accident.{% endc
       {% else %}
         <p class="hint">{% translate "No ingredients recorded." %}</p>
       {% endif %}
+
+      {% if pantry_verdict %}
+        {% include "recipes/_pantry_check.html" %}
+      {% endif %}
     </aside>
 
-    <div>
-      {% comment %}The diagram is the method when there is one, and the prose
-      below it is the same method in sentences. Neither replaces the other: the
-      table says what combines with what and in which order, which is the thing
-      a paragraph is bad at; the paragraph says how, which is the thing a cell
-      four words wide cannot.{% endcomment %}
+    <div data-recipe-panel="cook" hidden>
+      {% comment %}Two readings of one method, and the selector only appears
+      when there are two to choose between — which, since both are built from
+      the same rows, means whenever the recipe has any steps at all. A recipe
+      with none has only its prose, and is shown that and no switch.
+
+      The steps are a sequence, the diagram is a shape. Neither is a summary of
+      the other: the table says what combines with what, the numbered list says
+      what to do next, and which of those somebody wants depends on whether
+      they are planning or standing at the hob.{% endcomment %}
       {% if diagram %}
-        <h2>{% translate "Method" %}</h2>
-        {% include "recipes/_diagram.html" %}
-        <p class="hint diagram-hint">{% translate "Read left to right: everything in a row joins the box beside it." %}</p>
+        <div class="section-heading">
+          <h2>{% translate "Method" %}</h2>
+          <div class="view-switch" role="group" data-method-views
+               aria-label="{% translate 'How to show the method' %}">
+            <button type="button" class="view-switch-option" data-method-view="steps"
+                    aria-pressed="true">{% translate "Steps" %}</button>
+            <button type="button" class="view-switch-option" data-method-view="diagram"
+                    aria-pressed="false">{% translate "Diagram" %}</button>
+          </div>
+        </div>
+
+        <div data-method-panel="steps">
+          {% include "recipes/_steps_list.html" %}
+        </div>
+        <div data-method-panel="diagram" hidden>
+          {% include "recipes/_diagram.html" %}
+          <p class="hint diagram-hint">{% translate "Read left to right: everything in a row joins the box beside it." %}</p>
+        </div>
       {% endif %}
 
       {% if recipe.instructions %}
@@ -149,7 +204,14 @@ to the one people press every day is one somebody will press by accident.{% endc
         <h2>{% translate "Method" %}</h2>
         <p class="hint">{% translate "No method recorded." %}</p>
       {% endif %}
+    </div>
+  </div>
 
+  {% comment %}Below both panels rather than inside either: the notes, the
+  history and where the recipe came from are about the recipe itself, and
+  hiding them behind "Cooking" would make them findable only by somebody who
+  was already looking for the method.{% endcomment %}
+  <div class="recipe-aside">
       {% if recipe.notes %}
         <div class="recipe-notes">
           <h3>{% translate "Notes" %}</h3>
@@ -186,16 +248,24 @@ to the one people press every day is one somebody will press by accident.{% endc
                   </div>
                 {% endif %}
                 {% if log.notes %}<p class="cook-log-note">{{ log.notes }}</p>{% endif %}
+                {% comment %}Edit before Remove, and both only for the person
+                whose evening it was. How far a dish went is usually clearer the
+                next day — before there was an edit page the only way to correct
+                it was to delete the entry, taking the date and the measured time
+                with it.{% endcomment %}
                 {% if user.is_staff or log.cooked_by_id == user.id %}
-                  <form method="post" action="{% url 'recipes:cook-log-delete' recipe.slug log.pk %}"
-                        class="cook-log-remove"
-                        data-confirm-title="{% translate 'Remove this entry?' %}"
-                        data-confirm="{% translate 'The record of this cooking will be removed. The recipe itself is untouched.' %}"
-                        data-confirm-accept="{% translate 'Remove' %}"
-                        data-confirm-danger>
-                    {% csrf_token %}
-                    <button type="submit" class="link-button">{% translate "Remove" %}</button>
-                  </form>
+                  <div class="cook-log-actions">
+                    <a class="link-button" href="{% url 'recipes:cook-log-edit' recipe.slug log.pk %}">{% translate "Edit" %}</a>
+                    <form method="post" action="{% url 'recipes:cook-log-delete' recipe.slug log.pk %}"
+                          class="cook-log-remove"
+                          data-confirm-title="{% translate 'Remove this entry?' %}"
+                          data-confirm="{% translate 'The record of this cooking will be removed. The recipe itself is untouched.' %}"
+                          data-confirm-accept="{% translate 'Remove' %}"
+                          data-confirm-danger>
+                      {% csrf_token %}
+                      <button type="submit" class="link-button link-button--danger">{% translate "Remove" %}</button>
+                    </form>
+                  </div>
                 {% endif %}
               </li>
             {% endfor %}
@@ -234,10 +304,10 @@ to the one people press every day is one somebody will press by accident.{% endc
           <button type="submit" class="button button--danger button--small">{% translate "Delete recipe" %}</button>
         </form>
       {% endif %}
-    </div>
   </div>
 {% endblock %}
 
 {% block scripts %}
   <script src="{% static 'js/recipe_scale.js' %}"></script>
+  <script src="{% static 'js/recipe_views.js' %}"></script>
 {% endblock %}

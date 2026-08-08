@@ -1,10 +1,22 @@
 # State of the work
 
-Written 2026-08-05 at the end of the session that created the repository, and
+Written 2026-08-05 at the end of the session that created the repository,
 updated the same day by the session that added the diagram, the cooking view and
-the account pages. It exists so that somebody — or some agent — picking this up
-cold knows three things the code cannot tell them: **what has actually been
-run**, what was left out on purpose, and what is worth doing next.
+the account pages, again by the one that turned the diagram editor into a
+drag-and-drop canvas, and on 2026-08-06 by the session that added the pantry —
+the ingredient catalogue, the closed unit set, the what-can-I-cook matching, the
+Steps/Diagram views, the completeness rules and the drag-to-resize tiles, and on
+2026-08-08 by the session that fixed five things the household reported: the
+silent Play button on the settings page, a step timer that could only be whole
+minutes, an alarm that chimed once and stopped, a step with no ingredients that
+could not be pulled down over any, and a deleted step taking everything above it
+out of the recipe — and then, the same day, three more: adding a step to the
+right of one sending that step to the bottom of the list, and the timer now
+following you off the cooking page as a card in the corner that rings wherever
+you are. It exists so that somebody — or
+some agent — picking this up cold knows three things the code cannot tell them:
+**what has actually been run**, what was left out on purpose, and what is worth
+doing next.
 
 Keep it current. A status document that is six weeks stale is worse than none,
 because it is believed.
@@ -17,7 +29,7 @@ Everything below was observed working, not merely written.
 
 | | How it was checked |
 |---|---|
-| The whole test suite | `uv run pytest` — **263 passed**, ~90 s |
+| The whole test suite | `uv run pytest` — **499 passed**, ~160 s |
 | Every page renders | Driven in Chrome against `runserver`: home, list, detail, form, tags, login, cooking view, People |
 | Adding a recipe end to end | Typed into the real form in the browser; ingredients, tags and slug all correct on save |
 | Blank formset rows dropped | Same submission — 5 rendered rows, 2 filled, 2 ingredients saved |
@@ -25,7 +37,45 @@ Everything below was observed working, not merely written.
 | Servings scaling | Zwetschgenkuchen 12 → 18 in the browser: 1,5 kg → 2,25 kg, "umgerechnet" note appears — **and the diagram cells and the substitute follow in step**, read back from the DOM |
 | The diagram's geometry | Read the rendered `<table>` back out of the page cell by cell: the full-width "Ofen vorheizen" row, the four ingredients merging into "Hefeteig ansetzen", the rowspans and the empty filler cells all as in the reference picture |
 | A branching diagram | Kartoffelsalat: two arms (potatoes, dressing) meeting at "übergießen", the shallow arm spanning the columns between |
-| The diagram survives an edit | Opened the real edit form, pressed Save with nothing changed, and the diagram came back identical — the selects had been primed from the saved relations |
+| The diagram survives an edit | Opened the real edit form, pressed Save with nothing changed, and the diagram came back identical — the hidden index fields had been primed from the saved relations |
+| **The drag-and-drop canvas** | Driven in Chrome on the real edit form. A line dragged from one step into another, and out to the tray; a step dropped onto another step, which put it in a column of its own and stretched its cell across the columns between; the arrow keys doing each of those from the handle, with the live region announcing it in German and the focus staying on the handle it moved |
+| The canvas agrees with the rendered page | Read the editor's grid placements out of the DOM and the saved `<table>`'s `rowspan`/`colspan` out of the recipe page: same blocks, same columns, same spans. This is the check that matters, because the layout now exists in two languages |
+| The arrangement round-trips | Moved the "Ofen vorheizen" band below the whole main block, took a line out of its step, saved, and read the database back: `position` 4 with no parent, the line unassigned. Re-opening the edit page laid out identically — the ordering is a fixed point, not something that drifts one place per save |
+| Adding into a step | "+ Zutat hierher" on a step card mints a row already assigned to it and drops it in the right cell |
+| **The Steps view of the editor** | Driven in Chrome on the real new-recipe form: the switch marks itself, the cards move into a numbered list, and each one grows a "fließt ein in" / "verwendet in" select built from the other rows of the page |
+| **The Brot case, end to end** | The shape the household could not build. "+ Schritt danach" on step 1 minted "verkneten" and set step 1's `parent_index` to it; a second arm was added and pointed at the same step through the select; the list then numbered them 1, 2, 3 with "Nimmt auf, was herauskommt aus: Vorteig ansetzen, Hefe ansetzen" on the third. The same shape saved through the server is pinned in `apps/recipes/tests.py` and lays out three columns wide |
+| **The ingredient autosuggest** | Typed "Milch" into a real line: the popup offered the catalogue row, picking it filled the unit with `ml` and wrote the catalogue id into the hidden field |
+| **The completeness rules refuse a real page** | Pressed Save on a form with a named line and no amount: the page came back unsaved with "How much Milch? Give an amount, or tick 'no fixed amount'…" on the card — and the banner above it, which is what the `total_error_count` check in the template is for |
+| **The pantry, through its own form** | Five things added through the real "Etwas hinzufügen" control, including one with no amount; grouped by category on reload, Salz showing "etwas" |
+| **What-can-I-cook** | `/recipes/?have=nearly` narrowed the list to one recipe, carrying a "2 Dinge fehlen" pill — the matching, the filter and the card badge in one pass |
+| **A general step over only part of the width** | The Brot case again. "Step 4" detached with the "geht ein in" select, then its band's left end pulled in twice with the new arrows: the editor drew it over columns 3–4, the save round-tripped `span_from`/`span_to` as 3 and 4, and the recipe page rendered `filler[cs=2]` followed by the band at `cs=2` — sitting over Step 2 and Step 3 and nothing else |
+| **A second step in the same column** | The shape the household could not build. The "+" on the bottom edge of "Zerbröseln" made a step with the *same parent*, drawn directly below it in column 2 — read back from the DOM as `@2 / 3 rows 3 / 4`. Every other way of adding a step made a new column or a parentless root, which is why theirs "only stayed above the ingredients" |
+| Adding where it is wanted | "+" below *Wasser* minted an ingredient directly beneath it, already in Zerbröseln rather than in the tray; "+" on a tile's right edge inserted a step into the chain. No formset renders a spare row any more, and the tray is empty |
+| **The ingredient page** | "+" adds a row and bumps TOTAL_FORMS (2→3), "×" hides it and ticks DELETE while leaving it in the DOM (3 in the DOM, 2 shown). The unit dropdown went from ~790px to 176px |
+| Unit type-ahead | Typing "g" selects **grams**, typing "gl" selects Glas — measured, not assumed. The browser's own incremental search took the first label sharing a letter |
+| **Search as you type** | The catalogue narrowed 112 rows to 3 on "meh" and to 5 on "zucker", the address bar followed, clearing restored all 112, and a query matching nothing showed the empty message. The Search button is hidden once the script runs and still works without it |
+| The variety suggestion | "Roggenmehl - Typ 1150" offered *Mehl*; picking it **kept the typed name** and set the unit to `g` and the catalogue link to Mehl |
+| The step timer | Counted 25:00 → 24:59, wrote its deadline to localStorage, Stop reset it. A deadline planted in the past and the page reloaded came back at 0:00, "Zeit ist um", the live region announcing it and the stored deadline cleared — the phone-locked-mid-bake case |
+| **Resizing a tile by dragging its edge** | Driven with real pointer events on the Brot recipe: one row down, two rows down in a single drag, all four ingredients into one step, and every one of those dragged back — the assignments and their order returned exactly to where they started. The guide appeared during each drag, the scroll did not move (0px), the console stayed clean, and a drag that was released was still there after a save and a page load |
+| The band's ends | Dragged the left end from column 3 to column 2 and pressed ArrowRight to put it back; both the hidden fields and the rendered `grid-column` followed |
+| One handle per boundary | Read out of the DOM: Step 1 has a handle at Wasser's lower edge and Step 2 one at Test's, and the blank spare card has none. The previous build put a control on the top *and* bottom of every step, so this boundary had two of them 8px apart. A step that owns *no* lines used to have none either — see the row below; that was the bug, not the design |
+| **A step with no ingredients can be pulled down over some** | The household's "Vormischen", which nothing could attach Dinkelmehl, Salz and Zucker to. Driven on the real Brot edit form: the handle now exists on that tile (`anchor 3`), sits exactly on the boundary between it and the Dinkelmehl row (measured: both at y=1709.8), and three ArrowDown presses — then, separately, one real pointer drag past Zucker — moved all three lines into it, leaving the ingredient order untouched |
+| **Deleting a step no longer takes the recipe apart** | The reported sequence, driven on the real form: "+ Schritt danach" on "Zerbröseln", then "×" on what it made. The canvas came back to two blocks with Zerbröseln in column 2 beside Vormischen, every `position` identical to before and every ingredient still in the step it started in. Blanking the removed row's `parent_index` by hand — which is what the old code did — reproduces the break on the spot: three blocks, Zerbröseln stretched across columns 2–8 with Hefe and Wasser inside it |
+| **The alarm rings until it is stopped** | A deadline planted 1.5 s ahead and the page reloaded: `kitchenSounds.isRinging()` still true seven seconds later (it was one 0.7 s chime before), Start hidden, the remaining button relabelled "Alarm ausschalten" — and pressing it silenced the tone, stopped the buzzing and put the timer back to 60:00 |
+| **The Play buttons on the settings page make a noise** | They did nothing at all before: the page loaded `sound_preview.js` without `timer_sounds.js`, so the handler returned on its second line. Counted through a patched `createOscillator`: pressing "Abspielen" beside *Alarm* creates its five oscillators on a `running` context and ticks the radio beside it. `config/tests.py::test_no_page_loads_a_script_without_what_it_reaches_for` now walks every template for the same mistake |
+| **The temperature waits for a mode** | Read out of the DOM on the real form **with the focus left on the select, which is what a real click leaves behind**: the slot holds the select alone until a mode is chosen, grows the box + "°C" + an error line the moment one is, and drops all three again when the mode is cleared. The first version of this check dispatched `change` without focusing anything, which is a state nobody reaches — it passed while every real click failed, and the box only appeared after a save. Focus the control, then act |
+| **A bad temperature says so as it is typed** | Keyed in character by character: "abc" and "-5" never reach the box at all (digits only, `maxlength=3`), "18.5" becomes "185", and 0 or 501 turn the border red with "Eine Ofentemperatur ist eine ganze Zahl zwischen 1 und 500 °C." under it while `checkValidity()` goes false — so the Save is refused rather than the number vanishing. 1, 180 and 500 write straight through with no complaint |
+| **The help pop-up fits the screen** | Measured with the recipe form's help open: 1675px of text inside a 893px body, the panel 970px tall in a 1018px viewport with 24px clear top and bottom, the close button on screen, and `scrollTop` reaching the last paragraph. Before the cap the panel was as tall as its content and `body.modal-open` meant nothing could scroll to the end of it |
+| **The oven panel arrives on the keystroke** | Typed " im Ofen backen" into a step one letter at a time on the real form and watched the slot: the panel is absent up to "…im Ofe" and present from "…im Ofen" onwards. It used to need a drag or a save first, which is how it was reported |
+| **The temperature is a box, not a list** | `type=number min=0 max=500 step=1 inputmode=numeric` with "°C" beside it. Fed 180 / 500 / 0 (written through), 501 / −5 / 18.5 / "abc" (nothing written, and the browser marks the box invalid). 18.5 was the one worth catching: `parseInt` would have stored 18 |
+| **"In keinem Schritt" is gone** | Read out of the DOM: no heading and no help paragraph anywhere in that element, and "Salz" sits directly under the diagram as a plain card. It becomes a dashed drop zone with a one-line hint *only* while a drag is in flight — checked mid-drag with real pointer events, and dropping a line there still takes it out of its step |
+| The standing-instruction note is gone | `[data-standing-note]` no longer exists on any card, and `markStanding` with it |
+| **Adding a step no longer reorders the recipe** | "+ Schritt danach" on "Zerbröseln", on the real Brot form: it stays in rows 1–3 with Hefe and Wasser, "Vormischen" stays below it with its three lines, the new box lands in the column between, and every `position` is untouched. Doing what the old code did — minting the row and leaving it at the end of `stepOrder` — reproduces the report on the spot: Zerbröseln drops to rows 4–6 and Vormischen rises to the top |
+| **A timer follows you off the cooking page** | Started the 60-minute timer on Zwetschgenkuchen with a real click, then walked to the pantry: a card in the bottom-right corner reading ZWETSCHGENKUCHEN / "Hefeteig ansetzen, gehen lassen" / 59:39, linked back to the cooking view. The record in localStorage carries the step, the recipe, its URL and the chosen sound |
+| **…and rings there** | Deadline brought forward on the pantry page: four oscillators in three seconds on a `running` context, the card green with "Zeit ist um" and "Alarm ausschalten", `⏰` on the tab title, and the sr-only status announcing it once. Left alone it was **still ringing twelve seconds later** — sampled once a second, with the store intact throughout |
+| Two at once | A ringing one and a running one stack, only the expired one makes a noise, and stopping it leaves the other counting; stopping the second takes the dock away entirely. On the cooking view for Zwetschgenkuchen only the *other* recipe's card appears — its own timer is the one beside the step, restored from the same store on load (19:38, marked running, after a reload) |
+| **A timer finer than a minute** | Minutes and seconds are two boxes either side of a colon on the step card, and one attribute — `data-cook-seconds` — carries the total to the cooking view. Read back off the real page: 3600 and 2700 for the two Zwetschgenkuchen timers, and no `data-cook-minutes` anywhere. `seed_demo` now has one 45 s step, for the same reason it has one 1,5 kg ingredient |
+| The recipe page shows its ingredients once | Read back from the DOM: one `.ingredient-list` on the page, in the Preparing panel; the Cooking panel carries each line under the step that consumes it |
 | The cooking view | Walked Kartoffelsalat step by step in the browser: the current cell and its four ingredient rows light up, earlier steps go green, the stopwatch runs, "Fertig" opens the finish panel with the measured minutes filled in |
 | Creating a local account | Typed into the real People form; account created, password usable |
 | No sideways scroll at 390px | Measured, not eyeballed: the recipe page was 508px wide inside a 390px column before `min-width: 0` and is exactly 390px after it, with the diagram scrolling inside its own box. The form and the cooking view were measured the same way |
@@ -94,6 +144,30 @@ the NAS.
   follow Synology's usual `webman/sso/` shape. DEPLOYMENT.md §3.1 tells you to
   read the real ones off the discovery document before trusting them, and that
   instruction is not politeness.
+- **The canvas has never been dragged with a finger.** Pointer events were
+  chosen over the HTML5 drag API precisely so touch works, and `touch-action:
+  none` on the handle is there so a drag is not a scroll — but every drag in §1
+  was a mouse or a synthesised pointer. A tablet is exactly where somebody would
+  type a recipe in, and it is ten minutes to check.
+- **The canvas has never been seen at phone width.** It deliberately does *not*
+  reflow to one column — that would destroy the one thing the layout says — so
+  it scrolls sideways inside `.builder-scroll` instead. Whether that is workable
+  while also dragging is a question a measurement cannot answer. The **Steps**
+  view added since is the answer to this on a phone, and it has not been
+  measured there either.
+- **The pantry has never been used for a week.** Everything in §1 about it was
+  driven in one sitting with five things in the cupboard. The questions that
+  only time answers: whether anybody keeps the amounts current, whether the
+  catalogue fills with near-duplicates faster than it is worth merging them, and
+  whether "cannot tell" turns out to be the common answer rather than the rare
+  one — which would make the whole filter useless in a way no test can see.
+- **The shipped starter catalogue is one person's guess at a German kitchen.**
+  About a hundred rows, with pack sizes from memory rather than from a shop.
+  Being slightly wrong is survivable — the sizes only round a shortfall up — but
+  nobody has checked them against an actual receipt.
+- **No recipe with a real, deep diagram has been typed in through the Steps
+  view.** The Brot case in §1 is three steps. Whether a numbered list is still
+  the easier of the two at a dozen is unknown.
 - **`deploy/entrypoint.sh` has never executed** beyond a syntax check.
 - **`docker-compose.yml` paths are assumptions** —
   `/volume1/docker/kitchen/data` is the conventional place, not an observed one.
@@ -106,34 +180,51 @@ the NAS.
 Not gaps. Each was considered and left out, and re-opening one is fine — this
 list exists so it is re-opened knowingly.
 
-- **Meal planning, shopping lists, a pantry.** The app is called *Kitchen* and
-  the project is laid out for them (`apps/recipes/` is one app among future
-  siblings, not the whole thing), but only recipes exist. The structured
-  ingredient rows are the groundwork; a shopping list is an aggregation over
-  `RecipeIngredient` and needs no schema change to recipes. It now has two more
-  columns to respect: `optional` (don't buy saffron every week) and
-  `alternative_for` (don't buy both the butter and the margarine).
+- ~~**A pantry.**~~ **Built**, as `apps/pantry/` — the sibling app this entry
+  anticipated. It carries the ingredient catalogue (one row per substance, with
+  its usual unit, its other names and the sizes it is sold in), the closed unit
+  set, the cupboard itself, and the matching that answers *what can be cooked
+  now* and *what would have to be bought*. `RecipeIngredient` gained a nullable
+  FK to it and nothing else about recipes changed.
+- **Meal planning, and a shopping list across several recipes.** Still absent,
+  and now most of the way there rather than at the beginning:
+  `matching.shopping_list` already totals one substance across several recipes
+  and rounds to whole packets. What is missing is a page to choose the recipes
+  on. It respects the two columns this entry has always named — `optional`
+  (don't buy saffron every week) and `alternative_for` (don't buy both the
+  butter and the margarine).
 - **HTMX.** The briefing asked for it and the app does not use it. Nothing here
   needs partial page updates yet: the servings scaler is pure client-side
   arithmetic, the cooking view shows and hides steps the server already
   rendered, and everything else is a form post. Adding HTMX for its own sake
   would be a dependency and a second rendering path for no behaviour. The
   moment there is a live-filtering list or an inline edit, it earns its place.
-- **A server-rendered preview of the diagram while editing.** The form's preview
-  is a *nesting* built in JavaScript, not the real table. Drawing the real one
-  would mean either re-implementing the rowspan/colspan arithmetic in a second
-  language — the thing most likely to quietly disagree with the page it is
-  previewing — or a `fetch` to an endpoint that lays out an unsaved POST. The
-  second is the one to build if the preview ever needs to be exact; it is a view
-  and a template, not a rewrite.
-- **Editing the diagram by dragging.** Two `<select>`s per row is not elegant,
-  and it works on a phone, survives without JavaScript for everything except the
-  wiring itself, and needs no drag-and-drop library. A canvas editor is a real
-  feature, not a polish pass.
-- **Nutrition, cost per portion, and a real unit vocabulary.** `unit` is still
-  free text ("EL" / "Esslöffel" / "Tbsp" are three units as far as the database
-  is concerned). Normalising it is the prerequisite for all three, and there is
-  no reason to do it until one of them is wanted.
+- ~~**Editing the diagram by dragging.**~~ **Built.** This entry used to say a
+  canvas editor was a real feature rather than a polish pass, which was true —
+  it is now `static/js/recipe_diagram.js`, and the form's "Ingredients" and
+  "Method as a diagram" sections have become one canvas that the formset rows
+  live inside. The two `<select>`s per row are gone; the one that remains is
+  "Statt" (a substitute), because dropping one line onto another already means
+  "put it in the same step" and the same gesture cannot also mean "replace it".
+  What it cost, so the next pass knows: the layout rule now exists in JavaScript
+  as well as in `apps/recipes/diagram.py` (CLAUDE.md's standing decisions say
+  what bounds that), and the *arranging* no longer survives without JavaScript —
+  the form still renders every field and still saves, but as a flat list.
+- ~~**A server-rendered preview of the diagram while editing.**~~ **Moot.**
+  There is no preview any more: the editor *is* the layout, and the cards are
+  the formset rows themselves rather than a drawing of them. The `fetch`-an
+  endpoint idea is no longer worth keeping — what would be previewed is already
+  on the screen.
+- ~~**A real unit vocabulary.**~~ **Built.** `unit` is a code from a closed set
+  (`apps/pantry/units.py`), a dropdown rather than free text, and
+  `recipes/0003` translated the values that predate it. What made it worth doing
+  was the pantry: "1 kg Zucker" in the cupboard answers "500 g Zucker" in a
+  recipe only if something can convert one into the other.
+- **Nutrition and cost per portion.** Both now have their prerequisite — a
+  normalised unit and a catalogue row to hang a number on. Neither is wanted
+  yet; a per-100 g figure on `Ingredient` is where they would start, and the
+  honest warning is that keeping such figures current is a chore nobody in a
+  household volunteers for.
 - **Recipe versioning / history.** Somebody rewriting the family Rouladen is
   handled by *who may edit* (`apps/recipes/views._may_edit`), not by an audit
   trail. A household of four does not need one; if it turns out to, the shape to
@@ -145,7 +236,19 @@ list exists so it is re-opened knowingly.
   Structured ingredient rows make it *possible* (schema.org/Recipe maps onto
   them almost exactly), which is another thing the text-field version would have
   foreclosed.
-- **Self-service password change.** Accounts come from DSM. See CLAUDE.md.
+- **Self-service password change.** Accounts come from the identity provider.
+  See CLAUDE.md.
+- **Anything that guesses which substance a name means.** `catalogue.lookup` is
+  exact after case-folding, with aliases searched and nothing else. Stemming,
+  plural-stripping and prefix matching were all considered and left out: they
+  buy a handful of correct matches and pay for them with wrong ones, and a wrong
+  one here is the pantry claiming a substance the house does not have.
+- **A pantry per person, or a history of what was in the cupboard.** One row per
+  ingredient, overwritten. "How much sugar is there" has one answer and the
+  house is the trust boundary; a log of it would be a table nobody reads.
+- **Automatic depletion when a recipe is cooked.** Tempting, and wrong without a
+  weekly shop being recorded too — the cupboard would drift to empty and stay
+  there, which is worse than a number somebody updates when they notice.
 - **In-app export/backup.** `/data` is one SQLite file plus `media/`; Hyper
   Backup already covers that share.
 - **Per-user access control beyond edit rights.** Anyone signed in reads
@@ -188,10 +291,13 @@ list exists so it is re-opened knowingly.
    the responsive work was measured rather than seen.
 4. **Favourites.** Small, obviously wanted, and it exercises the first
    per-user relation in the app.
-5. **A shopping list** across selected recipes. This is the feature the
-   structured ingredients were for, and the first one that will show whether the
-   unit field wants normalising (`EL` vs `Esslöffel` vs `Tbsp`) — which it
-   currently is not, on purpose: free text until there is a reason.
+5. **A shopping list across *several* recipes.** Half of this exists:
+   `apps/pantry/matching.shopping_list` already takes a list of
+   `(recipe, verdict)` pairs, adds the same substance up across them and rounds
+   the total to whole packets. What is missing is the page — somewhere to choose
+   four recipes for the week and get one list out. The unit question that used
+   to be listed here is settled: units are a closed set now
+   (`apps/pantry/units.py`).
 6. **Pagination on the recipe list, and on the cooking history.** The list
    renders every recipe; the recipe page renders the last ten cookings and says
    how many more there are. Fine at a hundred with lazy-loaded images; not fine
@@ -200,16 +306,39 @@ list exists so it is re-opened knowingly.
 7. **A print stylesheet for the recipe page.** People print recipes, and the
    diagram is the part that will come out wrong: it lives in a horizontally
    scrolling box that a printer cannot scroll.
-8. **Somewhere to see the cooking history across recipes** — "what did we eat
-   this month", and whether "serves four" is ever true in this house. Every
-   number for it is already recorded; nothing reads it yet except the recipe
-   page's own median.
+8. **Turn the cooking history into an answer rather than a list.** The page
+   exists (`/cooked/`) and entries can be corrected after the fact, which was
+   the thing that was actually missing. What it still does not do is *add up*:
+   "what did we eat this month", and whether "serves four" is ever true in this
+   house. Every number for it is recorded; only the recipe page's own median
+   reads any of it.
+9. **Tidy the catalogue once it has been used for a while.** It grows by itself
+   from every recipe saved, which is what makes it useful and what will leave
+   "Kartoffeln" beside "festkochende Kartoffeln". Merging is a manual job in the
+   admin today; if it turns out to be a monthly chore, it wants a button on the
+   catalogue page rather than a cleverer matcher — see CLAUDE.md for why the
+   matcher stays exact.
 
 ## 6. Things that will bite
 
 Collected because each one cost time in the session that built this, and none is
 visible from the code alone.
 
+- **An exception inside `render()` in `static/js/recipe_diagram.js` deletes form
+  rows.** Not a hypothetical: the Steps view shipped with `nameOf()` reading
+  `latest`, which `refresh()` only assigns *after* `render()` returns — so on
+  the first pass it was null, the call threw halfway through moving the cards
+  into a detached `<ol>`, and three step cards ended up outside the document
+  altogether. `TOTAL_FORMS` still said six. The page looked like a recipe that
+  had silently lost its first three steps, and saving it would have.
+
+  Two things now bound it: the list is attached to the canvas *before* it is
+  filled, so the worst a throw can do is lay the cards out wrongly rather than
+  remove them; and anything called during a render takes `state` as an argument
+  instead of reaching for `latest`. **Nothing in the test suite can catch this**
+  — no test here runs JavaScript. The check that finds it is counting
+  `[data-step-row]` in the DOM against `steps-TOTAL_FORMS` in the browser, and
+  it is worth doing by hand after any change to that file.
 - **`collectstatic` is a prerequisite of `pytest`**, not only of a deployment.
   A fresh checkout fails most of the suite with "Missing staticfiles manifest
   entry" until it has run once.

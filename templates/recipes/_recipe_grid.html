@@ -33,6 +33,18 @@ full recipe is worse than one that omits the line.
             <span><strong>{{ recipe.ingredient_count }}</strong> {% translate "ingredients" %}</span>
           {% endif %}
         </div>
+        {% comment %}What the cupboard says, when the page asking for the cards
+        has worked it out. Guarded rather than assumed: the landing page passes
+        recipes with no `pantry` attribute at all, and a card claiming
+        "everything missing" because nobody asked the question would be worse
+        than one that says nothing.{% endcomment %}
+        {% if recipe.pantry %}
+          {% if recipe.pantry.can_be_made %}
+            <span class="pill pill--herb recipe-card-pantry">{% translate "can be made now" %}</span>
+          {% else %}
+            <span class="pill pill--saffron recipe-card-pantry">{% blocktranslate count n=recipe.pantry.short_count %}{{ n }} thing short{% plural %}{{ n }} things short{% endblocktranslate %}</span>
+          {% endif %}
+        {% endif %}
       </div>
     </a>
   {% endfor %}

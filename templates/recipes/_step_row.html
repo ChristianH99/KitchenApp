@@ -1,0 +1,145 @@
+{% load i18n %}
+{% comment %}One step — one box in the diagram — as a card that lives in a cell
+of the canvas. Included per form and again inside a <template> with
+``steps.empty_form``; see _ingredient_row.html for why that is one file.
+
+``parent_index`` is the step this one feeds into, written by dropping this card
+onto another one. A step with nothing feeding it and nothing going into it is a
+standing instruction — "heat the oven to 180 °C" — and draws as a band across
+the whole width wherever ``position`` puts it.{% endcomment %}
+<div class="step-card" data-step-row>
+  {{ row.id }}{{ row.parent_index }}{{ row.position }}{{ row.span_from }}{{ row.span_to }}{{ row.oven_celsius }}{{ row.oven_mode }}
+  <div class="card-head">
+    <button type="button" class="card-grip" data-grip
+            aria-label="{% translate 'Move this step' %}" title="{% translate 'Move this step' %}">
+      <span class="card-grip-mark" aria-hidden="true"></span>
+    </button>
+    {% comment %}There were up/down buttons here for a while. They reordered the
+    step, which is a different thing from resizing it, and beside a tile whose
+    edges are now draggable they read as the resize control and did nothing of
+    the sort. Reordering is the drag handle to the left, and its arrow keys.{% endcomment %}
+    <p class="step-text">
+      <label class="sr-only" for="{{ row.text.id_for_label }}">{% translate "Step" %}</label>
+      {{ row.text }}
+    </p>
+    <p class="row-delete-box">{{ row.DELETE }}</p>
+    <button type="button" class="card-remove" data-step-remove
+            aria-label="{% translate 'Remove this step' %}" title="{% translate 'Remove this step' %}">&times;</button>
+  </div>
+  <span class="field-error">{{ row.non_field_errors|striptags }}{{ row.text.errors|striptags }}{{ row.oven_celsius.errors|striptags }}</span>
+
+  {% comment %}What this step is *set to* — the oven and the timer — on one row
+  rather than scattered down the card. They are the same kind of thing (a
+  number the step carries, not a word somebody wrote) and they were previously
+  a dropdown pair at the left and a lone box floating in the middle.{% endcomment %}
+  <div class="step-settings">
+    {% comment %}Filled by static/js/recipe_diagram.js when this step's text says
+    it heats an oven — "vorheizen", "preheat", "Ofen", "oven". Empty otherwise,
+    so the twenty steps of a recipe that are not about an oven carry nothing.{% endcomment %}
+    {% comment %}The temperature is a number box now rather than a list of the
+    settings a domestic oven has detents for — a closed list is wrong the first
+    time a recipe says a number that is not on it, and then there is nowhere to
+    put it at all. Two attributes went with the list: `data-clear`, its "not an
+    oven step" option (a box is cleared by emptying it), and `data-ask`, its
+    prompt. No placeholder replaces the latter — the same reasoning as the timer
+    beside it, which puts "min" *after* the box rather than inside it, and for
+    the extra reason that a greyed "180" in a temperature box cannot be told
+    apart from a temperature of 180.{% endcomment %}
+    <span class="step-oven" data-oven-slot
+          data-temp-label="{% translate 'Oven temperature' %}"
+          data-mode-label="{% translate 'Oven mode' %}"></span>
+
+    {% comment %}The timer. On the face of the card because it is four
+    characters and the thing a bread recipe most often has on a step — it was
+    inside "More" and simply not found. The clock says what the box is for
+    without a label taking a line of its own.
+
+    Two boxes, minutes and seconds, separated by a colon — because a step is not
+    always a round number of minutes and the version with one box could not say
+    "1:30" at all. It is deliberately *not* one box holding a total: 2700 for
+    three quarters of an hour is a number nobody types correctly twice, and one
+    box that means minutes on this row and seconds on that one is worse again.
+    The seconds box stays empty on nearly every step, which is why it is the
+    narrower of the two and carries no unit word of its own.{% endcomment %}
+    <span class="step-minutes" title="{% translate 'Duration — minutes and seconds' %}">
+      <svg class="step-minutes-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="13" r="8"></circle>
+        <path d="M12 9v4l2.5 1.5"></path>
+        <path d="M9 2h6"></path>
+      </svg>
+      <label class="sr-only" for="{{ row.minutes.id_for_label }}">{% translate "Duration (min)" %}</label>
+      {{ row.minutes }}
+      <span class="step-minutes-colon" aria-hidden="true">:</span>
+      <label class="sr-only" for="{{ row.seconds.id_for_label }}">{% translate "Duration (seconds)" %}</label>
+      {{ row.seconds }}
+      <span class="step-minutes-unit" aria-hidden="true">{% translate "min:s" %}</span>
+    </span>
+  </div>
+  <span class="field-error">{{ row.minutes.errors|striptags }}{{ row.seconds.errors|striptags }}</span>
+  {% comment %}Folded away for the same reason as on an ingredient card: a step
+  cell is the box the diagram is read by, and a two-row textarea in every one of
+  them turns the layout into a wall of empty fields. Open from the start when
+  this step already has one of them.{% endcomment %}
+  <details class="card-more"{% if row.detail.value %} open{% endif %}>
+    <summary class="card-more-summary">{% translate "More" %}</summary>
+    <div class="card-more-body">
+      <p class="step-detail">
+        <label class="sr-only" for="{{ row.detail.id_for_label }}">{% translate "Detail" %}</label>
+        {{ row.detail }}
+      </p>
+    </div>
+  </details>
+  {% comment %}Where a step is joined to the rest of the recipe without dragging
+  anything. Two buttons, because the two directions are different thoughts and
+  the drag gesture only ever expressed one of them.
+
+  "+ Ingredient here" mints a line already assigned to this step.
+
+  "+ Step after this" mints a step that this one *feeds into* — which is what
+  puts the new box in the column to the right. It is the move the drag makes
+  hard to find: dropping card A onto card B means "A feeds into B", so building
+  a recipe forwards ("…and then this happens") meant creating the step first
+  and then dragging the earlier one onto it, backwards. Pressing this on each of
+  two parallel steps in turn is also how they are made to meet: the first press
+  creates the joining step, the second drops the other arm into the same one.
+
+  Neither is a form field, so they cost the row nothing.{% endcomment %}
+  <div class="step-adds">
+    <button type="button" class="step-add" data-step-add-line>
+      {% translate "+ Ingredient here" %}
+    </button>
+    <button type="button" class="step-add" data-step-add-after>
+      {% translate "+ Step after this" %}
+    </button>
+    {% comment %}A *sibling*: same parent, same column, its own ingredients —
+    "Zerbröseln" and "Vormischen" both feeding "Mit Holzlöffel vermischen". It
+    exists as a hover "+" on the tile's bottom edge too, but only on the canvas,
+    and the list is the view this form opens in. Without a labelled button here
+    there was no way to build the shape at all from the default view.{% endcomment %}
+    <button type="button" class="step-add" data-step-add-beside>
+      {% translate "+ Step beside this" %}
+    </button>
+  </div>
+
+  {% comment %}The list view's controls. Empty here and filled by
+  static/js/recipe_diagram.js when the editor is in "Steps" mode — the same card,
+  the same fields, with the relation shown as a select rather than as a place on
+  a canvas. Rendered as a slot rather than as a server-side <select> because the
+  options are the *other rows of this page*, which change as somebody types.{% endcomment %}
+  {% comment %}The empty option used to read "nothing — this is the finished
+  dish", which is true of exactly one step in a recipe and made the *other*
+  reason to pick it unreachable: a standing instruction like "heat the oven"
+  also feeds into nothing, and nobody was going to describe preheating as the
+  finished dish. Both are simply steps with no parent; which of the two a step
+  is, is decided by whether anything goes into it, not by this control.{% endcomment %}
+  <span class="row-extra" data-parent-slot
+        data-label="{% translate 'Feeds into' %}"
+        data-empty="{% translate 'nothing — a step on its own' %}"></span>
+
+  {% comment %}There was a note here saying, in a sentence and a half, that this
+  step stands on its own and that its band's ends can be dragged. It is gone:
+  the "feeds into" line directly above already says the same thing in three
+  words, and the diagram colours the band. A card that explains itself twice is
+  a card nobody finishes reading.{% endcomment %}
+</div>

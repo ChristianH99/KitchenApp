@@ -17,6 +17,11 @@ OPEN = {
     # The health probe. Answers "ok" or 503 and deliberately nothing else.
     ("", "health"),
 
+    # The site icon. A browser fetches it per *origin* and before anybody has
+    # signed in — the login page wants it too — and an icon is not household
+    # data. Gating it would replace a 404 in the log with a 302 in the log.
+    ("", "favicon"),
+
     # The login page itself, and the local sign-in POST.
     ("accounts", "login"),
 

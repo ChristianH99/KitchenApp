@@ -1,0 +1,76 @@
+{% load i18n l10n pantry_tags %}
+{% comment %}What the cupboard says about this recipe.
+
+Rendered only when there is a pantry at all — apps/recipes/views.py leaves the
+whole block out otherwise, because somebody who has not filled the cupboard in
+has not said they have nothing.
+
+Three states, and the third is the point. "Cannot tell" is what 200 g of butter
+against two packets of butter honestly is, and it is kept separate from
+"missing" rather than rounded into it: "you can make this" is a promise somebody
+acts on by not going to the shop.{% endcomment %}
+<section class="pantry-check">
+  {% if pantry_verdict.can_be_made %}
+    <p class="notice notice--success">{% translate "Everything for this is in the house." %}</p>
+  {% elif pantry_verdict.missing or pantry_verdict.unknown %}
+    <h3>{% translate "What is not in the house" %}</h3>
+    <ul class="pantry-check-list">
+      {% for entry in pantry_verdict.missing %}
+        <li class="pantry-check-line pantry-check-line--{{ entry.state }}">
+          <span class="pantry-check-name">{{ entry.line.name }}</span>
+          {% if entry.state == "short" %}
+            <span class="pantry-check-note">{% blocktranslate with have=entry.available|floatformat:"-2" unit=entry.needed_unit|unit_label %}only {{ have }} {{ unit }} there{% endblocktranslate %}</span>
+          {% else %}
+            <span class="pantry-check-note">{% translate "none" %}</span>
+          {% endif %}
+        </li>
+      {% endfor %}
+      {% for entry in pantry_verdict.unknown %}
+        <li class="pantry-check-line pantry-check-line--unknown">
+          <span class="pantry-check-name">{{ entry.line.name }}</span>
+          <span class="pantry-check-note">
+            {% if entry.line.ingredient_id %}
+              {% translate "cannot be compared — different units" %}
+            {% else %}
+              {% translate "not in the catalogue" %}
+            {% endif %}
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+
+    {% if shopping %}
+      {% comment %}The packet sizes turn "380 g short" into "one 500 g pack",
+      which is the useful sentence in a shop. Only shown for the lines the
+      catalogue knows how to buy.{% endcomment %}
+      <h3>{% translate "To buy" %}</h3>
+      <ul class="shopping-list">
+        {% for row in shopping %}
+          <li class="shopping-line">
+            <span class="shopping-name">{{ row.name }}</span>
+            {% comment %}The label only when it says something the unit does not.
+            Hefe is sold as one "Würfel" *in* the unit "Würfel", and "1 × 1
+            Würfel (Würfel)" is the packet named twice.{% endcomment %}
+            {% if row.packet %}
+              <span class="shopping-amount">{{ row.packets }} × {{ row.packet.amount_display }}&nbsp;{{ row.packet.unit|unit_label }}{% if row.packet.label and row.packet.label != row.packet.unit|unit_label|stringformat:"s" %} <span class="hint">({{ row.packet.label }})</span>{% endif %}</span>
+            {% elif row.amount %}
+              <span class="shopping-amount">{{ row.amount|floatformat:"-2" }}&nbsp;{{ row.unit|unit_label }}</span>
+            {% else %}
+              <span class="shopping-amount hint">{% translate "some" %}</span>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endif %}
+
+  {% if pantry_verdict.extras %}
+    {% comment %}Optional lines that are not there. Worth saying and never
+    blocking — a pantry that refuses a recipe for want of the parsley garnish
+    is one nobody consults twice.{% endcomment %}
+    <p class="hint">
+      {% translate "Optional and not in the house:" %}
+      {% for entry in pantry_verdict.extras %}{% if not forloop.first %}, {% endif %}{{ entry.line.name }}{% endfor %}
+    </p>
+  {% endif %}
+</section>

@@ -1,0 +1,104 @@
+{% load i18n %}
+{% comment %}One ingredient line, as a card that lives in a cell of the canvas.
+
+Included twice: once per form of the formset, and once inside a <template> with
+``formset.empty_form`` so "+ Ingredient" can mint a row without cloning a used
+one. One file, because the version where the template element holds a second
+copy of this markup is the version where a field added here is missing from
+every row somebody adds — and the row looks fine until it is saved.
+
+Every field of the form is *inside* this element, the pk and the DELETE box
+included. The canvas moves the card into the cell it belongs in and removal ticks
+its DELETE box and hides it; both operate on the element, so a field rendered
+outside would be left behind by either — and the row that comes back has lost
+its identity, or its place. A formset is an index range, not a list.
+
+The five hidden fields are the structure. ``step_index`` is the step this line
+goes into, ``alt_index`` the line it substitutes for, ``position`` where it sits
+in the order — all three written by the canvas in static/js/recipe_diagram.js —
+``ingredient`` is the catalogue row the autosuggest matched, and ``id`` is the
+row's own pk. apps/recipes/forms.py says why the first three are indices rather
+than primary keys.
+
+``data-suggest-scope`` is how static/js/ingredient_suggest.js finds the unit
+select and the hidden catalogue field belonging to *this* card rather than to
+whichever one happens to be first in the document.
+
+The name is on a line of its own above the amount because the name is what the
+diagram is read by, and a cell is about fourteen rems wide: sharing that row
+with an amount and a unit left "Zwetschgen" showing as "Zwets".{% endcomment %}
+<div class="line-card" data-ingredient-row data-suggest-scope>
+  {{ row.id }}{{ row.step_index }}{{ row.alt_index }}{{ row.position }}{{ row.ingredient }}
+  <div class="card-head">
+    {% comment %}A button rather than a div with a pointer handler: it is the
+    keyboard's way in as well as the mouse's — focus it and the arrow keys move
+    the line between steps.{% endcomment %}
+    <button type="button" class="card-grip" data-grip
+            aria-label="{% translate 'Move this line' %}" title="{% translate 'Move this line' %}">
+      <span class="card-grip-mark" aria-hidden="true"></span>
+    </button>
+    <p class="line-name">
+      <label class="sr-only" for="{{ row.name.id_for_label }}">{% translate "Ingredient" %}</label>
+      {% comment %}The combobox attributes ride on the widget, set in
+      apps/recipes/forms.py — see the note there for why they are not written
+      out here.{% endcomment %}
+      {{ row.name }}
+    </p>
+    <p class="row-delete-box">{{ row.DELETE }}</p>
+    <button type="button" class="card-remove" data-ingredient-remove
+            aria-label="{% translate 'Remove this line' %}" title="{% translate 'Remove this line' %}">&times;</button>
+  </div>
+  <span class="field-error">{{ row.non_field_errors|striptags }}{{ row.name.errors|striptags }}{{ row.amount.errors|striptags }}</span>
+  <div class="card-foot">
+    <p class="line-amount">
+      <label class="sr-only" for="{{ row.amount.id_for_label }}">{% translate "Amount" %}</label>
+      {{ row.amount }}
+    </p>
+    <p class="line-unit">
+      <label class="sr-only" for="{{ row.unit.id_for_label }}">{% translate "Unit" %}</label>
+      {{ row.unit }}
+    </p>
+  </div>
+  {% comment %}Out of the <details> below and onto the face of the card, unlike
+  the other three. It is not a rarity: it is the answer to "how much?" for salt,
+  pepper and oil, and the form now refuses to save a line that answers neither.
+  Folded away it would be an escape hatch nobody can find while looking at the
+  error telling them they need it.{% endcomment %}
+  <label class="checkbox-inline line-noamount">
+    {{ row.no_amount }}
+    <span>{% translate "no fixed amount" %}</span>
+  </label>
+  {% comment %}The list view's version of "which step uses this". Filled by
+  static/js/recipe_diagram.js only in "Steps" mode; on the canvas the answer is
+  which cell the card is sitting in, and saying it twice in two ways is how the
+  two come to disagree.{% endcomment %}
+  <span class="row-extra" data-step-slot
+        data-label="{% translate 'Used in' %}" data-empty="{% translate 'no step yet' %}"></span>
+  {% comment %}The three questions asked once a recipe in twenty, folded away.
+  A cell holding a note field, a checkbox and a select is a cell nobody can read
+  the ingredient out of — and five of them side by side is not a diagram.
+
+  <details> rather than a JavaScript toggle: it opens with the keyboard, it is
+  announced as a disclosure without any ARIA, and it works before any script has
+  run. Open from the start when this row already uses one of them, or the state
+  would be hidden behind a control nobody has a reason to press.{% endcomment %}
+  <details class="card-more"{% if row.note.value or row.optional.value or row.alt_index.value %} open{% endif %}>
+    <summary class="card-more-summary">{% translate "More" %}</summary>
+    <div class="card-more-body">
+      <p class="line-note">
+        <label class="sr-only" for="{{ row.note.id_for_label }}">{% translate "Note" %}</label>
+        {{ row.note }}
+      </p>
+      <label class="checkbox-inline">
+        {{ row.optional }}
+        <span>{% translate "optional" %}</span>
+      </label>
+      {% comment %}A substitute stays a select rather than a drag. Dropping one
+      line onto another already means "put it in the same step"; the same gesture
+      could not also mean "replace it", and a relation used once in twenty
+      recipes is not worth making the common one ambiguous for.{% endcomment %}
+      <span class="row-extra" data-alt-slot
+            data-label="{% translate 'Instead of' %}" data-empty="{% translate 'a line of its own' %}"></span>
+    </div>
+  </details>
+</div>

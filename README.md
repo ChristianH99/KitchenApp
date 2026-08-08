@@ -1,12 +1,13 @@
 # Kitchen
 
-A self-hosted kitchen app for one household. Recipes first; the shape allows
-meal planning, shopping lists and a pantry to arrive later as sibling apps
-rather than as bolt-ons.
+A self-hosted kitchen app for one household. Recipes and a pantry; the shape
+allows meal planning and shopping lists to arrive later as sibling apps rather
+than as bolt-ons.
 
 It runs as a single container on a Synology NAS, behind that NAS's own reverse
-proxy, and authenticates against the **Synology SSO Server** over OIDC — so
-there is one set of accounts, managed in DSM, and no passwords in this app.
+proxy, and authenticates against an **OpenID Connect provider** — a Synology SSO
+Server is what it was built for, but nothing user-facing names one. So there is
+one set of accounts, managed by the provider, and no passwords in this app.
 Almost. There is deliberately one local fallback account; see below.
 
 - Django 6 + server-rendered templates, no front-end framework
@@ -61,20 +62,89 @@ which is a tree; `apps/recipes/diagram.py` turns it into the rowspan/colspan
 geometry. The prose instructions stay exactly as they were and are shown
 alongside: the table says *what combines with what*, the paragraphs say *how*.
 
+That diagram is also how a recipe is **written**, and the form offers two ways
+of writing the same thing. **Steps** is a numbered list where each row says what
+it feeds into and each line says which step uses it — the recipe read in the
+direction it is spoken. **Diagram** is the canvas: the cards laid out as the
+table they will become, arranged by dragging a line onto the step that uses it
+or a step onto the step it feeds into. They are not two copies; the switch moves
+the *same* form rows, so nothing can be entered in one and missing from the
+other. Every drag has an arrow-key equivalent on the card's handle.
+
+"+ Step after this" on a step card is the move the drag makes hard to find:
+dropping A onto B means "A feeds into B", so building a recipe forwards used to
+mean creating the later step first and dragging the earlier one backwards onto
+it. A step with nothing going into it is a standing instruction, "heat the
+oven", drawn as a band wherever you leave it in the order.
+
+**A tile is resized by dragging its edge.** The bottom edge of a step is the
+boundary between the ingredients that go into it and the ones that go into the
+next step — drag it and the boundary moves, one ingredient at a time. A
+standing instruction's band has the same on its left and right ends, which is
+how "heat the oven" comes to sit over just the two steps it actually runs
+alongside instead of claiming to run alongside the mixing that came before
+them. Nothing moves until the drag is released; while it moves, a guide shows
+where the edge would land. Every handle is focusable and answers the arrow
+keys.
+
+A recipe **will not save half-finished**. Every ingredient needs an amount or an
+explicit "no fixed amount" (which is what salt and pepper are), every ingredient
+has to be used by some step once the recipe has a method at all, and a branch
+that is wired to nothing is refused — that last one being the case where two
+doughs get made and the step that kneads them together was never joined to
+either.
+
+The recipe page splits into **Preparing** and **Cooking** rather than showing
+the ingredients twice, once as a list and again inside the diagram beside it.
+Preparing is what to buy and get out; Cooking is the method, as steps or as the
+diagram.
+
 A **cooking view** walks that diagram one step at a time, lighting up the
 current operation and the lines that go into it, with a stopwatch and a
 per-step timer. When you finish, it records how long it really took and how far
 the food actually went — "2 portions and one for the lunchbox" — so the recipe
-page can eventually say what "serves four" means in *this* house.
+page can eventually say what "serves four" means in *this* house. A **Cooked**
+page lists those evenings across every recipe, and any of them can be opened and
+corrected: how far a dish went is usually clearer the next day, and before that
+page the only way to fix it was to delete the entry and lose the date with it.
 
-A **People** page manages the household's accounts, both the local ones and the
-Synology identities, without sending anybody to the Django admin. A second page
-beside it configures **Synology SSO itself** — endpoints, client ID and secret,
-the group rules and the on/off switch — so setting up single sign-on needs no
-`.env` edit and no container restart. That page is superuser-only, reads the
-discovery document from inside the container, and will tell you whether the
-container can actually reach the SSO server, which is the failure that otherwise
-eats an evening.
+Everything that is about the *app* rather than about the food — the household's
+accounts, the sign-in configuration, the Django admin — lives in a **Settings**
+group at the foot of the sidebar. The **People** page manages both local
+accounts and the ones that arrive through SSO, without sending anybody to the
+admin. The **Sign-in** page beside it configures the OIDC connection itself —
+endpoints, client ID and secret, the group rules and the on/off switch — so
+setting single sign-on up needs no `.env` edit and no container restart. It is
+superuser-only, reads the discovery document from inside the container, and will
+tell you whether the container can actually reach the provider, which is the
+failure that otherwise eats an evening.
+
+## The pantry
+
+What is actually in the house, measured against what the recipes ask for. Two
+questions, one answer: *what can be cooked now* and *what would have to be
+bought*.
+
+Behind it is an **ingredient catalogue** — one row per substance, with the unit
+it is usually measured in, the other names it goes by ("Zwiebeln" for
+"Zwiebel"), and the sizes it is sold in (sugar in 1 kg, milk in 1 l). Recipe
+lines point at it, which is the only reason a cupboard saying "1 kg Zucker" can
+answer a recipe asking for 500 g. It grows by itself: every recipe saved mints
+the names it does not already know, and the ingredient field on the form
+suggests from it — filling in the usual unit, which is what keeps the collection
+comparable at all.
+
+Units are a **closed set** with conversion inside a dimension and none across
+one. Grams convert to kilograms, tablespoons to millilitres; a clove of garlic
+converts to nothing, because it is not four grams. Where the comparison cannot
+be made the answer is "cannot tell" rather than a guess — and "cannot tell"
+counts against *can be made now*, because that is a promise somebody acts on by
+not going to the shop.
+
+The recipe list can then be filtered to what the house can make tonight, or to
+what it is two things short of; a recipe says which of its lines are missing and
+what to buy, rounded up to whole packets — "one 500 g pack" rather than "380 g",
+which is the useful sentence in a shop.
 
 Beyond that: photographs (resized on upload), free tags, search that looks
 inside ingredient lists as well as titles, and a note field for what you would
@@ -89,6 +159,14 @@ uv run python manage.py collectstatic --noinput   # see the note below
 uv run python manage.py seed_demo                 # account + sample recipes
 uv run python manage.py runserver
 ```
+
+The ingredient catalogue arrives with the migrations — about a hundred things a
+German kitchen has in it, each with the unit it is usually measured in and the
+sizes it is sold in. That is what makes the autosuggest useful on the first day
+rather than after somebody has filled a table in. `manage.py seed_catalogue`
+tops it up and, with `--link`, points existing recipe lines at it; run it with
+`--dry-run` first, because it prints exactly which new ingredients it would
+invent.
 
 `seed_demo` signs you in as **`claude` / `kitchen-dev-pass`** and adds four
 recipes. It refuses to run with `DEBUG` off, because it creates an account with
@@ -115,7 +193,7 @@ uv run python manage.py runserver           # development server
 uv run python manage.py migrate
 uv run python manage.py createsuperuser
 uv run python manage.py collectstatic       # required before pytest, see above
-uv run pytest                               # ~260 tests, ~90 s
+uv run pytest                               # ~500 tests, ~155 s
 
 # After touching any translatable string:
 uv run python manage.py makemessages -l de --no-obsolete --no-wrap
@@ -241,9 +319,11 @@ apps/recipes/          The collection.
                        because a multi-select asks somebody to go elsewhere and
                        create three objects first — which is how collections end
                        up untagged. The diagram is wired up by *row index*
-                       rather than by primary key; the module docstring says
-                       why, and it is the only version that works while a
-                       recipe is being typed in for the first time.
+                       rather than by primary key, and the order is a field of
+                       its own rather than the row's position in the range; the
+                       module docstring says why, and it is the only version
+                       that works while a recipe is being typed in for the
+                       first time.
   views.py             The pages, all pure reads except the two forms. Two rules
                        run through it: a read must not write, and the cost must
                        not grow with the collection. The cooking view is a GET
@@ -256,7 +336,45 @@ apps/recipes/          The collection.
                        instruction with nothing flowing into it, and one recipe
                        with no diagram at all. Refuses to run with DEBUG off.
 
+apps/pantry/           What the house has, and what a thing *is*.
+  units.py             The closed set of units and the only place that knows
+                       what converts into what. A unit belongs to a dimension
+                       and only converts within it; everything countable is a
+                       dimension of one, which is a deliberate way of saying
+                       *this never converts*. The header says why a tablespoon
+                       is volume and a cup is not.
+  models.py            Ingredient (the substance), IngredientAlias (every other
+                       name for it), PurchaseSize (how it is sold), PantryItem
+                       (what is in the cupboard). A null pantry amount means
+                       "some, not counted" and is treated as enough — which is
+                       the truth about salt.
+  catalogue.py         Turning a typed name into a row. Exact after folding,
+                       aliases searched, and *nothing else guessed*: a prefix
+                       match buys a few correct answers and pays for them with
+                       wrong ones, and a wrong one here is the pantry claiming
+                       a substance the house does not have.
+  matching.py          Measuring a recipe against the cupboard. Four verdicts,
+                       and the fourth is the point — "cannot tell" is kept
+                       separate from "missing" and counts against "can be made
+                       now". Pure, so the list page can run it over every
+                       recipe at a flat query count.
+  starter.py           About a hundred things a German kitchen has in it, with
+                       the unit each is usually measured in. Loaded by a data
+                       migration, because a feature that only starts helping
+                       after somebody runs a command is one nobody turns on.
+  management/commands/seed_catalogue.py
+                       Tops the shipped list up and, with --link, points
+                       existing recipe lines at it. --dry-run first: it prints
+                       exactly which new ingredients it would invent.
+
 templates/, static/    The shell (sidebar, topbar, dialogs) and the pages.
+static/icons/          The site icon. A second copy of the pot mark from
+                       templates/_brand.html, carrying its own colours: a
+                       favicon is fetched on its own, outside any page, so it
+                       has no `currentColor` to take and no stylesheet to read.
+                       base.html names it, and /favicon.ico redirects to it for
+                       anything that asks anyway — without both, every visit
+                       logged a 404.
 tools/fix_po.py        Repairs the reference lines makemessages mangles on
                        Windows. Run between makemessages and compilemessages.
 locale/de/             The German catalogs. .mo files are committed — nothing at

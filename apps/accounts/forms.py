@@ -28,7 +28,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
-from apps.accounts.models import SSOConfiguration, SignAlgorithm
+from apps.accounts.models import Preferences, SSOConfiguration, SignAlgorithm
 
 
 def is_sso_account(user):
@@ -142,7 +142,7 @@ class UserEditForm(forms.ModelForm):
             # field not being there: it looks like it worked.
             for name in ("first_name", "last_name", "email"):
                 self.fields[name].disabled = True
-                self.fields[name].help_text = _("Managed by Synology DSM.")
+                self.fields[name].help_text = _("Managed by the identity provider.")
 
         if editor is not None and not editor.is_superuser:
             del self.fields["is_superuser"]
@@ -293,3 +293,17 @@ class SSOConfigurationForm(forms.ModelForm):
         if commit:
             configuration.save()
         return configuration
+
+
+class PreferencesForm(forms.ModelForm):
+    """One person's own settings.
+
+    A radio group rather than a select: there are five choices, each wants a
+    "play it" button beside it, and a dropdown hides four of the five behind a
+    click on the one page whose whole purpose is comparing them.
+    """
+
+    class Meta:
+        model = Preferences
+        fields = ["timer_sound"]
+        widgets = {"timer_sound": forms.RadioSelect}

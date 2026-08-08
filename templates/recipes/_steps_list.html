@@ -1,0 +1,79 @@
+{% load i18n l10n pantry_tags %}
+{% comment %}The method as numbered steps, with what goes into each one.
+
+The same rows the diagram lays out, read a different way — one is a shape, this
+is a sequence. Both come from ``apps/recipes/diagram.py``: ``diagram.order`` is
+already post-order (children before parents), which is the order somebody would
+actually do them, so a step that combines two others comes after both.
+
+`data-amount` carries the unscaled number for static/js/recipe_scale.js, and
+`unlocalize` on it is load-bearing: German writes 1.5 as "1,5" and parseFloat
+stops at the comma. Every `.ingredient-amount` on the page is rewritten by the
+scaler, which is why this view and the diagram can both be present in the markup
+without one of them lagging.{% endcomment %}
+<ol class="method-steps">
+  {% for entry in diagram.order %}
+    <li class="method-step">
+      <div class="method-step-head">
+        <span class="method-step-number">{{ entry.number }}</span>
+        <h3 class="method-step-text">{{ entry.step.text }}</h3>
+        {% if entry.step.timer_seconds %}
+          <span class="pill">{{ entry.step.duration_label }}</span>
+        {% endif %}
+      </div>
+
+      {% if entry.from_steps %}
+        {% comment %}What arrives here already made. A list cannot draw the
+        merge, so it says it — otherwise a step that combines two others reads
+        as a step with nothing going into it.{% endcomment %}
+        <p class="method-step-from">
+          {% translate "with" %}
+          {% for from in entry.from_steps %}{% if not forloop.first %}, {% endif %}<em>{{ from.text }}</em>{% endfor %}
+        </p>
+      {% endif %}
+
+      {% if entry.ingredients %}
+        <ul class="method-step-lines">
+          {% for item in entry.ingredients %}
+            <li{% if item.optional %} class="is-optional"{% endif %}>
+              <span class="ingredient-amount" data-amount="{{ item.amount|default_if_none:''|unlocalize }}">{{ item.amount_display }}</span>
+              <span class="ingredient-name">
+                {% if item.unit %}{{ item.unit|unit_label }} {% endif %}{{ item.name }}
+                {% if item.optional %}<span class="ingredient-flag">{% translate "optional" %}</span>{% endif %}
+                {% if item.note %}<span class="ingredient-note">{{ item.note }}</span>{% endif %}
+                {% for alt in item.substitutes %}
+                  <span class="ingredient-alt">
+                    {% translate "or" %}
+                    <span class="ingredient-amount" data-amount="{{ alt.amount|default_if_none:''|unlocalize }}">{{ alt.amount_display }}</span>
+                    {{ alt.unit|unit_label }} {{ alt.name }}{% if alt.note %} <span class="ingredient-note">{{ alt.note }}</span>{% endif %}
+                  </span>
+                {% endfor %}
+              </span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+
+      {% if entry.step.detail %}
+        <p class="method-step-detail">{{ entry.step.detail }}</p>
+      {% endif %}
+    </li>
+  {% endfor %}
+</ol>
+
+{% if diagram.unplaced %}
+  {% comment %}Lines in no step. The form refuses to create these now, but a
+  recipe written before that rule existed can still have them, and leaving them
+  off the page would be losing an ingredient silently.{% endcomment %}
+  <div class="method-unplaced">
+    <h3>{% translate "Also needed" %}</h3>
+    <ul class="ingredient-list">
+      {% for item in diagram.unplaced %}
+        <li{% if item.optional %} class="is-optional"{% endif %}>
+          <span class="ingredient-amount" data-amount="{{ item.amount|default_if_none:''|unlocalize }}">{{ item.amount_display }}</span>
+          <span class="ingredient-name">{% if item.unit %}{{ item.unit|unit_label }} {% endif %}{{ item.name }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}

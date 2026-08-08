@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% load static i18n pantry_tags %}
+{% block title %}{% translate "Ingredient catalogue" %} – {% translate "Kitchen" %}{% endblock %}
+{% block topbar_title %}{% translate "Ingredient catalogue" %}{% endblock %}
+{% block topbar_sub %}{% blocktranslate count n=total %}{{ n }} ingredient{% plural %}{{ n }} ingredients{% endblocktranslate %}{% endblock %}
+
+{% block topbar_actions %}
+  <a class="button button--small" href="{% url 'pantry:ingredient-add' %}">{% translate "New ingredient" %}</a>
+  <a class="button button--secondary button--small" href="{% url 'pantry:list' %}">{% translate "Pantry" %}</a>
+{% endblock %}
+
+{% block content %}
+  <h1>{% translate "Ingredient catalogue" %}</h1>
+  <p class="page-lead">{% translate "Every substance the app knows: what it is usually measured in, what else it is called, and the sizes it is sold in. Recipes and the pantry both point at this list, which is what lets one answer the other." %}</p>
+
+  {% comment %}Filters from the first letter — static/js/live_search.js swaps
+  what is inside [data-live-results] and hides the button. The button and the
+  plain GET stay in the markup so the page still works with no script.{% endcomment %}
+  <form method="get" class="filter-bar" role="search" data-live-search>
+    <label class="sr-only" for="catalogue-search">{% translate "Search the catalogue" %}</label>
+    <input type="search" id="catalogue-search" name="q" value="{{ query }}"
+           autocomplete="off" placeholder="{% translate 'Search by name or other name' %}">
+    <button type="submit" class="button button--secondary button--small" data-live-submit>{% translate "Search" %}</button>
+    {% if query %}<a class="link-button" href="{% url 'pantry:catalogue' %}">{% translate "Clear" %}</a>{% endif %}
+  </form>
+
+  <div data-live-results>
+
+  {% if ingredients %}
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th scope="col">{% translate "Ingredient" %}</th>
+            <th scope="col">{% translate "Usual unit" %}</th>
+            <th scope="col">{% translate "Sold as" %}</th>
+            <th scope="col">{% translate "In recipes" %}</th>
+            <th scope="col">{% translate "In the pantry" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in ingredients %}
+            <tr>
+              <th scope="row">
+                <a href="{% url 'pantry:ingredient-edit' item.slug %}">{{ item.name }}</a>
+                {% if item.aliases.all %}
+                  <span class="catalogue-aliases">{% for alias in item.aliases.all %}{% if not forloop.first %}, {% endif %}{{ alias.name }}{% endfor %}</span>
+                {% endif %}
+              </th>
+              <td>{{ item.default_unit|unit_name }}</td>
+              <td>
+                {% for size in item.purchase_sizes.all %}{% if not forloop.first %}, {% endif %}{{ size.amount_display }}&nbsp;{{ size.unit|unit_label }}{% empty %}<span class="hint">&mdash;</span>{% endfor %}
+              </td>
+              <td class="numeric">{{ item.recipe_count }}</td>
+              <td>
+                {% if item.in_pantry %}
+                  <span class="pill pill--herb">{% if item.in_pantry.amount is None %}{% translate "some" %}{% else %}{{ item.in_pantry.amount_display }}&nbsp;{{ item.in_pantry.unit|unit_label }}{% endif %}</span>
+                {% else %}
+                  <span class="hint">&mdash;</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% elif query %}
+    <p class="hint">{% blocktranslate %}Nothing in the catalogue matches “{{ query }}”.{% endblocktranslate %}</p>
+  {% else %}
+    <p class="hint">{% translate "The catalogue is empty. It fills itself as recipes are written — every ingredient name that is new to it becomes an entry." %}</p>
+  {% endif %}
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{% static 'js/live_search.js' %}"></script>
+{% endblock %}

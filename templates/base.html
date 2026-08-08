@@ -4,6 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{% translate "Kitchen" %}{% endblock %}</title>
+  {% comment %}Without this a browser asks for /favicon.ico on its own, which
+  resolves to nothing and logs a 404 warning for every page anybody opens. The
+  route in config/urls.py catches the ones that ask for it anyway — a bookmark,
+  a browser that ignores this tag — so neither path is a miss.{% endcomment %}
+  <link rel="icon" href="{% static 'icons/favicon.svg' %}" type="image/svg+xml">
   {% comment %}Inter and Manrope are served from static/fonts/ — never linked
   from Google. static/css/fonts.css says why.{% endcomment %}
   <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
@@ -30,6 +35,8 @@
       A url_name is only unique within an app, so the moment a second app has a
       "list" or a "settings", the inline version marks two entries at once and
       nobody notices for a month.{% endcomment %}
+      {% comment %}The nav is what the app is *for* — the food. Everything about
+      the app itself lives in the Settings disclosure in the footer below.{% endcomment %}
       <nav class="shell-nav">
         <a class="shell-nav-item{% if 'home' in nav_current %} active{% endif %}"
            href="{% url 'recipes:home' %}">{% translate "Start" %}</a>
@@ -41,33 +48,66 @@
              href="{% url 'recipes:list' %}">{% translate "All recipes" %}</a>
           <a class="shell-nav-subitem{% if 'recipes.tags' in nav_current %} active{% endif %}"
              href="{% url 'recipes:tags' %}">{% translate "Tags" %}</a>
+          <a class="shell-nav-subitem{% if 'recipes.cooked' in nav_current %} active{% endif %}"
+             href="{% url 'recipes:history' %}">{% translate "Cooked" %}</a>
         </div>
 
-        {% comment %}Staff only. Hiding the link is presentation, not access
-        control — every view behind it carries its own check and a test walks
-        the URLconf to make sure none of them has lost it.{% endcomment %}
-        {% if user.is_staff %}
-          <a class="shell-nav-item{% if 'users' in nav_current %} active{% endif %}"
-             href="{% url 'accounts:user-list' %}">{% translate "People" %}</a>
-        {% endif %}
-        {% comment %}Superuser only, and a level below People on purpose: "may
-        add an account" and "may repoint the whole app at a different identity
-        provider" are not the same right.{% endcomment %}
-        {% if user.is_superuser %}
-          <a class="shell-nav-item{% if 'sso' in nav_current %} active{% endif %}"
-             href="{% url 'accounts:sso' %}">{% translate "Sign-in" %}</a>
-        {% endif %}
+        <a class="shell-nav-item shell-nav-parent{% if 'pantry' in nav_current %} active{% endif %}"
+           href="{% url 'pantry:list' %}">{% translate "Pantry" %}</a>
+        <div class="shell-nav-sub">
+          <a class="shell-nav-subitem{% if 'pantry.list' in nav_current %} active{% endif %}"
+             href="{% url 'pantry:list' %}">{% translate "In the house" %}</a>
+          <a class="shell-nav-subitem{% if 'pantry.catalogue' in nav_current %} active{% endif %}"
+             href="{% url 'pantry:catalogue' %}">{% translate "Ingredients" %}</a>
+        </div>
       </nav>
       <div class="shell-sidebar-footer">
+        {% comment %}Settings: the pages that are about the app rather than
+        about the food — who may sign in, how they sign in, and the raw admin.
+        A disclosure rather than four permanent entries, because they are opened
+        a handful of times a year and were otherwise sitting above the recipes
+        somebody uses daily.
+
+        It is `open` when one of the pages inside it is the current one: a menu
+        that hides the page you are looking at reads as broken. shell.js
+        remembers the state otherwise.
+
+        Every view behind these carries its own permission check — hiding a link
+        is presentation, not access control, and a test walks the URLconf to
+        make sure none of them has lost it.{% endcomment %}
+        {% if user.is_authenticated %}
+          <details class="shell-settings" data-shell-settings{% if 'settings' in nav_current %} open{% endif %}>
+            <summary class="shell-settings-summary">{% translate "Settings" %}</summary>
+            <div class="shell-nav-sub shell-settings-items">
+              {% comment %}First, and for everybody: it is the only entry here
+              that is about the person rather than about the household, and it
+              is the only reason somebody without staff rights opens this
+              menu at all.{% endcomment %}
+              <a class="shell-nav-subitem{% if 'settings.me' in nav_current %} active{% endif %}"
+                 href="{% url 'accounts:preferences' %}">{% translate "My settings" %}</a>
+              {% if user.is_staff %}
+                <a class="shell-nav-subitem{% if 'settings.users' in nav_current %} active{% endif %}"
+                   href="{% url 'accounts:user-list' %}">{% translate "People" %}</a>
+              {% endif %}
+              {% comment %}Superuser only, and below People on purpose: "may add
+              an account" and "may repoint the whole app at a different identity
+              provider" are not the same right.{% endcomment %}
+              {% if user.is_superuser %}
+                <a class="shell-nav-subitem{% if 'settings.sso' in nav_current %} active{% endif %}"
+                   href="{% url 'accounts:sso' %}">{% translate "Sign-in" %}</a>
+              {% endif %}
+              {% if user.is_staff %}
+                <a class="shell-nav-subitem" href="{% url 'admin:index' %}">{% translate "Administration" %}</a>
+              {% endif %}
+            </div>
+          </details>
+        {% endif %}
         {% comment %}Which build this is. Blank in a checkout and blank renders
         as nothing — a version string is a claim, and a working copy has none to
         make. Not a translatable string: it is a version number, and wrapping it
         in a label would put one word of German around three digits.{% endcomment %}
         {% if app_version %}
           <span class="shell-version">{{ app_version }}</span>
-        {% endif %}
-        {% if user.is_staff %}
-          <a class="shell-admin-link" href="{% url 'admin:index' %}">{% translate "Administration" %}</a>
         {% endif %}
         {% if user.is_authenticated %}
           <div class="shell-user">
@@ -167,6 +207,16 @@
   Content-Security-Policy, which cannot tell our inline script from an injected
   one (config/csp.py).{% endcomment %}
   <script src="{% static 'js/shell.js' %}"></script>
+  {% comment %}On every page, and that is the point of them. A step's timer is
+  started in the cooking view and then somebody looks up the next recipe or
+  checks the pantry — and a countdown that only exists on one page is thrown
+  away by the first click. The deadline lives in localStorage;
+  timer_watch.js reads it wherever you are and puts a card in the corner that
+  counts down and rings. It needs the tones, so they load first — a script that
+  reaches for another script's global has to come after it, which
+  config/tests.py checks for every template.{% endcomment %}
+  <script src="{% static 'js/timer_sounds.js' %}"></script>
+  <script src="{% static 'js/timer_watch.js' %}"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

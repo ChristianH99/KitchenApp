@@ -33,6 +33,10 @@ urlpatterns = [
     # The Synology connection. Superuser only — a narrower door than the pages
     # above, because this one decides how everybody authenticates and holds the
     # client secret.
+    # One person's own settings. Not staff-only and not superuser-only: it is
+    # about a body rather than about the household, and everybody has one.
+    path("preferences/", views.preferences, name="preferences"),
+
     path("sso/", sso_views.sso_settings, name="sso"),
     path("sso/discover/", sso_views.sso_discover, name="sso-discover"),
     path("sso/check/", sso_views.sso_check, name="sso-check"),

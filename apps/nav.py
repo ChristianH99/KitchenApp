@@ -31,23 +31,42 @@ ITEMS = {
                      "cook", "cooked", "cook-log-delete")
     },
     "recipes.tags": {("recipes", "tags")},
+    "recipes.cooked": {
+        ("recipes", name) for name in ("history", "cook-log-edit")
+    },
 
-    # Staff only, and the sidebar hides it for everybody else — but it is
+    "pantry.list": {("pantry", name) for name in ("list", "add", "save", "remove")},
+    "pantry.catalogue": {
+        ("pantry", name)
+        for name in ("catalogue", "ingredient-add", "ingredient-edit", "ingredient-delete")
+    },
+
+    # "My settings" is for everybody; the two below it are staff- and
+    # superuser-only and the sidebar hides them accordingly. They are all
     # registered here all the same, because "which entry is current" and "who
-    # may see the entry" are different questions and conflating them is how an
+    # may see the entry" are different questions, and conflating them is how an
     # entry ends up marked on a page nobody can reach.
-    "users": {
+    "settings.me": {("accounts", "preferences")},
+    "settings.users": {
         ("accounts", name)
         for name in ("user-list", "user-add", "user-edit", "user-password",
                      "user-delete", "user-active")
     },
-    "sso": {("accounts", name) for name in ("sso", "sso-discover", "sso-check")},
+    "settings.sso": {("accounts", name) for name in ("sso", "sso-discover", "sso-check")},
 }
 
 # Parent entry -> the entries nested under it. A parent is a link too, but never
 # to a page of its own: it is marked when any of its children is.
+#
+# "settings" is the odd one out and deliberately so: it is a *disclosure* in the
+# sidebar footer rather than a link, holding the pages that are about the app
+# rather than about the food. It still appears here, because the group has to
+# open by itself when one of the pages inside it is the current one — a menu
+# that hides the page you are looking at is a menu that looks broken.
 PARENTS = {
-    "recipes": ("recipes.list", "recipes.tags"),
+    "recipes": ("recipes.list", "recipes.tags", "recipes.cooked"),
+    "pantry": ("pantry.list", "pantry.catalogue"),
+    "settings": ("settings.me", "settings.users", "settings.sso"),
 }
 
 

@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% load static i18n pantry_tags %}
+{% block title %}{% if ingredient %}{{ ingredient.name }}{% else %}{% translate "New ingredient" %}{% endif %} – {% translate "Kitchen" %}{% endblock %}
+{% block topbar_title %}{% if ingredient %}{% translate "Edit ingredient" %}{% else %}{% translate "New ingredient" %}{% endif %}{% endblock %}
+
+{% comment %}Save rides in the topbar as well as at the foot of the form: the
+recipe page put Edit up here, so the page it opens has to offer the matching
+action in the same place. `form=` points at the form below, which is what lets a
+button outside it submit it.{% endcomment %}
+{% block topbar_actions %}
+  <button type="submit" class="button button--small" form="ingredient-form">{% translate "Save" %}</button>
+{% endblock %}
+
+{% block content %}
+  <a class="back-link" href="{% url 'pantry:catalogue' %}">&larr; {% translate "Catalogue" %}</a>
+
+  {% if form.errors or aliases.non_form_errors or sizes.non_form_errors %}
+    <p class="notice notice--error">{% translate "Something on this page needs another look — the fields concerned are marked below." %}</p>
+  {% endif %}
+
+  <form method="post" id="ingredient-form" data-unsaved-guard novalidate>
+    {% csrf_token %}
+
+    <p>
+      <label for="{{ form.name.id_for_label }}">{% translate "Name" %} <span class="required-marker">*</span></label>
+      {{ form.name }}
+      <span class="field-error">{{ form.name.errors|striptags }}</span>
+      <span class="help">{% translate "What this substance is called. Other spellings go under “also called” below." %}</span>
+    </p>
+
+    <div class="form-grid">
+      <p>
+        <label for="{{ form.default_unit.id_for_label }}">{% translate "Usual unit" %}</label>
+        {{ form.default_unit }}
+        <span class="help">{% translate "Offered when this is typed onto a recipe line — millilitres for milk, grams for butter. Never imposed." %}</span>
+      </p>
+      <p>
+        <label for="{{ form.category.id_for_label }}">{% translate "Category" %}</label>
+        {{ form.category }}
+        <span class="help">{{ form.category.help_text }}</span>
+      </p>
+    </div>
+
+    <p>
+      <label for="{{ form.note.id_for_label }}">{% translate "Note" %}</label>
+      {{ form.note }}
+      <span class="help">{{ form.note.help_text }}</span>
+    </p>
+
+    <h2 class="form-section">{% translate "Also called" %}</h2>
+    <p class="help">{% translate "Other names for the same thing. A recipe line saying “Zwiebeln” finds “Zwiebel” through one of these — without it, the plural becomes a second substance the house does not have." %}</p>
+    {% comment %}No spare rows and no "remove" tick-boxes. There were two empty
+    boxes on every ingredient — most have one name or none — and the number an
+    ingredient could have was however many the server happened to render. The
+    "+" mints one, the "×" takes one away. static/js/simple_rows.js.{% endcomment %}
+    {{ aliases.management_form }}
+    {% if aliases.non_form_errors %}<p class="field-error">{{ aliases.non_form_errors|striptags }}</p>{% endif %}
+    <ul class="simple-rows" data-rows="aliases">
+      {% for row in aliases %}
+        <li class="simple-row" data-row>
+          {{ row.id }}
+          <span class="simple-row-field">
+            <label class="sr-only" for="{{ row.name.id_for_label }}">{% translate "Also called" %}</label>
+            {{ row.name }}
+            <span class="field-error">{{ row.name.errors|striptags }}</span>
+          </span>
+          <span class="row-delete-box">{{ row.DELETE }}</span>
+          <button type="button" class="row-drop" data-row-remove
+                  aria-label="{% translate 'Remove this name' %}" title="{% translate 'Remove this name' %}">&times;</button>
+        </li>
+      {% endfor %}
+    </ul>
+    <button type="button" class="button button--secondary button--small" data-rows-add="aliases">
+      {% translate "+ Another name" %}
+    </button>
+    <template data-rows-template="aliases">
+      <li class="simple-row" data-row>
+        {{ aliases.empty_form.id }}
+        <span class="simple-row-field">
+          {{ aliases.empty_form.name }}
+        </span>
+        <span class="row-delete-box">{{ aliases.empty_form.DELETE }}</span>
+        <button type="button" class="row-drop" data-row-remove
+                aria-label="{% translate 'Remove this name' %}" title="{% translate 'Remove this name' %}">&times;</button>
+      </li>
+    </template>
+
+    <h2 class="form-section">{% translate "Sold as" %}</h2>
+    <p class="help">{% translate "The sizes this is bought in — sugar in 1 kg, milk in 1 l. A shopping list uses them to round a shortfall up to whole packets, so it can say “one 500 g pack” rather than “380 g”. More than one size is useful: butter comes in 250 g and in 500 g." %}</p>
+    {{ sizes.management_form }}
+    {% if sizes.non_form_errors %}<p class="field-error">{{ sizes.non_form_errors|striptags }}</p>{% endif %}
+    <ul class="simple-rows" data-rows="sizes">
+      {% for row in sizes %}
+        <li class="simple-row simple-row--size" data-row>
+          {{ row.id }}
+          <span class="simple-row-field">
+            <label class="sr-only" for="{{ row.amount.id_for_label }}">{% translate "Amount" %}</label>
+            {{ row.amount }}
+          </span>
+          <span class="simple-row-field">
+            <label class="sr-only" for="{{ row.unit.id_for_label }}">{% translate "Unit" %}</label>
+            {{ row.unit }}
+          </span>
+          <span class="simple-row-field">
+            <label class="sr-only" for="{{ row.label.id_for_label }}">{% translate "Sold as" %}</label>
+            {{ row.label }}
+          </span>
+          <span class="row-delete-box">{{ row.DELETE }}</span>
+          <button type="button" class="row-drop" data-row-remove
+                  aria-label="{% translate 'Remove this size' %}" title="{% translate 'Remove this size' %}">&times;</button>
+          <span class="field-error">{{ row.non_field_errors|striptags }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+    <button type="button" class="button button--secondary button--small" data-rows-add="sizes">
+      {% translate "+ Another size" %}
+    </button>
+    <template data-rows-template="sizes">
+      <li class="simple-row simple-row--size" data-row>
+        {{ sizes.empty_form.id }}
+        <span class="simple-row-field">{{ sizes.empty_form.amount }}</span>
+        <span class="simple-row-field">{{ sizes.empty_form.unit }}</span>
+        <span class="simple-row-field">{{ sizes.empty_form.label }}</span>
+        <span class="row-delete-box">{{ sizes.empty_form.DELETE }}</span>
+        <button type="button" class="row-drop" data-row-remove
+                aria-label="{% translate 'Remove this size' %}" title="{% translate 'Remove this size' %}">&times;</button>
+      </li>
+    </template>
+
+    <div class="form-actions">
+      <button type="submit" class="button">{% translate "Save" %}</button>
+      <a class="link-button" href="{% url 'pantry:catalogue' %}">{% translate "Cancel" %}</a>
+    </div>
+  </form>
+
+  {% if used_in %}
+    <h2 class="form-section">{% translate "Used in" %}</h2>
+    <ul class="plain-list">
+      {% for line in used_in %}
+        <li><a href="{{ line.recipe.get_absolute_url }}">{{ line.recipe.title }}</a>
+          <span class="hint">{{ line.amount_display }} {{ line.unit_label }} {{ line.name }}</span></li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {% if ingredient %}
+    <form method="post" action="{% url 'pantry:ingredient-delete' ingredient.slug %}"
+          class="form-actions"
+          data-confirm-title="{% translate 'Remove from the catalogue?' %}"
+          data-confirm="{% blocktranslate with name=ingredient.name %}“{{ name }}” will be removed. Recipe lines keep their text and simply stop taking part in the pantry matching.{% endblocktranslate %}"
+          data-confirm-accept="{% translate 'Remove' %}"
+          data-confirm-danger>
+      {% csrf_token %}
+      <button type="submit" class="button button--danger button--small">{% translate "Remove ingredient" %}</button>
+    </form>
+  {% endif %}
+{% endblock %}
+
+{% block scripts %}
+  <script src="{% static 'js/simple_rows.js' %}"></script>
+  <script src="{% static 'js/unit_typeahead.js' %}"></script>
+{% endblock %}
