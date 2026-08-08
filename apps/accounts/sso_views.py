@@ -377,11 +377,14 @@ def _cause(failure):
     if isinstance(failure, requests.exceptions.Timeout):
         # Word for word what `_reach` says, so the catalogue holds one entry and
         # the two buttons cannot end up describing the same fault differently.
-        return _(
-            "timed out. If a browser can reach this address but the container cannot, "
-            "it is the router not sending internal traffic back to itself — "
-            "DEPLOYMENT.md §3.3."
-        )
+        #
+        # It named hairpin NAT before. That is one cause of a timeout and not
+        # the common one — a resolver handing back the public address, a
+        # firewall, a provider that is simply slow all look identical from
+        # here — and a confident wrong diagnosis sends somebody to reconfigure
+        # a router that was never at fault. The address is printed beside this;
+        # what to do about it is not something this code knows.
+        return _("timed out")
     text = str(failure)
     if "getaddrinfo" in text or "NameResolution" in text or "Name or service" in text:
         return _("the name could not be resolved from inside the container")
@@ -415,11 +418,7 @@ def _reach(url, verify, timeout=TIMEOUT):
         return False, _("the certificate was refused — wrong hostname, or an internal CA")
     except requests.exceptions.ConnectTimeout:
         log.info("SSO check: timeout for %s", url)
-        return False, _(
-            "timed out. If a browser can reach this address but the container cannot, "
-            "it is the router not sending internal traffic back to itself — "
-            "DEPLOYMENT.md §3.3."
-        )
+        return False, _("timed out")
     except requests.exceptions.ConnectionError as failure:
         log.info("SSO check: connection failure for %s: %s", url, failure)
         text = str(failure)

@@ -2,12 +2,12 @@
 # Copyright (C) 2026
 # This file is distributed under the same licence as the kitchenapp package.
 # Maintained alongside the source strings; see README.md.
-# 
+#
 msgid ""
 msgstr ""
 "Project-Id-Version: kitchenapp 0.1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-08 22:45+0200\n"
+"POT-Creation-Date: 2026-08-08 22:49+0200\n"
 "PO-Revision-Date: 2026-08-05 12:00+0200\n"
 "Last-Translator: KitchenApp\n"
 "Language-Team: German\n"
@@ -278,7 +278,7 @@ msgstr "Von %(url)s gelesen. Die Adressen unten prüfen und dann speichern."
 msgid "There is nothing configured to check yet."
 msgstr "Es ist noch nichts eingetragen, das sich prüfen ließe."
 
-#: .\apps\accounts\sso_views.py:360 .\apps\accounts\sso_views.py:415
+#: .\apps\accounts\sso_views.py:360 .\apps\accounts\sso_views.py:418
 msgid "the certificate was refused — wrong hostname, or an internal CA"
 msgstr "das Zertifikat wurde abgelehnt — falscher Hostname oder eine interne CA"
 
@@ -286,28 +286,28 @@ msgstr "das Zertifikat wurde abgelehnt — falscher Hostname oder eine interne C
 msgid "the response was not JSON"
 msgstr "die Antwort war kein JSON"
 
-#: .\apps\accounts\sso_views.py:381 .\apps\accounts\sso_views.py:419
-msgid "timed out. If a browser can reach this address but the container cannot, it is the router not sending internal traffic back to itself — DEPLOYMENT.md §3.3."
-msgstr "Zeitüberschreitung. Wenn ein Browser diese Adresse erreicht und der Container nicht, schickt der Router internen Verkehr nicht zu sich selbst zurück — DEPLOYMENT.md §3.3."
+#: .\apps\accounts\sso_views.py:387 .\apps\accounts\sso_views.py:421
+msgid "timed out"
+msgstr "Zeitüberschreitung"
 
-#: .\apps\accounts\sso_views.py:387 .\apps\accounts\sso_views.py:427
+#: .\apps\accounts\sso_views.py:390 .\apps\accounts\sso_views.py:426
 msgid "the name could not be resolved from inside the container"
 msgstr "der Name ließ sich aus dem Container heraus nicht auflösen"
 
-#: .\apps\accounts\sso_views.py:389 .\apps\accounts\sso_views.py:429
+#: .\apps\accounts\sso_views.py:392 .\apps\accounts\sso_views.py:428
 msgid "the connection was refused — nothing is listening on that port"
 msgstr "die Verbindung wurde abgewiesen — auf diesem Port hört nichts zu"
 
-#: .\apps\accounts\sso_views.py:390 .\apps\accounts\sso_views.py:430
+#: .\apps\accounts\sso_views.py:393 .\apps\accounts\sso_views.py:429
 msgid "no connection could be made"
 msgstr "es kam keine Verbindung zustande"
 
-#: .\apps\accounts\sso_views.py:412
+#: .\apps\accounts\sso_views.py:415
 #, python-format
 msgid "answered, HTTP %(code)s"
 msgstr "hat geantwortet, HTTP %(code)s"
 
-#: .\apps\accounts\sso_views.py:433
+#: .\apps\accounts\sso_views.py:432
 msgid "the request failed"
 msgstr "die Anfrage ist fehlgeschlagen"
 
@@ -2781,6 +2781,9 @@ msgstr "Tags erscheinen hier, sobald Rezepte welche tragen. „Suppe“, „vege
 #: .\templates\recipes\tag_list.html:35
 msgid "Go to the recipes"
 msgstr "Zu den Rezepten"
+
+#~ msgid "timed out. If a browser can reach this address but the container cannot, it is the router not sending internal traffic back to itself — DEPLOYMENT.md §3.3."
+#~ msgstr "Zeitüberschreitung. Wenn ein Browser diese Adresse erreicht und der Container nicht, schickt der Router internen Verkehr nicht zu sich selbst zurück — DEPLOYMENT.md §3.3."
 
 #~ msgid "e.g. https://sso.example.org — the four addresses below are derived from it."
 #~ msgstr "z. B. https://sso.example.org — die vier Adressen darunter werden daraus abgeleitet."
