@@ -601,13 +601,35 @@ recognises them as decided rather than missed.
   says it in three words and the diagram colours the band. A card that explains
   itself twice is a card nobody finishes reading — and the removed sentence is
   why `markStanding` no longer exists.
-- **Three ways to add a step, and they are three different sentences.**
+- **Four ways to add a step, and they are four different sentences.**
   "+ Step after this" and the "+" on a tile's right edge insert into the chain
   (a new column). The "+" on a tile's *bottom* edge makes a **sibling** — same
   parent, same column, its own ingredients. That last one was missing, which is
   why the household's second dough "only stayed above the ingredients": every
   other route made a new column or a parentless root, and a root with nothing
   in it draws as a band across the top.
+
+  The fourth is the only one that reads the *whole* diagram: the toolbar's
+  "+ Step" and the "+" at the right-hand edge of the canvas both call
+  `addJoiningStep`, which mints one step and points **every loose end** at it.
+  A step has one parent, so each of the other three names one existing step —
+  and combining two arms is a statement about all of them at once. Without it a
+  recipe with two arms could be built and then not finished: there was no
+  gesture that joined them, and `validate_structure` refuses two productive
+  roots as "a branch somebody forgot to join". "+ Step" used to *append a
+  parentless row*, which is that second root — so the one general control made
+  the very shape the save refuses.
+
+  **What it must not sweep up is a standing instruction.** `unfinished()`
+  excludes a *bare* root — no children, no ingredients — because "Ofen
+  vorheizen" is one by construction, and feeding it into the final step turns
+  it into an input of the recipe, takes it out of its band and changes what the
+  recipe says. The same test excludes a blank card nobody has typed into, which
+  is how joining stops writing an unnamed step into the chain.
+
+  Everything is joined by default and the ends can be dragged off again: with
+  two arms that is always what was meant, and with more it is one drag per
+  exception rather than one per inclusion.
 
   **Adding a step never moves one.** A new row is minted at the *end* of the
   formset, so anything that mints one has to say where it goes in `stepOrder` or

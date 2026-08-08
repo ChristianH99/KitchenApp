@@ -521,8 +521,16 @@
     state.stepRows.forEach((row) => clearSlot(row, "parent-slot"));
     state.lineRows.forEach((row) => clearSlot(row, "step-slot"));
 
+    // The blocks stack vertically inside a strip of their own, so that the
+    // join "+" can sit to the right of *all* of them — it acts on the whole
+    // diagram, not on one block, and a control per block would be three
+    // buttons doing one thing.
+    const stack = document.createElement("div");
+    stack.className = "builder-stack";
+    canvas.appendChild(stack);
+
     state.blocks.forEach((block, at) => {
-      canvas.appendChild(gap(at));
+      stack.appendChild(gap(at));
       const grid = document.createElement("div");
       grid.className = "builder-block" + (block.standing ? " builder-block--standing" : "");
       // Marked so the first letter typed into a blank full-width box can colour
@@ -536,9 +544,12 @@
       grid.style.gridTemplateColumns = "minmax(13rem, 1.4fr)"
         + (rest > 0 ? " repeat(" + rest + ", minmax(11rem, 1fr))" : "");
       block.cells.forEach((cell) => grid.appendChild(cellFor(cell, state)));
-      canvas.appendChild(grid);
+      stack.appendChild(grid);
     });
-    canvas.appendChild(gap(state.blocks.length));
+    stack.appendChild(gap(state.blocks.length));
+
+    const join = joinPlus(state);
+    if (join) canvas.appendChild(join);
 
     canvas.hidden = !state.blocks.length;
   }
@@ -1909,6 +1920,84 @@
     focusFirst(latest.stepRows.get(created) || row);
   }
 
+  function unfinished(state) {
+    /* The roots that still produce something — the loose ends of the recipe.
+     *
+     * A root is a step nothing feeds *out of*: the last thing that happens in
+     * its arm. Two of them means two arms that never meet, which is what
+     * `validate_structure` refuses on save — and until now the page offered no
+     * way to join them, because every "+" names one existing step and a step
+     * has one parent.
+     *
+     * A **bare** root is excluded, and that exclusion is the whole care in this
+     * function. "Ofen vorheizen" is a root with no children and no ingredients
+     * by construction; feeding it into the final step would make it an input of
+     * the recipe rather than a standing instruction, move it out of its band,
+     * and change what the recipe says. A blank card nobody has typed into yet
+     * is excluded by the same test, which is also right: joining an empty box
+     * into the chain is how an unnamed step gets saved.
+     */
+    return state.steps.filter((index) =>
+      state.parentOf.get(index) === null
+      && (state.childrenOf.get(index).length || state.inputsOf.get(index).length));
+  }
+
+  function addJoiningStep() {
+    /* One new step at the right-hand end, with every loose end feeding into it.
+     *
+     * This is the gesture the other three cannot make. "+ Step after this"
+     * inserts into one chain, the sibling "+" adds beside one step, and the
+     * toolbar button used to append a parentless row — which is a *second*
+     * root, drawn as a band across the top, and the opposite of what somebody
+     * pressing "+ Step" on a half-built recipe means. Combining two arms is a
+     * statement about all of them at once, so it is the only add that reads the
+     * whole diagram before it acts.
+     *
+     * Everything is joined by default and the ends can then be pulled off
+     * again, because with two arms that is always what was wanted, and with
+     * more it is one drag per exception rather than one per inclusion.
+     */
+    const formsets = window.recipeFormsets;
+    if (!formsets || !formsets.steps) return;
+    // Read the ends *before* minting the row, or the new step is one of them
+    // and would be told to feed itself.
+    const ends = unfinished(latest);
+    const row = formsets.steps.add();
+    if (!row) return;
+    const created = indexOf(row);
+    if (created === null) return;
+
+    setRef(row, "parent_index", null);
+    ends.forEach((end) => setRef(latest.stepRows.get(end), "parent_index", created));
+    // Last in the order, because it is the last thing that happens. Unlike
+    // "+ Step after this" there is no slot being vacated to take: nothing is
+    // being spliced into a chain, a new end is being put on the whole thing.
+    const at = stepOrder.indexOf(created);
+    if (at !== -1) stepOrder.splice(at, 1);
+    stepOrder.push(created);
+
+    refresh();
+    focusFirst(latest.stepRows.get(created) || row);
+  }
+
+  function joinPlus(state) {
+    // The right-hand edge of the whole diagram, which is where a step that
+    // everything feeds into belongs. Only offered when there is something to
+    // feed it: on an empty canvas the toolbar button is the way in, and a "+"
+    // beside nothing is a control with no sentence.
+    if (!unfinished(state).length) return null;
+    const many = unfinished(state).length > 1;
+    const holder = document.createElement("div");
+    holder.className = "builder-join";
+    const plus = plusButton(
+      many ? gettext("Add a step that everything so far feeds into")
+           : gettext("Add a step at the end"),
+      addJoiningStep);
+    plus.classList.add("cell-plus--join");
+    holder.appendChild(plus);
+    return holder;
+  }
+
   function linePlus(cell, state, where) {
     // `where` is "before" or "after" the line in this cell.
     const label = gettext("Add an ingredient here");
@@ -2230,6 +2319,23 @@
       if (latest) substituteSelects(latest);
     }, 300);
   });
+
+  /* "+ Step" in the toolbar. Bound here rather than by the generic formset
+   * helper (see recipe_form.js) because what it should do is a question about
+   * the diagram: it puts a new step on the *right-hand end*, with every loose
+   * arm feeding into it.
+   *
+   * It appended a plain row before, which is a second root — drawn as a band
+   * across the top, feeding nothing, and refused by `validate_structure` on
+   * save as "a branch somebody forgot to join". That was the only general way
+   * to add a step, so a recipe with two arms could be built and then not
+   * finished.
+   *
+   * This is the mode-independent route, which is the point: the canvas "+" is
+   * a shortcut on top of it, and the form opens in Steps.
+   */
+  const stepAdd = document.querySelector("[data-step-add]");
+  if (stepAdd) stepAdd.addEventListener("click", addJoiningStep);
 
   // Mark the switch before the first layout. `mode` already holds the
   // remembered choice and `render` reads it — but nothing had told the buttons,

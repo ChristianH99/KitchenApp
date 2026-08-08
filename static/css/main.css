@@ -1066,7 +1066,15 @@ body.modal-open { overflow: hidden; }
 /* No min-width of its own: the blocks set their own minimum through their
    column tracks, and a second figure here would be a third place that has to
    agree with them. */
-.builder-canvas { display: flex; flex-direction: column; }
+/* A row of two: the blocks, and the join "+" to the right of all of them.
+   The blocks themselves still stack vertically, inside .builder-stack. */
+.builder-canvas { display: flex; flex-direction: row; align-items: stretch; }
+/* min-width: 0 so a wide diagram shrinks inside the row rather than pushing
+   the join column off the end — the default is "never smaller than my
+   content", and .builder-scroll is what is supposed to take the overflow. */
+.builder-stack { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+/* The list view is a single column and has no diagram to sit beside. */
+.builder-canvas--list { flex-direction: column; }
 .builder-block {
   display: grid;
   gap: var(--space-4);
@@ -1988,6 +1996,20 @@ select[data-unit-select] { max-width: 11rem; }
   width: var(--space-8);
   height: var(--space-8);
 }
+/* The right-hand end of the whole diagram: a step everything feeds into. Not
+   absolutely positioned like the others — it is a column of its own beside the
+   blocks, because it belongs to all of them rather than to one cell. */
+.builder-join {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-9);
+  flex: none;
+}
+.cell-plus--join { position: static; opacity: 0; pointer-events: none; }
+.builder-canvas:hover .cell-plus--join,
+.builder-join:focus-within .cell-plus--join { opacity: 1; pointer-events: auto; }
+
 .builder-cell:hover > .cell-plus,
 .builder-cell:focus-within > .cell-plus,
 .cell-plus:hover { opacity: 1; pointer-events: auto; }

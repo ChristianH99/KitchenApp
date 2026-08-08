@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kitchenapp 0.1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-08 20:42+0200\n"
+"POT-Creation-Date: 2026-08-08 22:13+0200\n"
 "PO-Revision-Date: 2026-08-05 12:00+0200\n"
 "Last-Translator: KitchenApp\n"
 "Language-Team: German\n"
@@ -57,84 +57,92 @@ msgstr "Alarm ausschalten"
 msgid "Takes in what comes out of: %(steps)s"
 msgstr "Nimmt auf, was herauskommt aus: %(steps)s"
 
-#: .\static\js\recipe_diagram.js:488 .\static\js\recipe_diagram.js:714
-#: .\static\js\recipe_diagram.js:736 .\static\js\recipe_diagram.js:1292
+#: .\static\js\recipe_diagram.js:488 .\static\js\recipe_diagram.js:725
+#: .\static\js\recipe_diagram.js:747 .\static\js\recipe_diagram.js:1303
 msgid "Step %(n)s"
 msgstr "Schritt %(n)s"
 
-#: .\static\js\recipe_diagram.js:685 .\static\js\recipe_diagram.js:1292
+#: .\static\js\recipe_diagram.js:696 .\static\js\recipe_diagram.js:1303
 msgid "Line %(n)s"
 msgstr "Zeile %(n)s"
 
-#: .\static\js\recipe_diagram.js:1297
+#: .\static\js\recipe_diagram.js:1308
 msgid "%(line)s is now in “%(step)s”"
 msgstr "%(line)s liegt jetzt in „%(step)s“"
 
-#: .\static\js\recipe_diagram.js:1302
+#: .\static\js\recipe_diagram.js:1313
 msgid "%(line)s is not in any step"
 msgstr "%(line)s liegt in keinem Schritt"
 
-#: .\static\js\recipe_diagram.js:1307
+#: .\static\js\recipe_diagram.js:1318
 msgid "%(step)s now feeds into “%(parent)s”"
 msgstr "%(step)s mündet jetzt in „%(parent)s“"
 
-#: .\static\js\recipe_diagram.js:1312
+#: .\static\js\recipe_diagram.js:1323
 msgid "%(step)s no longer feeds into anything"
 msgstr "%(step)s mündet in nichts mehr"
 
-#: .\static\js\recipe_diagram.js:1319
+#: .\static\js\recipe_diagram.js:1330
 msgid "%(step)s is now %(n)s of %(total)s"
 msgstr "%(step)s ist jetzt %(n)s von %(total)s"
 
-#: .\static\js\recipe_diagram.js:1541 .\static\js\recipe_diagram.js:1542
+#: .\static\js\recipe_diagram.js:1552 .\static\js\recipe_diagram.js:1553
 msgid "Drag to change which ingredients go into this step"
 msgstr "Ziehen, um zu ändern, welche Zutaten in diesen Schritt gehen"
 
-#: .\static\js\recipe_diagram.js:1567
+#: .\static\js\recipe_diagram.js:1578
 msgid "Drag to change where this step starts"
 msgstr "Ziehen, um zu ändern, wo dieser Schritt beginnt"
 
-#: .\static\js\recipe_diagram.js:1568
+#: .\static\js\recipe_diagram.js:1579
 msgid "Drag to change how far this step reaches"
 msgstr "Ziehen, um zu ändern, wie weit dieser Schritt reicht"
 
-#: .\static\js\recipe_diagram.js:1914
+#: .\static\js\recipe_diagram.js:1993
+msgid "Add a step that everything so far feeds into"
+msgstr "Einen Schritt hinzufügen, in den alles bisher Begonnene einfließt"
+
+#: .\static\js\recipe_diagram.js:1994
+msgid "Add a step at the end"
+msgstr "Am Ende einen Schritt hinzufügen"
+
+#: .\static\js\recipe_diagram.js:2003
 msgid "Add an ingredient here"
 msgstr "Hier eine Zutat einfügen"
 
-#: .\static\js\recipe_diagram.js:1921
+#: .\static\js\recipe_diagram.js:2010
 msgid "Add a step after this one"
 msgstr "Danach einen Schritt einfügen"
 
-#: .\static\js\recipe_diagram.js:1931
+#: .\static\js\recipe_diagram.js:2020
 msgid "Add a step below, in the same column"
 msgstr "Darunter einen Schritt in derselben Spalte einfügen"
 
-#: .\static\js\recipe_diagram.js:1962
+#: .\static\js\recipe_diagram.js:2051
 msgid "top and bottom heat"
 msgstr "Ober-/Unterhitze"
 
-#: .\static\js\recipe_diagram.js:1963
+#: .\static\js\recipe_diagram.js:2052
 msgid "fan"
 msgstr "Umluft"
 
-#: .\static\js\recipe_diagram.js:1964
+#: .\static\js\recipe_diagram.js:2053
 msgid "top heat"
 msgstr "Oberhitze"
 
-#: .\static\js\recipe_diagram.js:1965
+#: .\static\js\recipe_diagram.js:2054
 msgid "bottom heat"
 msgstr "Unterhitze"
 
-#: .\static\js\recipe_diagram.js:1966
+#: .\static\js\recipe_diagram.js:2055
 msgid "grill"
 msgstr "Grill"
 
-#: .\static\js\recipe_diagram.js:1967
+#: .\static\js\recipe_diagram.js:2056
 msgid "fan grill"
 msgstr "Umluftgrill"
 
-#: .\static\js\recipe_diagram.js:2003
+#: .\static\js\recipe_diagram.js:2092
 msgid "An oven temperature is a whole number between %(min)s and %(max)s °C."
 msgstr "Eine Ofentemperatur ist eine ganze Zahl zwischen %(min)s und %(max)s °C."
 

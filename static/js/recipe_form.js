@@ -36,8 +36,13 @@
   window.formsetRows = function formsetRows(config) {
     const pool = document.querySelector(config.pool);
     const template = document.querySelector(config.template);
-    const addButton = document.querySelector(config.add);
-    if (!pool || !template || !addButton) return null;
+    // `add` is optional. The steps formset does not name one: what "+ Step"
+    // has to do depends on the shape of the diagram — it joins whatever is
+    // currently unfinished into one new final step — and that lives in
+    // recipe_diagram.js, which owns the model. A plain append would put a
+    // parentless root at the bottom, which draws as a band across the top.
+    const addButton = config.add ? document.querySelector(config.add) : null;
+    if (!pool || !template || (config.add && !addButton)) return null;
 
     // The prefix is read out of the blank form, not written as a literal here:
     // it is inlineformset_factory's to choose, there are two formsets on this
@@ -77,12 +82,14 @@
       return row;
     }
 
-    addButton.addEventListener("click", () => {
-      const row = add();
-      if (!row) return;
-      const first = row.querySelector("input:not([type='hidden']), textarea");
-      if (first) first.focus();
-    });
+    if (addButton) {
+      addButton.addEventListener("click", () => {
+        const row = add();
+        if (!row) return;
+        const first = row.querySelector("input:not([type='hidden']), textarea");
+        if (first) first.focus();
+      });
+    }
 
     document.addEventListener("click", (event) => {
       const button = event.target.closest(config.remove);
@@ -151,7 +158,9 @@
       row: "[data-ingredient-row]", remove: "[data-ingredient-remove]",
     }),
     steps: window.formsetRows({
-      pool: "[data-step-pool]", add: "[data-step-add]",
+      // No `add`: recipe_diagram.js binds "+ Step", because what it should do
+      // is a question about the diagram. See addJoiningStep there.
+      pool: "[data-step-pool]",
       template: "[data-step-template]",
       row: "[data-step-row]", remove: "[data-step-remove]",
     }),
