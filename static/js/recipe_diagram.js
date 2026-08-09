@@ -1953,15 +1953,35 @@
      * statement about all of them at once, so it is the only add that reads the
      * whole diagram before it acts.
      *
+     * **A loose ingredient is a loose end too**, and that is the second half of
+     * the same idea rather than an extra. A recipe is typed in ingredients
+     * first: half a dozen lines and no steps at all. Pressing "+ Step" there
+     * read the diagram, found no arms to join, and minted a parentless row with
+     * nothing going into it — which is a *standing instruction* by
+     * construction, drawn as a band across the top of the page over none of the
+     * lines somebody had just typed. The one control for "now say what to do
+     * with all this" produced the one kind of step that says nothing about it,
+     * and the first step of a recipe then had to be assembled by dragging every
+     * line into it one at a time.
+     *
+     * So it takes the lines in no step as well as the arms, and the two cases
+     * are one sentence: the new step is where everything that is not yet spoken
+     * for goes.
+     *
      * Everything is joined by default and the ends can then be pulled off
      * again, because with two arms that is always what was wanted, and with
-     * more it is one drag per exception rather than one per inclusion.
+     * more it is one drag per exception rather than one per inclusion. The same
+     * bargain holds for the lines: dragging one out to the tray is one gesture,
+     * and dragging six in was six.
      */
     const formsets = window.recipeFormsets;
     if (!formsets || !formsets.steps) return;
     // Read the ends *before* minting the row, or the new step is one of them
     // and would be told to feed itself.
     const ends = unfinished(latest);
+    // `loose` is already free of substitutes — they ride with the line they
+    // replace and must never take a step of their own.
+    const loose = latest.loose.slice();
     const row = formsets.steps.add();
     if (!row) return;
     const created = indexOf(row);
@@ -1969,6 +1989,7 @@
 
     setRef(row, "parent_index", null);
     ends.forEach((end) => setRef(latest.stepRows.get(end), "parent_index", created));
+    loose.forEach((line) => setRef(latest.lineRows.get(line), "step_index", created));
     // Last in the order, because it is the last thing that happens. Unlike
     // "+ Step after this" there is no slot being vacated to take: nothing is
     // being spliced into a chain, a new end is being put on the whole thing.
@@ -1985,8 +2006,14 @@
     // everything feeds into belongs. Only offered when there is something to
     // feed it: on an empty canvas the toolbar button is the way in, and a "+"
     // beside nothing is a control with no sentence.
-    if (!unfinished(state).length) return null;
-    const many = unfinished(state).length > 1;
+    //
+    // Counted the way addJoiningStep acts — arms *and* lines in no step. A
+    // recipe holding only "heat the oven" and a list of ingredients has no arm
+    // to join and every reason to offer this: the band is bare, so `unfinished`
+    // rightly ignores it, and the lines below it are the whole recipe so far.
+    const ends = unfinished(state).length + state.loose.length;
+    if (!ends) return null;
+    const many = ends > 1;
     const holder = document.createElement("div");
     holder.className = "builder-join";
     const plus = plusButton(

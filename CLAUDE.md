@@ -620,6 +620,18 @@ recognises them as decided rather than missed.
   parentless row*, which is that second root — so the one general control made
   the very shape the save refuses.
 
+  **A loose ingredient is a loose end too**, and that is the same rule rather
+  than an extra one: the new step takes the lines in no step as well as the
+  arms. A recipe is typed in ingredients first, so the commonest press of
+  "+ Step" is on a page with six lines and no steps at all — where there was
+  no arm to join, and the row it minted had nothing going into it, which *is* a
+  standing instruction by construction. The one control for "now say what to do
+  with all this" produced the one kind of step that says nothing about it: a
+  band across the top, over none of the lines somebody had just typed, and the
+  first step then had to be assembled by dragging each line into it. Both cases
+  read as one sentence now — the new step is where everything not yet spoken
+  for goes — and the ends can be pulled off again either way.
+
   **What it must not sweep up is a standing instruction.** `unfinished()`
   excludes a *bare* root — no children, no ingredients — because "Ofen
   vorheizen" is one by construction, and feeding it into the final step turns
