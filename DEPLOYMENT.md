@@ -248,11 +248,13 @@ What this looks like if you skip the check: the container comes up, prints
 roughly a minute in rather than immediately. §9 has the symptom row.
 
 **The fix used here** — run the container as an identity the ACL already grants,
-rather than trying to make the ACL grant uid 1000. In `docker-compose.yml`,
-inside the `kitchen:` service:
+rather than trying to make the ACL grant uid 1000. The compose file already
+carries the line; what it needs is the two numbers, and they go in **`.env`**,
+beside it:
 
-```yaml
-    user: "1026:101"
+```
+KITCHEN_UID=1026
+KITCHEN_GID=101
 ```
 
 1026 is the DSM user that owns the folder (`Christian`); **101 is
@@ -265,6 +267,24 @@ match:
 sudo chown -R 1026:100 /volume1/docker/kitchen/data
 ```
 
+**Check the substitution before starting anything.** This is the one line here
+whose failure is silent — unset variables fall back to `1000:1000`, which is the
+error above:
+
+```
+sudo docker compose config | grep user:
+```
+
+The reason they live in `.env` and not in the compose file is that **the compose
+file is replaced wholesale by the next release you download and `.env` is not**.
+Until v0.2.2 this was a hand-edited `user: "1026:101"` line with an instruction
+to carry it across every update — a step that works right up until the once it
+is forgotten, and forgetting it is this crash loop on a folder that by then has
+the household's recipes in it. Note that Compose substitutes `${…}` from the
+`.env` in the same directory as the compose file, which is a *different*
+mechanism from the `env_file:` key in that file; both happen to read the same
+file here, which is why one entry serves both.
+
 Test any of this without waiting on the restart loop — a throwaway container
 with the same mount and the same user answers in a second:
 
@@ -275,14 +295,17 @@ sudo docker run --rm -u 1026:101 \
   -c 'id; ls -land /data; touch /data/.wtest && echo WRITABLE && rm /data/.wtest || echo NOT-WRITABLE'
 ```
 
-That `user:` line is a **local edit to a file that ships with every release**.
-Carry it across when you edit the version line for an update (§7), and re-add it
-if you ever download a fresh `docker-compose.yml` from a release page. Losing it
-fails loudly — straight back to this error — which is why it is preferred here
-over the alternative: widening the ACL's `everyone` entry to `rwx` with
-`synoacltool -replace` and leaving the container at uid 1000. That keeps the
-compose file stock at the cost of giving every DSM account write on the
-household's recipes and photographs, which they can already read.
+**Three alternatives, and why not.** *Widening the ACL's `everyone` entry to
+`rwx`* with `synoacltool -replace` and leaving the container at uid 1000 keeps
+`.env` stock, at the cost of giving every DSM account write on the household's
+recipes and photographs — which they can already read. *Running as root*, which
+is what Immich and most self-hosted apps do (no `user:`, no `USER` in the
+Dockerfile), sidesteps the ACL entirely because root bypasses the check — but
+this app accepts photograph uploads, and it is close to a one-way door: `/data`
+fills with root-owned files and going back means chowning a database you have
+come to care about. *Chown-then-drop-privileges* in the entrypoint, the
+`gosu` pattern, cannot work here at all — the `chown` is the exact call the ACL
+makes a no-op, so dropping to uid 1000 afterwards lands straight back here.
 
 The gid only affects file permissions on this one bind mount. The container has
 no DSM API and nothing else mounted, so it is not DSM administrator in any sense
@@ -402,6 +425,17 @@ Deliberately in this order, because it is the order that cannot lock you out.
    sudo docker exec -it kitchen python manage.py createsuperuser
    ```
 
+   **Leave the e-mail address blank.** `createsuperuser` accepts an empty one,
+   and here that is the safety rather than laziness. A token whose address
+   matches exactly one local account is *linked* to it automatically — one
+   person, both doors, which is the feature — and the account this step creates
+   is the one that can do everything, including turning SSO off again. Giving
+   it an address means whoever can set that address on a DSM account can sign
+   in as it. An empty address never matches, because the link needs a non-empty
+   address on both sides. Use a real one only for an account you would be
+   content to reach that way, and see the Security section of CLAUDE.md for the
+   other three conditions the link has to satisfy.
+
 2. Open `https://kitchen.haeusslerr.de/`, sign in locally, confirm the app works
    end to end — add a recipe, upload a photograph.
 3. Now do §3 — the DSM application, then the app's **Anmeldung** page. No
@@ -437,16 +471,48 @@ rather than as a file copy.
 
 ## 7. Updating, and rolling back
 
-Edit the one line in `docker-compose.yml` that names the version, then:
+**Take a copy of `/data` first when the release carries a migration**, and
+assume it does unless you have checked. This is thirty seconds and it is the
+only undo there is:
 
 ```
 cd /volume1/docker/kitchen
+sudo docker compose stop                        # so the -wal file is folded in
+sudo cp -a data "data.before-<new version>"
+```
+
+Two reasons it is not ceremony. A roll-back puts the *code* back and cannot put
+the *schema* back (see the end of this section), so an image older than a
+migration that has already run leaves the database ahead of the code with
+nothing to do about it. And a migration that carries a **data step** — one that
+fills a new column from an old one rather than only adding it — is the kind
+whose failure is silent: nothing crashes, the app comes up, and something is
+quietly wrong on a page nobody looks at that day. `recipes/0007_recipe_owner` is
+this app's first of those; it fills `owner` from `created_by`, and without it
+every existing recipe becomes editable by staff alone, which presents as "Edit
+disappeared from my own recipes" rather than as anything to do with an update.
+
+Then edit the one line in `docker-compose.yml` that names the version — or drop
+in the one attached to the new release, which from v0.2.2 is safe to do because
+the machine-specific `KITCHEN_UID`/`KITCHEN_GID` live in `.env` and not in that
+file (§4.1). If you are coming from an older compose file that had
+`user: "1026:101"` written into it by hand, move those two numbers into `.env`
+now, and confirm with `sudo docker compose config | grep user:`. Then:
+
+```
 sudo docker compose pull        # or: gunzip -c kitchen-<new>-linux-amd64.tar.gz | sudo docker load
 sudo docker compose up -d
 ```
 
 Migrations run from `deploy/entrypoint.sh` on start-up. The image is disposable;
 `/data` is not.
+
+Once the app is up and you have looked at a page that exercises whatever
+changed, the copy can go:
+
+```
+sudo rm -rf "data.before-<new version>"
+```
 
 **Confirm the update actually landed.** Open the app and look at the bottom of
 the sidebar — the running version is printed there. This is not ceremony: a
@@ -528,7 +594,7 @@ there.
 | `DisallowedHost` on every request | `DJANGO_ALLOWED_HOSTS` does not include the hostname the proxy forwards. |
 | Every page renders unstyled | `collectstatic` did not run — check the build log, not the run log. |
 | Container restarts every ten seconds | Read `docker logs`; a missing `DJANGO_SECRET_KEY` raises at import with a sentence saying so. |
-| Restart loop, `unable to open database file` after `→ applying migrations` | `/data` is not writable by the container's user. On an ACL-enabled share `chown` succeeds and changes nothing — §4.1, including the `+` tell and the `user:` line that fixes it. |
+| Restart loop, `unable to open database file` after `→ applying migrations` | `/data` is not writable by the container's user. On an ACL-enabled share `chown` succeeds and changes nothing — §4.1, including the `+` tell. First check `docker compose config \| grep user:`: if it reads `1000:1000`, `KITCHEN_UID`/`KITCHEN_GID` are not reaching the compose file from `.env`. |
 | No way to sign in on a fresh install | There are no default credentials. `docker exec -it kitchen python manage.py createsuperuser` — §5. |
 | Signature error during the token exchange | Try `OIDC_RP_SIGN_ALGO=HS256`; older DSM builds sign with the client secret rather than RS256, and then no JWKS endpoint is needed. |
 | Nobody can sign in via SSO after a DSM update | Re-read the discovery document (§3.1) — the endpoints may have moved. The local login (`?local=1`) still works. |

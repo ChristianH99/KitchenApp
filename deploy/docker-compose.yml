@@ -26,10 +26,22 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
 
-    # Everything the app writes. The path is a real folder on the NAS
-    # (File Station → docker → kitchen → data) and it has to be writable by uid
-    # 1000, which is the container's user:
-    #     chown -R 1000:1000 /volume1/docker/kitchen/data
+    # Same shape as the release file, so the two do not drift: the image runs as
+    # uid 1000 and these override it. Unset means 1000, which is right here.
+    #
+    # On the NAS it is not — `/volume1/docker` is an ACL-enabled share with no
+    # owner entry, so `chown -R 1000:1000` succeeds and grants nothing and the
+    # container dies on its first write with `unable to open database file`.
+    # DEPLOYMENT.md §4.1.
+    #
+    # Note that a value in the repository's own `.env` will **not** reach this
+    # one: Compose interpolates from the `.env` in the *project directory*,
+    # which for this file is `deploy/`, while the `env_file:` below deliberately
+    # points a level up. That asymmetry is harmless — a laptop wants the default
+    # — but it is why the same expression behaves differently in the two files.
+    user: "${KITCHEN_UID:-1000}:${KITCHEN_GID:-1000}"
+
+    # Everything the app writes.
     volumes:
       - /volume1/docker/kitchen/data:/data
 

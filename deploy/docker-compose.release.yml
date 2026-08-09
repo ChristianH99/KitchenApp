@@ -34,10 +34,48 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
 
-    # Everything the app writes. The path is a real folder on the NAS
-    # (File Station → docker → kitchen → data) and it has to be writable by uid
-    # 1000, which is the container's user:
-    #     chown -R 1000:1000 /volume1/docker/kitchen/data
+    # Who the process is, and therefore what it may write in the bind mount
+    # below. The image's own answer is uid 1000 (`USER kitchen` in the
+    # Dockerfile) and this line only overrides it — the default is what you get
+    # if the two variables are unset, so nothing here has to be filled in on a
+    # machine where 1000 works.
+    #
+    # **On this NAS it does not, and the way it fails is the problem.**
+    # `/volume1/docker` is an ACL-enabled share whose ACL has no owner entry, so
+    # `chown -R 1000:1000` reports success, `ls` shows the new owner, and the
+    # container still cannot write: it comes up, prints `→ applying migrations`,
+    # and dies about three seconds later with `unable to open database file`.
+    # `restart: unless-stopped` then backs off, so it presents as a crash a
+    # minute in rather than immediately. The tell is a `+` on `drwxrwxrwx+`.
+    # The fix is to *be* an identity the ACL already grants rather than to
+    # change the folder, and on the DS723+ that is `1026:101` — 1026 is the DSM
+    # user owning the folder and **101 is `administrators`**, which is the half
+    # that matters, gid 100 (`users`) matching only the `everyone` entry.
+    #
+    # It reads them from `.env` rather than being written in here, and that is
+    # deliberate: this file is **replaced wholesale** by the next release you
+    # download, and `.env` is not. The previous version of this comment told you
+    # to re-add a hand-edited line every time, which is a step that works right
+    # up until the once it is forgotten — and forgetting it is the crash loop
+    # above, on a folder that by then has the household's recipes in it.
+    #
+    # Two warnings, because this is the line where a mistake is silent:
+    #
+    #   * Compose substitutes `${…}` from the `.env` sitting **beside this
+    #     file**, which is *not* the same mechanism as the `env_file:` key
+    #     further down (that one only passes variables into the container).
+    #     Both read the same file here, which is why one entry serves both.
+    #   * A variable that does not reach it falls back to 1000 and you are back
+    #     at the crash loop. Check before starting, not after:
+    #         sudo docker compose config | grep user:
+    #
+    # DEPLOYMENT.md §4.1 has the ACL dump, the one-second way to test a uid
+    # against the mount, and the alternatives that were rejected.
+    user: "${KITCHEN_UID:-1000}:${KITCHEN_GID:-1000}"
+
+    # Everything the app writes. A real folder on the NAS
+    # (File Station → docker → kitchen → data), so that an image update replaces
+    # the code and leaves the collection alone.
     volumes:
       - /volume1/docker/kitchen/data:/data
 

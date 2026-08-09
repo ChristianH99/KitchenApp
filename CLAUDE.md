@@ -200,6 +200,18 @@ Things to keep in mind when touching them:
   Each of those produces a release that is perfect in CI and undeployable.
 - **The version is pinned, never `latest`.** A compose file saying `latest`
   cannot be rolled back by re-reading it.
+- **The one machine-specific value in the shipped compose file is not in it.**
+  `user:` reads `${KITCHEN_UID:-1000}:${KITCHEN_GID:-1000}`, because that file
+  is *replaced wholesale* by the next release and `.env` is not. It used to be a
+  hand-edited `user: "1026:101"` carried across every update from memory, and
+  forgetting it once is a crash loop on a folder that by then holds the recipes
+  (DEPLOYMENT.md §4.1 — the ACL on `/volume1/docker` makes `chown` a no-op, so
+  the image's own uid 1000 cannot write). The `:-` defaults are load-bearing in
+  the other direction: an unset variable without one leaves `user: ":"`, which
+  fails complaining about the user rather than about the file. Both halves are
+  pinned in `TestTheReleasePipelineAgreesWithItself`, `.env.example` included —
+  that is a release asset, and the only place anybody learns the two names
+  exist.
 - **A release asset must not be a dotfile.** `.env.example` is shipped as
   `env.example`, because a shell glob does not match dotfiles and `dist/*` would
   silently leave it out of both the checksums and the upload.
@@ -485,6 +497,15 @@ Each of these is here because breaking it produces a page that still renders.
   the provider can reach the local account that holds it. That is why the link
   is logged at WARNING and why "Unlink" exists on the account page — an
   automatic action with no undo is not one this app should take.
+
+  **The sharpest version of that risk is the break-glass administrator**, which
+  is the one account that can turn SSO off again, and it is bounded by an
+  address rather than by a rule: the link needs a non-empty address on both
+  sides, so an account with *no* e-mail can never be linked to. DEPLOYMENT.md §5
+  says to create that account without one, and that sentence is the mitigation.
+  Refusing to link superusers in code was the alternative and is worse — the
+  household's own account is a superuser, and it is exactly the account somebody
+  wants both doors on.
 - **"SSO account" and "local account" stopped being opposites.** `is_sso_account`
   means "the provider can sign this in" (no usable password, *or* a linked
   identity); `has_local_password` means the form can. A linked account is both,

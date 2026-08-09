@@ -108,11 +108,25 @@ page lists those evenings across every recipe, and any of them can be opened and
 corrected: how far a dish went is usually clearer the next day, and before that
 page the only way to fix it was to delete the entry and lose the date with it.
 
+A recipe can be **handed to somebody else**. Who may edit one is a column of its
+own (`Recipe.owner`), starting as whoever typed it in and moving from a control
+on the recipe page — so a recipe typed in by whoever had the laptop open can end
+up belonging to whoever actually cooks it. Handing it over means *losing* it:
+the old owner keeps "added by" and nothing else, because a rule that accepted
+either column would be a share wearing a transfer's label.
+
 Everything that is about the *app* rather than about the food — the household's
 accounts, the sign-in configuration, the Django admin — lives in a **Settings**
 group at the foot of the sidebar. The **People** page manages both local
 accounts and the ones that arrive through SSO, without sending anybody to the
-admin. The **Sign-in** page beside it configures the OIDC connection itself —
+admin. A person who has both is **one row, not two**: a Synology identity whose
+e-mail address matches exactly one local account with a password is attached to
+it rather than given an account of its own, so both ways in reach the same
+recipes — and staff can undo that from the account page, because an automatic
+action with no undo is not one this app should take. Identity is still the OIDC
+`sub`; the address is one deliberate, hedged exception, and CLAUDE.md's Security
+section says what bounds it. The **Sign-in** page beside it configures the OIDC
+connection itself —
 endpoints, client ID and secret, the group rules and the on/off switch — so
 setting single sign-on up needs no `.env` edit and no container restart. It is
 superuser-only, reads the discovery document from inside the container, and will
@@ -439,6 +453,9 @@ included) lives *inside* the row so the operation cannot leave one behind.
   file plus a `media/` folder under `/data`; Hyper Backup already covers that
   share. An in-app export would be a second, worse copy of a working answer.
 - **Anyone signed in can read every recipe.** Editing is limited to whoever
-  added it (or staff). A household collection is shared to cook from; the
-  failure worth preventing is somebody quietly rewriting the family recipe, not
-  somebody reading it.
+  *looks after* it — `Recipe.owner`, which starts as whoever typed it in and can
+  be handed on from the recipe page — or to staff. A household collection is
+  shared to cook from; the failure worth preventing is somebody quietly
+  rewriting the family recipe, not somebody reading it. A recipe whose owner's
+  account has been deleted answers to staff alone until somebody takes it on,
+  because guessing an heir is the alternative and it is worse.

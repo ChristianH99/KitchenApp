@@ -510,6 +510,45 @@ class TestTheReleasePipelineAgreesWithItself:
                 f"{line} pins `latest`; a rollback then has nothing to edit"
             )
 
+    def test_the_container_user_comes_from_the_environment(self):
+        """The uid and gid are the one machine-specific thing in a file that is
+        **replaced wholesale by the next release**, which is why they are read
+        from `.env` — the file an update does not touch — rather than written
+        in here.
+
+        Hardcoding them back would work on the machine somebody tested it on
+        and would then ship that machine's uid to every other one. Dropping the
+        `:-` default would be worse: an unset variable makes the expression
+        empty, `user: ":"`, and the container refuses to start with a message
+        about the *user* rather than about the compose file.
+        """
+        compose = RELEASE_COMPOSE.read_text(encoding="utf-8")
+        line = next(
+            (ln.strip() for ln in compose.splitlines() if ln.strip().startswith("user:")),
+            None,
+        )
+        assert line, (
+            "docker-compose.release.yml no longer sets `user:`. The image's own "
+            "uid 1000 cannot write an ACL-enabled Synology share — DEPLOYMENT.md §4.1"
+        )
+        for variable in ("KITCHEN_UID", "KITCHEN_GID"):
+            assert f"${{{variable}:-" in line, (
+                f"{line} does not read {variable} with a `:-` default; either it "
+                "hardcodes one machine's uid into every release, or an unset "
+                "variable collapses it to `user: \":\"`"
+            )
+
+    def test_the_environment_example_explains_them(self):
+        """`env.example` is a release asset, and it is the only place somebody
+        setting the NAS up will find out those two names exist at all — the
+        compose file mentions them, but reading it is not a step in §4."""
+        example = (BASE_DIR / ".env.example").read_text(encoding="utf-8")
+        for variable in ("KITCHEN_UID", "KITCHEN_GID"):
+            assert variable in example, (
+                f"{variable} is substituted into the shipped compose file but is "
+                "not in .env.example, so nothing tells anybody to set it"
+            )
+
     def test_the_dockerfile_takes_the_version_the_workflow_passes(self):
         """`docker build --build-arg X` for an ARG the Dockerfile never declares
         is not an error — it is a warning nobody reads, and the image ships

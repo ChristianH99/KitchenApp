@@ -13,7 +13,11 @@ could not be pulled down over any, and a deleted step taking everything above it
 out of the recipe — and then, the same day, three more: adding a step to the
 right of one sending that step to the bottom of the list, and the timer now
 following you off the cooking page as a card in the corner that rings wherever
-you are. It exists so that somebody — or
+you are — and on 2026-08-09 by the session that let a recipe be handed to
+somebody else, gave "+ Step" the ingredients that are in no step, ranged the
+diagram's boxes left and stopped it touching the edge of its own card, and made
+a DSM identity link to the local account that shares its address instead of
+becoming a second half-account. It exists so that somebody — or
 some agent — picking this up cold knows three things the code cannot tell them:
 **what has actually been run**, what was left out on purpose, and what is worth
 doing next.
@@ -29,7 +33,7 @@ Everything below was observed working, not merely written.
 
 | | How it was checked |
 |---|---|
-| The whole test suite | `uv run pytest` — **499 passed**, ~160 s |
+| The whole test suite | `uv run pytest` — **552 passed**, ~215 s (2026-08-09) |
 | Every page renders | Driven in Chrome against `runserver`: home, list, detail, form, tags, login, cooking view, People |
 | Adding a recipe end to end | Typed into the real form in the browser; ingredients, tags and slug all correct on save |
 | Blank formset rows dropped | Same submission — 5 rendered rows, 2 filled, 2 ingredients saved |
@@ -82,7 +86,8 @@ Everything below was observed working, not merely written.
 | The recipe page shows its ingredients once | Read back from the DOM: one `.ingredient-list` on the page, in the Preparing panel; the Cooking panel carries each line under the step that consumes it |
 | The cooking view | Walked Kartoffelsalat step by step in the browser: the current cell and its four ingredient rows light up, earlier steps go green, the stopwatch runs, "Fertig" opens the finish panel with the measured minutes filled in |
 | **v0.2.0 running on the DS723+** | The first install on the real NAS, 2026-08-08. The image came down, the container started, `→ applying migrations` completed and the process stayed up — on the hardware, not on Docker Desktop. Everything past the container itself (proxy, certificate, sign-in, SSO) is still §2 |
-| **The bind mount, and the ACL that defeats the documented `chown`** | Found by a crash loop: 17 restarts, exit 1, `sqlite3.OperationalError: unable to open database file` about 2.7 s after `→ applying migrations` — presenting as a crash *a minute in* because of the restart backoff. The cause was `/volume1/docker` being an ACL-enabled share: `everyone` is `r-x`, there is no owner entry, so `chown -R 1000:1000` reported success and granted nothing. Two tells, both read off the running system: a `+` on `drwxrwxrwx+`, and the host reporting mode 777 while the container saw the same directory as 555. `user: "1026:101"` in the compose file fixes it — 101 is `administrators`, and gid 100 (`users`) does not work. DEPLOYMENT.md §4.1 was rewritten around this |
+| **v0.2.1 — a running container replaced by a newer one** | 2026-08-09, and the first time this has been done rather than assumed. The §7 path end to end on the real NAS: the version line edited, the image fetched, the container replaced, the collection in `/data` still there afterwards. The `user:` line from §4.1 survived it, because §7 edits the file rather than replacing it — which is the case the option below was chosen against, not the case it protects. v0.2.1 carried **no migrations**, so the schema half of an update is still §2 |
+| **The bind mount, and the ACL that defeats the documented `chown`** | Found by a crash loop: 17 restarts, exit 1, `sqlite3.OperationalError: unable to open database file` about 2.7 s after `→ applying migrations` — presenting as a crash *a minute in* because of the restart backoff. The cause was `/volume1/docker` being an ACL-enabled share: `everyone` is `r-x`, there is no owner entry, so `chown -R 1000:1000` reported success and granted nothing. Two tells, both read off the running system: a `+` on `drwxrwxrwx+`, and the host reporting mode 777 while the container saw the same directory as 555. Running as `1026:101` fixes it — 101 is `administrators`, and gid 100 (`users`) does not work. DEPLOYMENT.md §4.1 was rewritten around this, and again for v0.2.2, which moved those two numbers out of the compose file and into `.env` |
 | Creating a local account | Typed into the real People form; account created, password usable |
 | No sideways scroll at 390px | Measured, not eyeballed: the recipe page was 508px wide inside a 390px column before `min-width: 0` and is exactly 390px after it, with the diagram scrolling inside its own box. The form and the cooking view were measured the same way |
 | German UI | `lang="de"`, sidebar and headings in German, catalogs compiled and loaded; every new string translated |
@@ -144,11 +149,22 @@ the NAS.
   from `created_by`, without which every existing recipe becomes staff-only).
   It is the next thing to reach the NAS, so it is the update to take a copy
   before — see DEPLOYMENT.md §7.
-- **An *update* of a running container.** v0.2.0 is now installed and running on
-  the DS723+ (§1), but it went onto an empty folder — it was the first thing
-  ever put there. Replacing a *running* container with a newer image — the path
-  in §7, including whether the version in the sidebar actually changes — has
-  still not been done.
+- **An update that carries a *migration*.** Replacing a running container is no
+  longer a guess — v0.2.1 did it on the real NAS (§1). What that update did not
+  do is change the schema: it carried no migrations at all, so
+  `entrypoint.sh`'s `migrate` had nothing to apply and `/data` was never at
+  risk. The next release is the first with both halves at once, and one of them
+  (`recipes/0007_recipe_owner`) fills a column from another rather than only
+  adding it. §5.1, and take the copy.
+- **The uid and gid now come from `.env`, and only the default has ever run.**
+  What is on the NAS today is `user: "1026:101"` written into the compose file
+  by hand. The shipped file now reads them from `KITCHEN_UID`/`KITCHEN_GID`
+  instead (DEPLOYMENT.md §4.1) — which means the *interpolation* is the new,
+  untested part: Compose substitutes `${…}` from the `.env` beside the compose
+  file, which is a different mechanism from the `env_file:` key two lines below
+  it, and a variable that does not reach it falls back to 1000 and reproduces
+  the original crash loop. `sudo docker compose config | grep user:` before
+  `up -d` answers it in one line.
 - **Most of the DS723+, still.** v0.2.0 now starts on the NAS and its bind mount
   works (§1), so the container half of this is no longer a guess. Everything
   around it is: the reverse proxy rule and its two custom headers, the
@@ -159,10 +175,14 @@ the NAS.
   correction is only tested one way round.** `/volume1/docker` is an
   ACL-enabled share whose ACL has no owner entry, so `chown -R 1000:1000`
   succeeds and grants nothing — see DEPLOYMENT.md §4.1. What works here is
-  `user: "1026:101"` in the compose file. The documented alternative in that
-  section (widening the `everyone` entry with `synoacltool -replace` and leaving
-  the container at uid 1000) is written from the same ACL dump and has **not**
-  been run.
+  running as `1026:101`, now supplied as `KITCHEN_UID`/`KITCHEN_GID` from
+  `.env`. The three alternatives named in that section have **not** been run:
+  widening the `everyone` entry with `synoacltool -replace`, and running as
+  root, are both written from the same ACL dump rather than from an attempt;
+  the third (chown-then-drop-privileges in the entrypoint) is ruled out by
+  reasoning rather than by test — the `chown` is the call the ACL makes a
+  no-op — and if that reasoning is wrong it is wrong in the direction of an
+  option we did not take.
 - **The OIDC flow has never touched a real Synology SSO Server.** The claim
   handling is unit-tested by handing the backend dictionaries — which is the
   only way to test the DSM version that omits the group claim — but no browser
@@ -301,46 +321,59 @@ list exists so it is re-opened knowingly.
 
 ## 5. Worth doing next, roughly in order
 
-1. **Put v0.2.0 on the actual NAS.** Everything up to the container is now
-   known good (§1) and nothing past it is. DEPLOYMENT.md §1–§5 in order: the
-   data folder and its uid-1000 ownership, the reverse-proxy rule with its two
-   custom headers (§2 — this is the step that breaks the login), the SSO client
-   read off the real discovery document rather than trusted from `settings.py`,
-   then the local fallback administrator *before* switching OIDC on.
+1. **Update the NAS to the next release, and take a copy of `/data` first.**
+   v0.2.0 is running on the DS723+ (§1), so this is no longer an install — it
+   is the **first update of a running container this app has ever had**, and
+   the first one carrying a migration that *changes data* rather than only
+   adding a column. `recipes/0007_recipe_owner` fills `owner` from
+   `created_by`, and the failure is silent: nothing crashes, and every existing
+   recipe becomes editable by staff alone. DEPLOYMENT.md §7 now opens with the
+   copy; take it.
+
+   Then confirm the version in the sidebar actually changed, and that the
+   household's own recipes still offer Edit to the household.
+
+2. **Finish the rest of the NAS.** Everything up to the container is known good
+   (§1) and nothing past it is. DEPLOYMENT.md §1–§5 in order: the reverse-proxy
+   rule with its two custom headers (§2 — this is the step that breaks the
+   login), the SSO client read off the real discovery document rather than
+   trusted from `settings.py`, then the local fallback administrator — **with a
+   blank e-mail address**, §5, because an address on that account is a way in
+   for anybody who can set one in DSM — before switching OIDC on.
 
    Correct DEPLOYMENT.md as you go, in the file rather than in your terminal
    history, and move what you observed into §1 here.
-2. **Complete one OIDC round trip against the real SSO server**, then correct
+3. **Complete one OIDC round trip against the real SSO server**, then correct
    the endpoint defaults in `settings.py` and DEPLOYMENT.md §3.1 to what was
    actually found. Note the DSM version in the commit message — the next person
    to hit a moved endpoint will want to know which version this was true for.
-3. **Look at it on a real phone**, and at the cooking view in particular — that
+4. **Look at it on a real phone**, and at the cooking view in particular — that
    is the page whose whole point is being used on one. See the caveat under §1:
    the responsive work was measured rather than seen.
-4. **Favourites.** Small, obviously wanted, and it exercises the first
+5. **Favourites.** Small, obviously wanted, and it exercises the first
    per-user relation in the app.
-5. **A shopping list across *several* recipes.** Half of this exists:
+6. **A shopping list across *several* recipes.** Half of this exists:
    `apps/pantry/matching.shopping_list` already takes a list of
    `(recipe, verdict)` pairs, adds the same substance up across them and rounds
    the total to whole packets. What is missing is the page — somewhere to choose
    four recipes for the week and get one list out. The unit question that used
    to be listed here is settled: units are a closed set now
    (`apps/pantry/units.py`).
-6. **Pagination on the recipe list, and on the cooking history.** The list
+7. **Pagination on the recipe list, and on the cooking history.** The list
    renders every recipe; the recipe page renders the last ten cookings and says
    how many more there are. Fine at a hundred with lazy-loaded images; not fine
    at a thousand. The query-cost tests will *not* catch this — they pin the
    query count, which stays flat while the payload grows.
-7. **A print stylesheet for the recipe page.** People print recipes, and the
+8. **A print stylesheet for the recipe page.** People print recipes, and the
    diagram is the part that will come out wrong: it lives in a horizontally
    scrolling box that a printer cannot scroll.
-8. **Turn the cooking history into an answer rather than a list.** The page
+9. **Turn the cooking history into an answer rather than a list.** The page
    exists (`/cooked/`) and entries can be corrected after the fact, which was
    the thing that was actually missing. What it still does not do is *add up*:
    "what did we eat this month", and whether "serves four" is ever true in this
    house. Every number for it is recorded; only the recipe page's own median
    reads any of it.
-9. **Tidy the catalogue once it has been used for a while.** It grows by itself
+10. **Tidy the catalogue once it has been used for a while.** It grows by itself
    from every recipe saved, which is what makes it useful and what will leave
    "Kartoffeln" beside "festkochende Kartoffeln". Merging is a manual job in the
    admin today; if it turns out to be a monthly chore, it wants a button on the
