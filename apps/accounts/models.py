@@ -1,4 +1,11 @@
-"""The Synology SSO connection, stored so it can be edited from the app.
+"""The Synology SSO connection, and the identities that arrive over it.
+
+Two models. ``SSOConfiguration`` is the connection — one row, edited from a
+page, and everything below the first heading is about it. ``SSOIdentity`` is one
+DSM account attached to one local account, and it is what lets a person have
+both ways in.
+
+---- the connection ----
 
 This is a **reversal of an earlier decision**, taken deliberately and with its
 cost understood. The client secret used to live only in the environment, which
@@ -311,6 +318,60 @@ class SSOConfiguration(models.Model):
             and endpoints["authorization"]
             and endpoints["token"]
         )
+
+
+class SSOIdentity(models.Model):
+    """One DSM account, attached to one local account.
+
+    ---- why the ``sub`` moved out of ``username`` ----
+
+    An SSO account used to be a row whose ``username`` *was* the provider's
+    ``sub``, which is a fine way to store an identity right up to the moment one
+    person has both ways in. A local account has a username somebody chose; the
+    ``sub`` has to live somewhere else for the two to be the same row. Here.
+
+    Rows created before this model still work: apps/accounts/oidc.py looks the
+    ``sub`` up here first and falls back to ``username``, and mints the missing
+    row at the next sign-in.
+
+    ---- what the two constraints are for ----
+
+    ``subject`` is **unique**, so one DSM identity cannot be attached to two
+    local accounts — two rows to sign in as, with no way to say which one a
+    token means. And it is a **OneToOne** on the account, so one local account
+    cannot collect several DSM identities: the household has one provider, and
+    an account with two subs is a question ("which one is this?") that nothing
+    would answer.
+
+    Both matter more than they look, because linking is *automatic* by e-mail
+    (see ``SynologyOIDCBackend._account_to_link``) and these are the two shapes
+    a shared address could otherwise produce.
+
+    ``matched_by_email`` records how the row came about — created alongside a
+    brand-new account, or attached to one that already existed. It is the audit
+    trail for the one thing here that happens without anybody pressing
+    anything, and it is what the People page reads to say "linked".
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sso_identity",
+        verbose_name=_("account"),
+    )
+    # The OIDC `sub`. Long, because it is whatever the provider says it is —
+    # DSM's are short, other providers issue URIs.
+    subject = models.CharField(_("subject"), max_length=255, unique=True)
+    linked_at = models.DateTimeField(auto_now_add=True)
+    matched_by_email = models.BooleanField(
+        _("matched by e-mail address"), default=False,
+        help_text=_("Attached to an account that already existed, rather than creating one."),
+    )
+
+    class Meta:
+        verbose_name = _("provider identity")
+        verbose_name_plural = _("provider identities")
+
+    def __str__(self):
+        return self.subject
 
 
 class TimerSound(models.TextChoices):

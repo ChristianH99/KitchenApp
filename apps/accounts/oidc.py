@@ -16,10 +16,24 @@ household and the wrong one the moment that server also serves guests).
 
 ``sub`` is the identity, not the username. A DSM account renamed from ``chris``
 to ``christian`` keeps its ``sub``, and matching on the name instead would hand
-that person a brand-new, empty account. So the local ``username`` *is* the
-``sub``, and the human-readable name lives in ``first_name``/``last_name`` where
-it can change freely. It reads oddly in the Django admin and it is the only
-version of this that survives a rename.
+that person a brand-new, empty account. The ``sub`` lives in an
+``SSOIdentity`` row, and the human-readable name in
+``first_name``/``last_name`` where it can change freely.
+
+An account this app created for a token is *also* called by its ``sub``, which
+reads oddly in the Django admin and is what every such row looked like before
+those identity rows existed — ``filter_users_by_claims`` still answers to it, so
+nothing created by an earlier version needs migrating. What it cannot do any
+more is carry the identity on its own: a person who signs in **both ways** has a
+username they chose, so the ``sub`` has to be somewhere that is not the username
+column.
+
+That is the other thing this file now does: a token whose e-mail address matches
+exactly one local account is attached to it rather than given an account of its
+own, and both ways in keep working. ``_account_to_link`` is where the hedges
+are, and there are four of them, because an e-mail address is the tempting key
+and the wrong one — this is the app's one deliberate exception to that, not a
+change of mind about it.
 """
 
 import logging
@@ -32,6 +46,7 @@ from mozilla_django_oidc.views import (
 )
 
 from apps.accounts import sso
+from apps.accounts.models import SSOIdentity
 
 log = logging.getLogger(__name__)
 
@@ -90,17 +105,111 @@ class SynologyOIDCBackend(OIDCAuthenticationBackend):
         return sso.get_setting(attr, *args)
 
     def filter_users_by_claims(self, claims):
-        """Find the local row for this identity — by ``sub``, never by e-mail.
+        """Find the local row for this identity.
 
-        E-mail is the tempting key and it is the wrong one twice over: DSM lets
-        two accounts share an address, and an address can be reassigned to a
-        different person entirely. Either way, matching on it means signing
-        somebody in as somebody else.
+        Three questions, in this order, and the order is the safety:
+
+        1. **Which account carries this ``sub``?** The identity, and the only
+           answer that survives a rename or a change of address.
+        2. **Is there an account whose username is this ``sub``?** Every SSO
+           account created before ``SSOIdentity`` existed. ``update_user``
+           mints the missing row, so each of them answers question 1 from its
+           next sign-in onwards.
+        3. **Is there exactly one local account with this e-mail address?**
+           This is the automatic link, and it is the only question here that
+           is not about identity — see ``_account_to_link`` for the four things
+           that have to be true before it counts.
+
+        A read, and only a read: the link is *recorded* in ``update_user``,
+        which is the method that already writes.
         """
         sub = (claims.get("sub") or "").strip()
         if not sub:
             return self.UserModel.objects.none()
-        return self.UserModel.objects.filter(username=sub)
+
+        by_subject = self.UserModel.objects.filter(sso_identity__subject=sub)
+        if by_subject.exists():
+            return by_subject
+
+        # Named by the sub and carrying no identity row: an account from before
+        # this app kept the two apart. Not `is_sso_account` — a *local* account
+        # that happens to be called the same as a sub is a coincidence nobody
+        # in a household will produce, and it would still be the right row.
+        legacy = self.UserModel.objects.filter(username=sub, sso_identity__isnull=True)
+        if legacy.exists():
+            return legacy
+
+        return self._account_to_link(claims)
+
+    def _account_to_link(self, claims):
+        """The local account this token should be attached to, if any.
+
+        **This is the one place in the app that treats an e-mail address as
+        something like an identity, and it is deliberately hedged about.** The
+        objection is real and has not gone away: DSM lets two accounts share an
+        address, an address can be reassigned to somebody else entirely, and an
+        address is a claim the provider asserts rather than something this app
+        can check. Matching on it carelessly means signing somebody in as
+        somebody else, which is why questions 1 and 2 above are asked first and
+        why this one is asked *only* about an account that has never been
+        linked to anything.
+
+        What it buys is the thing it was asked for: one person, one account,
+        both ways in. Somebody who has a local password from before SSO was set
+        up, or who keeps one so that a broken provider is not a locked door,
+        does not end up with two half-accounts, two collections of recipes and
+        two names in the People list.
+
+        Four things have to be true, and each one is a shape a shared address
+        could otherwise produce:
+
+        * **The token carries an address, and does not say it is unverified.**
+          Only an explicit ``email_verified: false`` refuses — the claim is
+          absent on DSM builds that send nothing but ``sub`` and ``email``, and
+          requiring it would mean linking never happens on the very provider
+          this was written for.
+        * **Exactly one active account has it.** Two is the ambiguous case and
+          the dangerous one, and there is no tie-break worth inventing: the
+          login carries on and creates its own account, which is visible and
+          undoable rather than silent and wrong.
+        * **That account has a local password.** An account without one is
+          another *provider* identity that happens to share an address — a
+          second DSM account, not the same person — and attaching this token to
+          it would be exactly the mix-up the objection above describes.
+        * **It is not already linked.** One account, one identity. The second
+          ``sub`` to arrive with a shared address gets an account of its own.
+
+        Nothing about it is undone silently: the link is a row a staff user can
+        see on the account page and remove there.
+        """
+        email = (claims.get("email") or "").strip()
+        if not email:
+            return self.UserModel.objects.none()
+        if claims.get("email_verified") is False:
+            log.info("Not linking sub=%s by e-mail: the provider marked it unverified",
+                     claims.get("sub"))
+            return self.UserModel.objects.none()
+
+        candidates = self.UserModel.objects.filter(email__iexact=email, is_active=True)
+        if candidates.count() != 1:
+            if candidates.count() > 1:
+                log.warning(
+                    "Not linking sub=%s by e-mail: %s active accounts share that address",
+                    claims.get("sub"), candidates.count(),
+                )
+            return self.UserModel.objects.none()
+
+        person = candidates.first()
+        if not person.has_usable_password():
+            log.info("Not linking sub=%s to %s: that account is itself a provider identity",
+                     claims.get("sub"), person.get_username())
+            return self.UserModel.objects.none()
+        if getattr(person, "sso_identity", None) is not None:
+            log.warning("Not linking sub=%s to %s: it is already linked to another identity",
+                        claims.get("sub"), person.get_username())
+            return self.UserModel.objects.none()
+
+        return candidates
 
     def verify_claims(self, claims):
         """Whether this token may sign in at all.
@@ -139,6 +248,7 @@ class SynologyOIDCBackend(OIDCAuthenticationBackend):
         # be a second, unmanaged door into a DSM-managed account.
         user.set_unusable_password()
         self._apply_claims(user, claims)
+        self._remember_identity(user, claims)
         log.info("Created a local account for OIDC sub=%s", claims["sub"])
         return user
 
@@ -148,9 +258,38 @@ class SynologyOIDCBackend(OIDCAuthenticationBackend):
         Including ``is_staff``: taking somebody out of the admin group in DSM
         has to actually take their admin away, and the only moment this app
         hears about that change is the next login.
+
+        This is also where a link is *written*, because it is the method that
+        already writes. ``filter_users_by_claims`` decides which account a token
+        belongs to and does nothing else; a lookup that quietly attaches an
+        identity as a side effect of being asked a question is the kind of
+        thing that is discovered from a log file months later.
         """
+        self._remember_identity(user, claims)
         self._apply_claims(user, claims)
         return user
+
+    def _remember_identity(self, user, claims):
+        """Record which DSM identity this account answers to, once.
+
+        Three cases arrive here and only one of them is new. A brand-new
+        account gets its row alongside itself; an account created before
+        ``SSOIdentity`` existed gets the row it never had, which moves it off
+        the username fallback for good; and an account matched by e-mail gets
+        the link, which is the one worth a line in the log at a level somebody
+        will actually see.
+        """
+        sub = (claims.get("sub") or "").strip()
+        if not sub or getattr(user, "sso_identity", None) is not None:
+            return
+        linked = user.has_usable_password()
+        SSOIdentity.objects.create(user=user, subject=sub, matched_by_email=linked)
+        if linked:
+            log.warning(
+                "Linked OIDC sub=%s to the existing account %s by the e-mail address %s. "
+                "Both ways of signing in now reach it.",
+                sub, user.get_username(), user.email,
+            )
 
     def _apply_claims(self, user, claims):
         user.email = (claims.get("email") or "")[:254]

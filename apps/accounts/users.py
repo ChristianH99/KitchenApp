@@ -32,7 +32,8 @@ from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 
 from apps.accounts.forms import (
-    SetPasswordForm, UserCreateForm, UserEditForm, is_sso_account,
+    SetPasswordForm, UserCreateForm, UserEditForm, has_local_password,
+    is_sso_account, sso_subject,
 )
 from apps.accounts.permissions import staff_required
 
@@ -49,6 +50,10 @@ def user_list(request):
     """
     people = list(
         User.objects
+        # The identity row, so that `is_sso_account` below is free rather than
+        # a query per person — it reads the relation, and an uncached reverse
+        # one-to-one fetches.
+        .select_related("sso_identity")
         .annotate(recipe_count=Count("recipes", distinct=True),
                   cooked_count=Count("cook_logs", distinct=True))
         .order_by("-is_active", "first_name", "username")
@@ -57,6 +62,10 @@ def user_list(request):
         # A template cannot call has_usable_password() with an argument and a
         # property on the model would mean subclassing User for one boolean.
         person.is_sso = is_sso_account(person)
+        # No longer the opposite of the line above: an account that has been
+        # linked is both, and the page has to be able to say so.
+        person.has_password = has_local_password(person)
+        person.sso_subject = sso_subject(person)
 
     return render(request, "accounts/user_list.html", {
         "people": people,
@@ -99,21 +108,29 @@ def user_edit(request, pk):
         form = UserEditForm(instance=person, editor=request.user)
 
     return render(request, "accounts/user_form.html", {
-        "form": form, "person": person, "is_sso": is_sso_account(person),
+        "form": form, "person": person,
+        "is_sso": is_sso_account(person),
+        "has_password": has_local_password(person),
+        "sso_subject": sso_subject(person),
     })
 
 
 @staff_required
 def user_password(request, pk):
-    """Set a new password — for a local account only.
+    """Set a new password — for an account that has one.
 
     A Synology account has no usable password on purpose, and giving it one
     here would quietly create the second, unmanaged door into a DSM-managed
     identity that the whole SSO arrangement exists to avoid. So this is a 404
     for those, not a disabled button.
+
+    The test is "has a password", not "is not an SSO account", and since
+    linking those are no longer the same question: a linked account already has
+    a local password by definition, and refusing to *change* it would be a
+    household locked out of its own fallback the day the provider is down.
     """
     person = get_object_or_404(User, pk=pk)
-    if is_sso_account(person):
+    if not has_local_password(person):
         raise Http404
 
     if request.method == "POST":
@@ -136,6 +153,50 @@ def user_password(request, pk):
     return render(request, "accounts/user_password.html", {
         "form": form, "person": person,
     })
+
+
+@staff_required
+@require_POST
+def user_unlink_sso(request, pk):
+    """Detach the identity provider from an account.
+
+    The counterpart to the automatic link, and the reason the link is allowed
+    to be automatic at all. Everything else on these pages is somebody pressing
+    something; attaching a DSM identity to an existing account happens on its
+    own, by e-mail address, and an automatic action with no undo is not one
+    this app should be taking. See ``SynologyOIDCBackend._account_to_link``.
+
+    Refused for an account with no local password, and that is the same door
+    rule as the rest of this file: unlinking one would leave an account with no
+    way in at all. Those are unlinked by deleting them.
+
+    The next token carrying that ``sub`` gets an account of its own — or links
+    again, if the address still matches. Changing one of the two first is the
+    point of doing this at all.
+    """
+    person = get_object_or_404(User, pk=pk)
+    name = person.get_full_name() or person.get_username()
+
+    if not has_local_password(person):
+        messages.error(request, _(
+            "“%(name)s” has no password of their own, so single sign-on is the "
+            "only way in. Delete the account instead."
+        ) % {"name": name})
+        return redirect("accounts:user-list")
+
+    identity = getattr(person, "sso_identity", None)
+    if identity is None:
+        messages.error(request, _("“%(name)s” is not linked to the identity provider.") % {
+            "name": name,
+        })
+        return redirect("accounts:user-list")
+
+    identity.delete()
+    messages.success(request, _(
+        "“%(name)s” is no longer linked to the identity provider and signs in "
+        "with their password."
+    ) % {"name": name})
+    return redirect("accounts:user-edit", pk=person.pk)
 
 
 @staff_required

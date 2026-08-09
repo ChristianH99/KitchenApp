@@ -469,7 +469,30 @@ Each of these is here because breaking it produces a page that still renders.
   anywhere" has never been access control.
 - **Identity is the OIDC `sub`, never e-mail.** DSM lets two accounts share an
   address and an address can be reassigned; matching on it signs somebody in as
-  somebody else.
+  somebody else. The `sub` lives in `accounts.SSOIdentity`, not in `username` —
+  a person with both ways in has a username they chose.
+- **There is exactly one exception to that, and it is hedged about.** A token
+  whose address matches an existing account is *linked* to it rather than given
+  an account of its own, so one person is one account with two doors.
+  `SynologyOIDCBackend._account_to_link` asks the identity questions first and
+  only then this one, and it needs four things at once: an address the provider
+  does not mark unverified, **exactly one** active account holding it, that
+  account having a local password (an account without one is another *provider*
+  identity sharing an address — a different person), and no identity attached to
+  it already. Anything else and the login carries on into an account of its own,
+  which is visible and undoable rather than silent and wrong. The residual risk
+  is real and stated here rather than argued away: whoever can set an address at
+  the provider can reach the local account that holds it. That is why the link
+  is logged at WARNING and why "Unlink" exists on the account page — an
+  automatic action with no undo is not one this app should take.
+- **"SSO account" and "local account" stopped being opposites.** `is_sso_account`
+  means "the provider can sign this in" (no usable password, *or* a linked
+  identity); `has_local_password` means the form can. A linked account is both,
+  which is why the password page gates on the second — refusing to change the
+  password of an account that has one would take away the fallback that exists
+  for the day the provider is down. `OIDCSessionRefresh` keys off the
+  *session's* token for the same reason: asking the account would bounce
+  somebody who signed in locally to the SSO server they are working around.
 - **The OIDC group check fails closed.** With `OIDC_ALLOWED_GROUPS` set and the
   group claim absent — which real DSM versions do — the login is refused rather
   than waved through.
@@ -555,7 +578,9 @@ recognises them as decided rather than missed.
 - **The People page only knows the DSM accounts that have signed in.** This app
   has no directory to read: a Synology identity exists here from the moment its
   first token arrives and not a second earlier. The page says so rather than
-  leaving somebody to wonder where their sister is.
+  leaving somebody to wonder where their sister is. A DSM account whose address
+  matches somebody already on the page does not appear as a second row — it is
+  linked to the first, and that row grows a second pill.
 - **The diagram editor is the diagram, and that reverses an earlier decision.**
   It used to be a list of rows with a "feeds into" select on each, previewed as
   nested boxes rather than as the table — deliberately, because the geometry

@@ -32,8 +32,45 @@ from apps.accounts.models import Preferences, SSOConfiguration, SignAlgorithm
 
 
 def is_sso_account(user):
-    """Whether this row is the local end of a Synology identity."""
-    return not user.has_usable_password()
+    """Whether this row can be signed into through the identity provider.
+
+    Two ways it can be. A row created *by* a token has no usable password by
+    construction, which is the original test and still the whole answer for an
+    account that only ever signs in that way. A row that also has a local
+    password is one the two have been **linked** on — same person, both doors —
+    and it is a provider account too, so the same rules about who owns the name
+    and the e-mail apply to it.
+
+    ``getattr`` rather than a query per call: apps/accounts/users.py fetches the
+    People page with ``select_related("sso_identity")``, and a reverse
+    one-to-one that is not there raises an ``AttributeError`` subclass — which
+    is what makes the default work.
+    """
+    return not user.has_usable_password() or getattr(user, "sso_identity", None) is not None
+
+
+def has_local_password(user):
+    """Whether this account can also be signed into with the local form.
+
+    The other half of ``is_sso_account``, and the two are no longer opposites:
+    a linked account is both. This is the one that decides whether a password
+    page is offered — giving one to an account that has none would open the
+    second, unmanaged door into a DSM-managed identity that SSO exists to
+    close, and that argument does not apply to somebody who already has one.
+    """
+    return user.has_usable_password()
+
+
+def sso_subject(user):
+    """The provider's ``sub`` for this account, or "" if it has none.
+
+    Reads the identity row when there is one and falls back to the username,
+    which *is* the ``sub`` on every account created before those rows existed.
+    """
+    identity = getattr(user, "sso_identity", None)
+    if identity is not None:
+        return identity.subject
+    return "" if user.has_usable_password() else user.get_username()
 
 
 class _PasswordPair(forms.Form):

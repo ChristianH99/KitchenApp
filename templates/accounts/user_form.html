@@ -8,7 +8,13 @@
 
   <h1>{% if person %}{% firstof person.get_full_name person.get_username %}{% else %}{% translate "New account" %}{% endif %}</h1>
 
-  {% if is_sso %}
+  {% comment %}Three states, not two. An account can sign in with a password, or
+  through the provider, or — since the two are linked by a shared e-mail address
+  — both. Only the last one needs explaining, because it is the one nobody asked
+  for by pressing anything.{% endcomment %}
+  {% if is_sso and has_password %}
+    <p class="notice">{% translate "This account signs in both ways: with its own password, and through SSO. The two were linked because they share an e-mail address. Its name and e-mail address come from the identity provider and are refreshed at every sign-in, so they cannot be changed here." %}</p>
+  {% elif is_sso %}
     <p class="notice">{% translate "This account signs in through SSO. Its name and e-mail address come from the identity provider and are refreshed at every sign-in, so they cannot be changed here. What this page can change is whether they may sign in at all, and what they may do once they are in." %}</p>
   {% endif %}
 
@@ -93,9 +99,28 @@
     <div class="form-actions">
       <button type="submit" class="button">{% if person %}{% translate "Save changes" %}{% else %}{% translate "Create the account" %}{% endif %}</button>
       <a class="link-button" href="{% url 'accounts:user-list' %}">{% translate "Cancel" %}</a>
-      {% if person and not is_sso %}
+      {% comment %}Offered whenever there is a password to change — which now
+      includes a linked account, whose local password is the way in on the day
+      the provider is down.{% endcomment %}
+      {% if person and has_password %}
         <a class="link-button" href="{% url 'accounts:user-password' person.pk %}">{% translate "Set a new password" %}</a>
       {% endif %}
     </div>
   </form>
+
+  {% comment %}Outside the form above, because it is a POST of its own — and
+  the counterpart to the one thing on these pages that happens without anybody
+  pressing anything. Only for a linked account: an account that signs in
+  through the provider alone would be left with no way in.{% endcomment %}
+  {% if person and is_sso and has_password %}
+    <form method="post" action="{% url 'accounts:user-unlink' person.pk %}"
+          class="form-actions"
+          data-confirm-title="{% translate 'Unlink this account from SSO?' %}"
+          data-confirm="{% translate 'They will sign in with their password only. Their recipes and everything else stay with the account. Signing in through the provider afterwards creates a separate account — unless the e-mail addresses still match, which links them again.' %}"
+          data-confirm-accept="{% translate 'Unlink' %}">
+      {% csrf_token %}
+      <span class="help">{% blocktranslate with subject=sso_subject %}Linked to the provider identity {{ subject }}.{% endblocktranslate %}</span>
+      <button type="submit" class="link-button">{% translate "Unlink" %}</button>
+    </form>
+  {% endif %}
 {% endblock %}

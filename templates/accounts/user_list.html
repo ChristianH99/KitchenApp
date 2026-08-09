@@ -41,17 +41,22 @@
               — an opaque string, never an e-mail (apps/accounts/oidc.py). Shown
               small and only when it is not already the name above it, because
               it is an identifier rather than something to read.{% endcomment %}
-              {% if person.is_sso %}
-                <span class="people-sub" title="{% translate 'Identity from the provider' %}">{{ person.get_username|truncatechars:22 }}</span>
-              {% elif person.get_full_name %}
+              {% if person.get_full_name and person.get_username != person.sso_subject %}
                 <span class="people-sub">{{ person.get_username }}</span>
+              {% endif %}
+              {% if person.sso_subject %}
+                <span class="people-sub" title="{% translate 'Identity from the provider' %}">{{ person.sso_subject|truncatechars:22 }}</span>
               {% endif %}
               {% if person.email %}<span class="people-sub">{{ person.email }}</span>{% endif %}
             </th>
             <td>
+              {% comment %}Not either/or since the two can be linked: an account
+              that shares an e-mail address with a provider identity signs in
+              both ways and shows both pills.{% endcomment %}
               {% if person.is_sso %}
                 <span class="pill pill--herb">{% translate "SSO" %}</span>
-              {% else %}
+              {% endif %}
+              {% if person.has_password %}
                 <span class="pill">{% translate "Password" %}</span>
               {% endif %}
             </td>
@@ -71,7 +76,7 @@
             <td class="people-actions">
               <div class="people-actions-group">
               <a class="link-button" href="{% url 'accounts:user-edit' person.pk %}">{% translate "Edit" %}</a>
-              {% if not person.is_sso %}
+              {% if person.has_password %}
                 <a class="link-button" href="{% url 'accounts:user-password' person.pk %}">{% translate "Password" %}</a>
               {% endif %}
               {% if person.pk != user.pk %}

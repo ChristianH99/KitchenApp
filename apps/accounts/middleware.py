@@ -99,9 +99,12 @@ class OIDCSessionRefresh(SessionRefresh):
         # a local-password session would cost a configuration lookup to answer a
         # question the session cookie had already settled.
         #
-        # The session's own token, not the user's — an SSO account signing in
-        # through the local form (which cannot happen: those accounts have no
-        # usable password) would still not have a provider session to renew.
+        # The session's own token, not the user's, and that distinction stopped
+        # being theoretical the day the two kinds of account could be linked: a
+        # person with both signs in through the local form on the morning the
+        # provider is down, and has no provider session to renew. Asking the
+        # *account* whether it is an SSO account would bounce them straight to
+        # the SSO server they are working around.
         if not request.session.get("oidc_id_token"):
             return False
         if not sso.is_enabled():

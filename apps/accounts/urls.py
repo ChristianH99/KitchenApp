@@ -29,6 +29,7 @@ urlpatterns = [
     path("users/<int:pk>/password/", users.user_password, name="user-password"),
     path("users/<int:pk>/delete/", users.user_delete, name="user-delete"),
     path("users/<int:pk>/active/", users.user_toggle_active, name="user-active"),
+    path("users/<int:pk>/unlink/", users.user_unlink_sso, name="user-unlink"),
 
     # The Synology connection. Superuser only — a narrower door than the pages
     # above, because this one decides how everybody authenticates and holds the

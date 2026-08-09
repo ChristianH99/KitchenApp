@@ -16,7 +16,7 @@ from django.core.exceptions import SuspiciousOperation
 from django.urls import reverse
 
 from apps.accounts import sso, throttle
-from apps.accounts.models import SSOConfiguration
+from apps.accounts.models import SSOConfiguration, SSOIdentity
 from apps.accounts.oidc import SynologyOIDCBackend, _claim_groups, _display_name
 
 
@@ -60,8 +60,13 @@ def configured_sso(**overrides):
 
 class TestIdentity:
     def test_a_user_is_matched_by_sub_not_by_email(self, db):
-        """DSM lets two accounts share an address, and an address can be
-        reassigned. Matching on it signs somebody in as somebody else."""
+        """The identity is the `sub`, and it wins wherever the two disagree.
+
+        The second half is the one that stays true now that an address *can*
+        link an account: the row here has no usable password, so it is another
+        provider identity that happens to share an address — a different DSM
+        account, not the same person — and a second `sub` must not land on it.
+        """
         existing = User.objects.create_user(username="sub-123", email="anna@example.org")
         backend = SynologyOIDCBackend()
         found = backend.filter_users_by_claims({"sub": "sub-123", "email": "other@example.org"})
@@ -94,6 +99,219 @@ class TestIdentity:
         a new account."""
         with pytest.raises(SuspiciousOperation):
             SynologyOIDCBackend().verify_claims({"email": "a@example.org"})
+
+
+class TestLinkingTheTwoKindsOfAccount:
+    """One person, one account, both ways in.
+
+    The rule under test is `_account_to_link`: a token whose address matches
+    exactly one local account is attached to it instead of being given an
+    account of its own. Everything else here is a case where that must *not*
+    happen, because an e-mail address is a claim the provider asserts and the
+    damage from getting it wrong is signing somebody in as somebody else.
+    """
+
+    def _sign_in(self, claims):
+        """What the library does: find the row, then update or create it."""
+        backend = SynologyOIDCBackend()
+        found = backend.filter_users_by_claims(claims)
+        if found.count() == 1:
+            return backend.update_user(found.first(), claims)
+        assert not found.exists()
+        return backend.create_user(claims)
+
+    def test_a_shared_address_attaches_the_token_to_the_local_account(self, db):
+        anna = User.objects.create_user(
+            username="anna", password="pw", email="anna@example.org",
+        )
+        signed_in = self._sign_in({"sub": "sub-1", "email": "anna@example.org"})
+        assert signed_in == anna
+        assert User.objects.count() == 1
+        assert anna.sso_identity.subject == "sub-1"
+        assert anna.sso_identity.matched_by_email is True
+
+    def test_both_ways_in_keep_working(self, db):
+        """The whole point. The local password is untouched, and the provider
+        finds the same row again — by `sub` this time, so it holds even after
+        the address changes."""
+        from django.contrib.auth import authenticate
+
+        anna = User.objects.create_user(
+            username="anna", password="pw", email="anna@example.org",
+        )
+        self._sign_in({"sub": "sub-1", "email": "anna@example.org"})
+        anna.refresh_from_db()
+        assert anna.has_usable_password()
+        assert authenticate(username="anna", password="pw") == anna
+
+        again = self._sign_in({"sub": "sub-1", "email": "moved@example.org"})
+        assert again == anna
+        assert User.objects.count() == 1
+
+    def test_the_address_is_matched_whatever_its_case(self, db):
+        anna = User.objects.create_user(
+            username="anna", password="pw", email="Anna@Example.org",
+        )
+        assert self._sign_in({"sub": "sub-1", "email": "anna@example.org"}) == anna
+
+    def test_two_accounts_sharing_an_address_link_neither(self, db):
+        """The ambiguous case, and there is no tie-break worth inventing: the
+        login carries on into an account of its own, which is visible and
+        undoable rather than silent and wrong."""
+        User.objects.create_user(username="anna", password="pw", email="haus@example.org")
+        User.objects.create_user(username="bernd", password="pw", email="haus@example.org")
+        signed_in = self._sign_in({"sub": "sub-1", "email": "haus@example.org"})
+        assert signed_in.username == "sub-1"
+        assert not signed_in.has_usable_password()
+        assert User.objects.count() == 3
+
+    def test_an_account_that_has_left_is_not_linked(self, db):
+        """Switching somebody off is how a household says "not any more", and a
+        token must not be able to switch them back on by arriving."""
+        gone = User.objects.create_user(
+            username="gone", password="pw", email="gone@example.org", is_active=False,
+        )
+        signed_in = self._sign_in({"sub": "sub-1", "email": "gone@example.org"})
+        assert signed_in != gone
+        assert signed_in.username == "sub-1"
+
+    def test_a_provider_account_is_not_linked_to_another_one(self, db):
+        """Two DSM accounts sharing an address are two people, not one. The
+        row here has no local password, so it is the *other* identity's."""
+        first = self._sign_in({"sub": "sub-1", "email": "haus@example.org"})
+        second = self._sign_in({"sub": "sub-2", "email": "haus@example.org"})
+        assert first != second
+        assert SSOIdentity.objects.count() == 2
+
+    def test_a_second_subject_does_not_take_an_already_linked_account(self, db):
+        """One account, one identity — the constraint that makes "which one is
+        this?" a question nobody has to answer."""
+        anna = User.objects.create_user(
+            username="anna", password="pw", email="anna@example.org",
+        )
+        self._sign_in({"sub": "sub-1", "email": "anna@example.org"})
+        second = self._sign_in({"sub": "sub-2", "email": "anna@example.org"})
+        assert second != anna
+        anna.refresh_from_db()
+        assert anna.sso_identity.subject == "sub-1"
+
+    def test_an_address_the_provider_marks_unverified_is_not_used(self, db):
+        anna = User.objects.create_user(
+            username="anna", password="pw", email="anna@example.org",
+        )
+        signed_in = self._sign_in({
+            "sub": "sub-1", "email": "anna@example.org", "email_verified": False,
+        })
+        assert signed_in != anna
+
+    def test_a_token_with_no_verified_claim_at_all_still_links(self, db):
+        """DSM builds that send nothing but `sub` and `email` are the ones this
+        was written for. Requiring the claim would mean it never happens."""
+        anna = User.objects.create_user(
+            username="anna", password="pw", email="anna@example.org",
+        )
+        assert self._sign_in({"sub": "sub-1", "email": "anna@example.org"}) == anna
+
+    def test_a_token_with_no_address_creates_its_own_account(self, db):
+        User.objects.create_user(username="anna", password="pw", email="anna@example.org")
+        signed_in = self._sign_in({"sub": "sub-1"})
+        assert signed_in.username == "sub-1"
+        assert User.objects.count() == 2
+
+    def test_an_account_from_before_identity_rows_still_signs_in(self, db):
+        """Every SSO account this app created used to be a row named by its
+        `sub` and nothing else. It is found by that name and gains the row it
+        never had, which moves it off the fallback for good."""
+        old = User.objects.create_user(username="sub-1", email="c@example.org")
+        old.set_unusable_password()
+        old.save()
+
+        assert self._sign_in({"sub": "sub-1", "email": "c@example.org"}) == old
+        old.refresh_from_db()
+        assert old.sso_identity.subject == "sub-1"
+        assert old.sso_identity.matched_by_email is False
+        assert User.objects.count() == 1
+
+    def test_the_provider_owns_the_name_of_a_linked_account(self, db):
+        """It is a provider account now, and DSM re-applies these at every
+        sign-in — so the form must not offer boxes whose contents vanish."""
+        from apps.accounts.forms import UserEditForm, has_local_password, is_sso_account
+
+        anna = User.objects.create_user(
+            username="anna", password="pw", email="anna@example.org", first_name="Anna",
+        )
+        self._sign_in({"sub": "sub-1", "email": "anna@example.org", "given_name": "Anna"})
+        anna.refresh_from_db()
+
+        assert is_sso_account(anna)
+        assert has_local_password(anna)
+        form = UserEditForm(instance=anna, editor=anna)
+        assert form.fields["first_name"].disabled
+
+    def test_a_linked_account_may_still_be_given_a_new_password(self, boss, db):
+        """The local password is what gets the household in on the day the
+        provider is down. Refusing to change it would take that away."""
+        session, _ = boss
+        anna = User.objects.create_user(
+            username="anna", password="pw", email="anna@example.org",
+        )
+        self._sign_in({"sub": "sub-1", "email": "anna@example.org"})
+        assert session.get(reverse("accounts:user-password", args=[anna.pk])).status_code == 200
+
+    def test_an_account_with_only_a_provider_identity_is_offered_none(self, boss, db):
+        session, _ = boss
+        only_sso = self._sign_in({"sub": "sub-1", "email": "c@example.org"})
+        assert session.get(
+            reverse("accounts:user-password", args=[only_sso.pk])).status_code == 404
+
+
+class TestUnlinking:
+    """The undo for the one thing on these pages that happens on its own."""
+
+    def _linked(self):
+        # Not "anna": the shared `user` fixture is already called that, and two
+        # of these tests want both in one database.
+        person = User.objects.create_user(
+            username="bea", password="pw", email="bea@example.org",
+        )
+        SSOIdentity.objects.create(user=person, subject="sub-1", matched_by_email=True)
+        return person
+
+    def test_it_leaves_the_account_and_takes_the_identity(self, boss, db):
+        session, _ = boss
+        anna = self._linked()
+        session.post(reverse("accounts:user-unlink", args=[anna.pk]))
+        anna.refresh_from_db()
+        assert User.objects.filter(pk=anna.pk).exists()
+        assert not SSOIdentity.objects.filter(user=anna).exists()
+        assert anna.has_usable_password()
+
+    def test_the_next_token_no_longer_finds_it_by_subject(self, boss, db):
+        """It may well link again — the addresses still match, which is the
+        whole reason to change one of them before doing this."""
+        session, _ = boss
+        anna = self._linked()
+        session.post(reverse("accounts:user-unlink", args=[anna.pk]))
+        found = SynologyOIDCBackend().filter_users_by_claims(
+            {"sub": "sub-1", "email": "somewhere-else@example.org"})
+        assert not found.exists()
+
+    def test_an_account_with_no_password_cannot_be_unlinked(self, boss, db):
+        """It would be left with no way in at all. Those are deleted instead."""
+        session, _ = boss
+        only_sso = SynologyOIDCBackend().create_user({"sub": "sub-1", "email": "c@example.org"})
+        session.post(reverse("accounts:user-unlink", args=[only_sso.pk]))
+        assert SSOIdentity.objects.filter(user=only_sso).exists()
+
+    def test_it_needs_a_post(self, boss, db):
+        session, _ = boss
+        anna = self._linked()
+        assert session.get(reverse("accounts:user-unlink", args=[anna.pk])).status_code == 405
+
+    def test_an_ordinary_account_cannot_do_it(self, client, user, db):
+        anna = self._linked()
+        assert client.post(reverse("accounts:user-unlink", args=[anna.pk])).status_code in (403, 404)
+        assert SSOIdentity.objects.filter(user=anna).exists()
 
 
 class TestDisplayName:
