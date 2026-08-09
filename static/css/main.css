@@ -1489,7 +1489,14 @@ body.modal-open { overflow: hidden; }
 .diagram-cell--ingredient.is-optional .diagram-name { font-weight: 500; color: var(--text-mid); }
 
 .diagram-cell--step {
-  text-align: center;
+  /* Left, like every other instruction in the app — and like the *same* step
+     one line further down. A step is one or more things to do; the several-part
+     version is a list, and a list cannot be centred, so `.diagram-step-parts`
+     set itself back to the left. The result was a diagram whose boxes were
+     centred or ranged left depending on how many actions somebody had written
+     into them, changing as they typed a second one. The cooking view has always
+     read left, and this is the same sentence in a smaller box. */
+  text-align: left;
   background: var(--herb-bg);
   color: var(--herb);
   font-family: 'Manrope', sans-serif;
