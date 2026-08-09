@@ -322,19 +322,55 @@ list exists so it is re-opened knowingly.
 
 ## 5. Worth doing next, roughly in order
 
-1. **Update the NAS to the next release, and take a copy of `/data` first.**
-   v0.2.0 is running on the DS723+ (§1), so this is no longer an install — it
-   is the **first update of a running container this app has ever had**, and
-   the first one carrying a migration that *changes data* rather than only
-   adding a column. `recipes/0007_recipe_owner` fills `owner` from
-   `created_by`, and the failure is silent: nothing crashes, and every existing
-   recipe becomes editable by staff alone. DEPLOYMENT.md §7 now opens with the
-   copy; take it.
+1. **Update the NAS to 0.2.2, and take a copy of `/data` first.** This is the
+   first update carrying a migration that *changes data* rather than only
+   adding a column: `recipes/0007_recipe_owner` fills `owner` from
+   `created_by`, and the failure is silent — nothing crashes, and every
+   existing recipe becomes editable by staff alone. DEPLOYMENT.md §7 opens with
+   the copy; take it.
+
+   **Keep the existing compose file and edit only its version line.** It has
+   `user: "1026:101"` written into it by hand and that is a working
+   configuration; the point of §4.1's `.env` variables is that a *replaced*
+   file no longer loses the setting, and a file you are not replacing has
+   nothing to gain from them today. So: do **not** add `KITCHEN_UID` /
+   `KITCHEN_GID` as part of this update, and do not drop in the
+   `docker-compose.yml` attached to the release. One change at a time, and the
+   one that matters here is the migration.
 
    Then confirm the version in the sidebar actually changed, and that the
    household's own recipes still offer Edit to the household.
 
-2. **Finish the rest of the NAS.** Everything up to the container is known good
+2. **Then, separately, move to the `.env` variables and prove they work.**
+   Deferred deliberately on 2026-08-09 — 0.2.2 went onto the NAS with the old
+   hand-edited file, so the interpolation shipped in that release has still
+   never run anywhere. It is the whole of §4.1's new advice, and it is
+   currently advice nobody has followed.
+
+   It is a five-minute job and it does not need an update to hang off:
+
+   ```
+   cd /volume1/docker/kitchen
+   printf 'KITCHEN_UID=1026\nKITCHEN_GID=101\n' >> .env
+   # replace the hand-edited line with:
+   #     user: "${KITCHEN_UID:-1000}:${KITCHEN_GID:-1000}"
+   sudo docker compose config | grep user:    # must say 1026:101
+   sudo docker compose up -d
+   ```
+
+   That `config` line is the whole test — it renders the file the way Compose
+   will read it, before anything starts. If it says `1000:1000` the variables
+   are not reaching the interpolation (they are read from the `.env` beside the
+   compose file, which is *not* the same mechanism as `env_file:`), and
+   starting would be the crash loop of §4.1. The safe way to try it is to
+   confirm that line first and only then `up -d`; the way back is the old
+   hardcoded line.
+
+   Until this is done, a release's `docker-compose.yml` must still not be
+   dropped in wholesale — which is the exact hazard the change exists to
+   remove, so leaving it half-adopted is the worst of the three states.
+
+3. **Finish the rest of the NAS.** Everything up to the container is known good
    (§1) and nothing past it is. DEPLOYMENT.md §1–§5 in order: the reverse-proxy
    rule with its two custom headers (§2 — this is the step that breaks the
    login), the SSO client read off the real discovery document rather than
@@ -344,37 +380,37 @@ list exists so it is re-opened knowingly.
 
    Correct DEPLOYMENT.md as you go, in the file rather than in your terminal
    history, and move what you observed into §1 here.
-3. **Complete one OIDC round trip against the real SSO server**, then correct
+4. **Complete one OIDC round trip against the real SSO server**, then correct
    the endpoint defaults in `settings.py` and DEPLOYMENT.md §3.1 to what was
    actually found. Note the DSM version in the commit message — the next person
    to hit a moved endpoint will want to know which version this was true for.
-4. **Look at it on a real phone**, and at the cooking view in particular — that
+5. **Look at it on a real phone**, and at the cooking view in particular — that
    is the page whose whole point is being used on one. See the caveat under §1:
    the responsive work was measured rather than seen.
-5. **Favourites.** Small, obviously wanted, and it exercises the first
+6. **Favourites.** Small, obviously wanted, and it exercises the first
    per-user relation in the app.
-6. **A shopping list across *several* recipes.** Half of this exists:
+7. **A shopping list across *several* recipes.** Half of this exists:
    `apps/pantry/matching.shopping_list` already takes a list of
    `(recipe, verdict)` pairs, adds the same substance up across them and rounds
    the total to whole packets. What is missing is the page — somewhere to choose
    four recipes for the week and get one list out. The unit question that used
    to be listed here is settled: units are a closed set now
    (`apps/pantry/units.py`).
-7. **Pagination on the recipe list, and on the cooking history.** The list
+8. **Pagination on the recipe list, and on the cooking history.** The list
    renders every recipe; the recipe page renders the last ten cookings and says
    how many more there are. Fine at a hundred with lazy-loaded images; not fine
    at a thousand. The query-cost tests will *not* catch this — they pin the
    query count, which stays flat while the payload grows.
-8. **A print stylesheet for the recipe page.** People print recipes, and the
+9. **A print stylesheet for the recipe page.** People print recipes, and the
    diagram is the part that will come out wrong: it lives in a horizontally
    scrolling box that a printer cannot scroll.
-9. **Turn the cooking history into an answer rather than a list.** The page
+10. **Turn the cooking history into an answer rather than a list.** The page
    exists (`/cooked/`) and entries can be corrected after the fact, which was
    the thing that was actually missing. What it still does not do is *add up*:
    "what did we eat this month", and whether "serves four" is ever true in this
    house. Every number for it is recorded; only the recipe page's own median
    reads any of it.
-10. **Tidy the catalogue once it has been used for a while.** It grows by itself
+11. **Tidy the catalogue once it has been used for a while.** It grows by itself
    from every recipe saved, which is what makes it useful and what will leave
    "Kartoffeln" beside "festkochende Kartoffeln". Merging is a manual job in the
    admin today; if it turns out to be a monthly chore, it wants a button on the
