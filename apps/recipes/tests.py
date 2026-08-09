@@ -180,6 +180,161 @@ class TestWhoMayEdit:
         assert Recipe.objects.filter(pk=recipe.pk).exists()
 
 
+class TestHandingARecipeOver:
+    """Ownership moves, and it moves *away* from whoever gave it.
+
+    The rule under test is that ``_may_edit`` reads exactly one column. A
+    version that accepted either ``owner`` or ``created_by`` would pass every
+    "the new person can edit it" check and quietly turn a transfer into a
+    share — with nothing on the page to see, because the old owner would simply
+    still be offered Edit.
+    """
+
+    def _client_for(self, person):
+        from django.test import Client
+
+        c = Client()
+        c.force_login(person)
+        return c
+
+    def test_a_new_recipe_is_looked_after_by_whoever_typed_it_in(self, user, db):
+        """Filled by Recipe.save, so every way of making one produces a recipe
+        its author can edit — not only the path through the view."""
+        assert Recipe.objects.create(title="Griesbrei", created_by=user).owner == user
+
+    def test_the_owner_can_hand_it_over(self, client, recipe, other_user):
+        response = client.post(
+            reverse("recipes:transfer", args=[recipe.slug]),
+            {"owner": str(other_user.pk)}, follow=True,
+        )
+        assert response.status_code == 200
+        recipe.refresh_from_db()
+        assert recipe.owner == other_user
+
+    def test_the_new_owner_may_edit_it(self, client, recipe, other_user):
+        client.post(reverse("recipes:transfer", args=[recipe.slug]),
+                    {"owner": str(other_user.pk)})
+        theirs = self._client_for(other_user)
+        assert theirs.get(reverse("recipes:edit", args=[recipe.slug])).status_code == 200
+
+    def test_the_old_owner_may_not(self, client, recipe, other_user):
+        """The half that makes it a transfer rather than a share."""
+        client.post(reverse("recipes:transfer", args=[recipe.slug]),
+                    {"owner": str(other_user.pk)})
+        assert client.get(reverse("recipes:edit", args=[recipe.slug])).status_code == 404
+        assert client.post(reverse("recipes:delete", args=[recipe.slug])).status_code == 404
+        assert Recipe.objects.filter(pk=recipe.pk).exists()
+
+    def test_who_typed_it_in_is_not_rewritten(self, client, user, recipe, other_user):
+        """Two facts, two columns. The recipe page says "added by" over
+        ``created_by``, and handing the recipe on does not make somebody the
+        author of it."""
+        client.post(reverse("recipes:transfer", args=[recipe.slug]),
+                    {"owner": str(other_user.pk)})
+        recipe.refresh_from_db()
+        assert recipe.created_by == user
+
+    def test_staff_may_still_edit_it_afterwards(self, client, recipe, other_user, staff):
+        client.post(reverse("recipes:transfer", args=[recipe.slug]),
+                    {"owner": str(other_user.pk)})
+        theirs = self._client_for(staff)
+        assert theirs.get(reverse("recipes:edit", args=[recipe.slug])).status_code == 200
+
+    def test_staff_may_hand_over_a_recipe_that_is_not_theirs(self, recipe, other_user, staff):
+        """The case the People page cannot answer: a recipe left behind by
+        somebody who has gone."""
+        theirs = self._client_for(staff)
+        theirs.post(reverse("recipes:transfer", args=[recipe.slug]),
+                    {"owner": str(other_user.pk)})
+        recipe.refresh_from_db()
+        assert recipe.owner == other_user
+
+    def test_somebody_else_cannot_take_it(self, recipe, other_user):
+        theirs = self._client_for(other_user)
+        assert theirs.post(reverse("recipes:transfer", args=[recipe.slug]),
+                           {"owner": str(other_user.pk)}).status_code == 404
+        recipe.refresh_from_db()
+        assert recipe.owner != other_user
+
+    def test_it_needs_a_post(self, client, recipe):
+        assert client.get(reverse("recipes:transfer", args=[recipe.slug])).status_code == 405
+
+    def test_it_cannot_be_given_to_nobody(self, client, user, recipe):
+        """"Nobody" is a value the column takes — it is what deleting an
+        account leaves behind — but choosing it here would be a member of the
+        household putting a recipe beyond everybody who is not staff."""
+        client.post(reverse("recipes:transfer", args=[recipe.slug]), {"owner": ""})
+        recipe.refresh_from_db()
+        assert recipe.owner == user
+
+    def test_it_cannot_be_given_to_somebody_who_has_left(self, client, recipe, other_user):
+        """Handing a recipe to a switched-off account is a way of losing it."""
+        other_user.is_active = False
+        other_user.save(update_fields=["is_active"])
+        client.post(reverse("recipes:transfer", args=[recipe.slug]),
+                    {"owner": str(other_user.pk)})
+        recipe.refresh_from_db()
+        assert recipe.owner != other_user
+
+    def test_an_sso_account_can_be_given_one(self, client, recipe, db):
+        """A Synology identity is an ordinary row here, and a household that
+        signs in over SSO would otherwise have nobody to hand anything to. Its
+        username is the provider's opaque `sub`, which is why the dropdown is
+        labelled by name."""
+        from django.contrib.auth.models import User
+
+        from apps.recipes.forms import person_label
+
+        sso = User.objects.create_user(
+            username="1a2b3c-sub", first_name="Clara", email="clara@example.org",
+        )
+        sso.set_unusable_password()
+        sso.save()
+
+        client.post(reverse("recipes:transfer", args=[recipe.slug]),
+                    {"owner": str(sso.pk)})
+        recipe.refresh_from_db()
+        assert recipe.owner == sso
+        assert person_label(sso) == "Clara"
+        assert self._client_for(sso).get(
+            reverse("recipes:edit", args=[recipe.slug])
+        ).status_code == 200
+
+    def test_the_control_is_only_offered_to_somebody_who_may_edit(
+        self, client, recipe, other_user,
+    ):
+        url = reverse("recipes:detail", args=[recipe.slug])
+        mine = client.get(url).content.decode()
+        theirs = self._client_for(other_user).get(url).content.decode()
+        transfer = reverse("recipes:transfer", args=[recipe.slug])
+        assert transfer in mine
+        assert transfer not in theirs
+
+    def test_a_recipe_nobody_looks_after_answers_to_staff_alone(
+        self, user, recipe, other_user, staff,
+    ):
+        """What deleting an account leaves behind. Staff can then hand it on;
+        the alternative — guessing an heir — is how a recipe ends up belonging
+        to somebody who never asked for it."""
+        Recipe.objects.filter(pk=recipe.pk).update(owner=None)
+        assert self._client_for(user).get(
+            reverse("recipes:edit", args=[recipe.slug])).status_code == 404
+        assert self._client_for(other_user).get(
+            reverse("recipes:edit", args=[recipe.slug])).status_code == 404
+        assert self._client_for(staff).get(
+            reverse("recipes:edit", args=[recipe.slug])).status_code == 200
+
+    def test_an_unrelated_save_does_not_hand_it_back(self, user, recipe, staff):
+        """Recipe.save fills the owner on *insert* only. Re-deriving it from
+        ``created_by`` on every save would give the rights back to whoever gave
+        them away, in the middle of an edit about something else."""
+        Recipe.objects.filter(pk=recipe.pk).update(owner=None)
+        fresh = Recipe.objects.get(pk=recipe.pk)
+        fresh.title = "Kartoffelsalat, neu"
+        fresh.save()
+        assert Recipe.objects.get(pk=recipe.pk).owner is None
+
+
 # --------------------------------------------------------------------------
 # The form, and the formset
 # --------------------------------------------------------------------------

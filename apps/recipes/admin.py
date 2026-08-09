@@ -19,8 +19,12 @@ class RecipeIngredientInline(admin.TabularInline):
 
 @admin.register(Recipe)
 class RecipeAdmin(admin.ModelAdmin):
-    list_display = ("title", "servings", "total_minutes", "created_by", "updated_at")
-    list_filter = ("tags", "created_by")
+    # `owner` beside `created_by` because they answer different questions and
+    # only one of them decides who may edit — this is the surface for the case
+    # the app's own "Hand over" cannot reach: a recipe whose owner's account is
+    # gone, which nobody outside staff can take back on their own.
+    list_display = ("title", "servings", "total_minutes", "created_by", "owner", "updated_at")
+    list_filter = ("tags", "created_by", "owner")
     search_fields = ("title", "description", "instructions", "ingredients__name")
     filter_horizontal = ("tags",)
     inlines = [RecipeIngredientInline]

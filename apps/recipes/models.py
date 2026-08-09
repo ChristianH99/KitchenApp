@@ -22,6 +22,14 @@ combines with what, the prose says how, and neither replaces the other.
 The other decision: a recipe is a household object, not a personal one.
 ``created_by`` records who typed it in, and anyone signed in may cook from it;
 who may *edit* it is apps/recipes/views.py's business, not the model's.
+
+``owner`` is the second half of that, and it is a **separate column on
+purpose**. Who typed a recipe in is history and never moves; who looks after it
+is a job, and a job can be handed on — somebody leaves the household, or a
+recipe was typed in by whoever had the laptop open and belongs to whoever
+actually cooks it. Writing the new person into ``created_by`` would answer the
+second question by falsifying the answer to the first, and the recipe page would
+then say "added by" over a name that never added anything.
 """
 
 from decimal import Decimal
@@ -103,6 +111,19 @@ class Recipe(models.Model):
         settings.AUTH_USER_MODEL, verbose_name=_("added by"),
         null=True, blank=True, on_delete=models.SET_NULL, related_name="recipes",
     )
+    # Who looks after it now — and, through views._may_edit, who may change it.
+    # It starts as whoever typed the recipe in (see save() below) and moves only
+    # when somebody hands it over.
+    #
+    # SET_NULL for the same reason as above, and it means something slightly
+    # different here: when the owner's account is deleted the recipe survives
+    # with nobody looking after it, which leaves it editable by staff alone
+    # until somebody takes it on. That is the safe direction — the alternative
+    # is guessing an heir.
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name=_("looked after by"),
+        null=True, blank=True, on_delete=models.SET_NULL, related_name="owned_recipes",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -121,6 +142,18 @@ class Recipe(models.Model):
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = _unique_slug(Recipe, self.title, self.pk)
+        # A recipe is looked after by whoever typed it in, until it is handed
+        # on. Filled here rather than in the view so that *every* way of making
+        # one — the form, the seeder, the admin, a test — produces a recipe its
+        # author can edit. An owner-less recipe answers to staff alone, and a
+        # view that forgot this line would create them silently.
+        #
+        # On insert only. A recipe whose owner's account has been deleted has
+        # nobody looking after it on purpose; re-deriving it from `created_by`
+        # at the next save would hand the rights back to somebody who gave them
+        # away, in the middle of an unrelated edit.
+        if self._state.adding and self.owner_id is None and self.created_by_id is not None:
+            self.owner_id = self.created_by_id
         super().save(*args, **kwargs)
 
     def get_absolute_url(self):

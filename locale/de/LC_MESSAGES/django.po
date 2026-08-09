@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kitchenapp 0.1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-08 22:49+0200\n"
+"POT-Creation-Date: 2026-08-09 15:03+0200\n"
 "PO-Revision-Date: 2026-08-05 12:00+0200\n"
 "Last-Translator: KitchenApp\n"
 "Language-Team: German\n"
@@ -43,7 +43,7 @@ msgstr "Womit sich die Person anmeldet. Buchstaben, Ziffern und . @ + - _"
 msgid "Managed by the identity provider."
 msgstr "Wird vom Identitätsanbieter verwaltet."
 
-#: .\apps\accounts\forms.py:153 .\apps\accounts\users.py:191
+#: .\apps\accounts\forms.py:153 .\apps\accounts\users.py:196
 msgid "You cannot switch off your own account."
 msgstr "Das eigene Konto lässt sich nicht abschalten."
 
@@ -51,8 +51,8 @@ msgstr "Das eigene Konto lässt sich nicht abschalten."
 msgid "You cannot take the administrator right off your own account."
 msgstr "Das Administrationsrecht lässt sich dem eigenen Konto nicht entziehen."
 
-#: .\apps\accounts\forms.py:169 .\apps\accounts\users.py:166
-#: .\apps\accounts\users.py:198
+#: .\apps\accounts\forms.py:169 .\apps\accounts\users.py:171
+#: .\apps\accounts\users.py:203
 msgid "This is the last active administrator. Give somebody else the right first."
 msgstr "Das ist die letzte aktive Administration. Erst jemand anderem das Recht geben."
 
@@ -326,21 +326,21 @@ msgstr "„%(name)s“ wurde gespeichert."
 msgid "The password for “%(name)s” was changed."
 msgstr "Das Passwort für „%(name)s“ wurde geändert."
 
-#: .\apps\accounts\users.py:156
+#: .\apps\accounts\users.py:161
 msgid "You cannot delete your own account."
 msgstr "Das eigene Konto lässt sich nicht löschen."
 
-#: .\apps\accounts\users.py:173
+#: .\apps\accounts\users.py:178
 #, python-format
 msgid "“%(name)s” was deleted."
 msgstr "„%(name)s“ wurde gelöscht."
 
-#: .\apps\accounts\users.py:206
+#: .\apps\accounts\users.py:211
 #, python-format
 msgid "“%(name)s” can sign in again."
 msgstr "„%(name)s“ kann sich wieder anmelden."
 
-#: .\apps\accounts\users.py:207
+#: .\apps\accounts\users.py:212
 #, python-format
 msgid "“%(name)s” can no longer sign in."
 msgstr "„%(name)s“ kann sich nicht mehr anmelden."
@@ -375,13 +375,13 @@ msgstr "Das ist der eigene Name einer anderen Zutat."
 
 #: .\apps\pantry\forms.py:131 .\apps\pantry\forms.py:178
 #: .\apps\pantry\forms.py:228 .\apps\pantry\models.py:173
-#: .\apps\pantry\models.py:215 .\apps\recipes\forms.py:199
-#: .\apps\recipes\models.py:384
+#: .\apps\pantry\models.py:215 .\apps\recipes\forms.py:263
+#: .\apps\recipes\models.py:417
 msgid "unit"
 msgstr "Einheit"
 
 #: .\apps\pantry\forms.py:141 .\apps\pantry\forms.py:188
-#: .\apps\pantry\forms.py:226 .\apps\recipes\forms.py:222
+#: .\apps\pantry\forms.py:226 .\apps\recipes\forms.py:286
 #: .\templates\pantry\ingredient_form.html:99
 #: .\templates\pantry\pantry_list.html:33
 #: .\templates\pantry\pantry_list.html:69
@@ -404,20 +404,20 @@ msgstr "Eine Gebindegröße braucht eine Menge."
 msgid "A purchase size is more than nothing."
 msgstr "Eine Gebindegröße ist mehr als nichts."
 
-#: .\apps\pantry\forms.py:189 .\apps\recipes\forms.py:224
+#: .\apps\pantry\forms.py:189 .\apps\recipes\forms.py:288
 #: .\templates\pantry\ingredient_form.html:46
 #: .\templates\recipes\_ingredient_row.html:95
 msgid "Note"
 msgstr "Anmerkung"
 
-#: .\apps\pantry\forms.py:194 .\apps\recipes\forms.py:293
+#: .\apps\pantry\forms.py:194 .\apps\recipes\forms.py:357
 msgid "An amount cannot be negative."
 msgstr "Eine Menge kann nicht negativ sein."
 
 #: .\apps\pantry\forms.py:210 .\apps\pantry\models.py:112
 #: .\apps\pantry\models.py:143 .\apps\pantry\models.py:170
-#: .\apps\pantry\models.py:211 .\apps\recipes\models.py:386
-#: .\apps\recipes\models.py:427
+#: .\apps\pantry\models.py:211 .\apps\recipes\models.py:419
+#: .\apps\recipes\models.py:460
 msgid "ingredient"
 msgstr "Zutat"
 
@@ -426,7 +426,7 @@ msgid "e.g. Butter"
 msgstr "z. B. Butter"
 
 #: .\apps\pantry\forms.py:223 .\apps\pantry\models.py:172
-#: .\apps\pantry\models.py:213 .\apps\recipes\models.py:378
+#: .\apps\pantry\models.py:213 .\apps\recipes\models.py:411
 msgid "amount"
 msgstr "Menge"
 
@@ -466,7 +466,7 @@ msgstr "Getränke"
 msgid "other"
 msgstr "Sonstiges"
 
-#: .\apps\pantry\models.py:83 .\apps\recipes\models.py:49
+#: .\apps\pantry\models.py:83 .\apps\recipes\models.py:57
 msgid "name"
 msgstr "Name"
 
@@ -483,7 +483,7 @@ msgid "Used to group a shopping list."
 msgstr "Gruppiert die Einkaufsliste."
 
 #: .\apps\pantry\models.py:98 .\apps\pantry\models.py:216
-#: .\apps\recipes\models.py:400
+#: .\apps\recipes\models.py:433
 msgid "note"
 msgstr "Anmerkung"
 
@@ -491,11 +491,11 @@ msgstr "Anmerkung"
 msgid "e.g. “the one in the blue bag”, “only the Italian”."
 msgstr "z. B. „die aus der blauen Tüte“, „nur die italienische“."
 
-#: .\apps\pantry\models.py:107 .\apps\recipes\models.py:103
+#: .\apps\pantry\models.py:107 .\apps\recipes\models.py:111
 msgid "added by"
 msgstr "hinzugefügt von"
 
-#: .\apps\pantry\models.py:113 .\apps\recipes\models.py:428
+#: .\apps\pantry\models.py:113 .\apps\recipes\models.py:461
 #: .\templates\recipes\_recipe_grid.html:34
 msgid "ingredients"
 msgstr "Zutaten"
@@ -767,74 +767,78 @@ msgstr "„%(name)s“ ist nicht mehr im Vorrat."
 msgid "“%(name)s” was removed from the catalogue."
 msgstr "„%(name)s“ wurde aus dem Zutatenverzeichnis entfernt."
 
-#: .\apps\recipes\forms.py:56 .\apps\recipes\models.py:54
-#: .\apps\recipes\models.py:98
+#: .\apps\recipes\forms.py:57 .\apps\recipes\models.py:62
+#: .\apps\recipes\models.py:106
 msgid "tags"
 msgstr "Tags"
 
-#: .\apps\recipes\forms.py:57
+#: .\apps\recipes\forms.py:58
 msgid "Separated by commas, e.g. “soup, vegetarian, quick”."
 msgstr "Durch Kommas getrennt, z. B. „Suppe, vegetarisch, schnell“."
 
-#: .\apps\recipes\forms.py:91
+#: .\apps\recipes\forms.py:92
 msgid "A recipe is for at least one serving."
 msgstr "Ein Rezept ist für mindestens eine Portion."
 
-#: .\apps\recipes\forms.py:223 .\templates\pantry\ingredient_list.html:35
+#: .\apps\recipes\forms.py:191
+msgid "This recipe is already theirs."
+msgstr "Dieses Rezept gehört dieser Person schon."
+
+#: .\apps\recipes\forms.py:287 .\templates\pantry\ingredient_list.html:35
 #: .\templates\recipes\_ingredient_row.html:43
 msgid "Ingredient"
 msgstr "Zutat"
 
-#: .\apps\recipes\forms.py:290
+#: .\apps\recipes\forms.py:354
 msgid "Give this line an ingredient, or clear it."
 msgstr "Dieser Zeile eine Zutat geben oder sie leeren."
 
-#: .\apps\recipes\forms.py:297
+#: .\apps\recipes\forms.py:361
 #, python-format
 msgid "How much %(name)s? Give an amount, or tick “no fixed amount” for something added to taste."
 msgstr "Wie viel %(name)s? Gib eine Menge an oder setze den Haken bei „keine feste Menge“, wenn es nach Geschmack dazukommt."
 
-#: .\apps\recipes\forms.py:303
+#: .\apps\recipes\forms.py:367
 msgid "This line has an amount, so “no fixed amount” cannot also be true."
 msgstr "Diese Zeile hat eine Menge, also kann „keine feste Menge“ nicht auch zutreffen."
 
-#: .\apps\recipes\forms.py:334
+#: .\apps\recipes\forms.py:398
 msgid "What happens here"
 msgstr "Was hier passiert"
 
-#: .\apps\recipes\forms.py:338
+#: .\apps\recipes\forms.py:402
 msgid "Detail — shown while cooking"
 msgstr "Detail — wird beim Kochen angezeigt"
 
-#: .\apps\recipes\forms.py:392
+#: .\apps\recipes\forms.py:456
 msgid "An oven temperature is between 0 and 500 °C."
 msgstr "Eine Ofentemperatur liegt zwischen 0 und 500 °C."
 
-#: .\apps\recipes\forms.py:424
+#: .\apps\recipes\forms.py:488
 msgid "Give this step a name, or clear it."
 msgstr "Diesem Schritt einen Namen geben oder ihn leeren."
 
-#: .\apps\recipes\forms.py:572
+#: .\apps\recipes\forms.py:636
 msgid "Write what happens in this step — something already goes into it."
 msgstr "Schreib auf, was in diesem Schritt passiert — es geht bereits etwas hinein."
 
-#: .\apps\recipes\forms.py:589
+#: .\apps\recipes\forms.py:653
 msgid "Put this into one of the steps — every ingredient has to be used somewhere once the recipe has a method."
 msgstr "Ordne das einem der Schritte zu — sobald ein Rezept eine Zubereitung hat, muss jede Zutat irgendwo verwendet werden."
 
-#: .\apps\recipes\forms.py:626
+#: .\apps\recipes\forms.py:690
 msgid "This step is not joined to the rest of the recipe. Say what it feeds into — with the “feeds into” box in the step list, or by dragging it onto that step on the diagram."
 msgstr "Dieser Schritt hängt nicht am Rest des Rezepts. Sag, wo er hineinfließt — mit dem Feld „fließt ein in“ in der Schrittliste oder indem du ihn im Diagramm auf diesen Schritt ziehst."
 
-#: .\apps\recipes\forms.py:891
+#: .\apps\recipes\forms.py:955
 msgid "Use this as the recipe’s cooking time"
 msgstr "Als Garzeit des Rezepts übernehmen"
 
-#: .\apps\recipes\forms.py:963
+#: .\apps\recipes\forms.py:1027
 msgid "A cooking is for at least one serving."
 msgstr "Eine Zubereitung ist für mindestens eine Portion."
 
-#: .\apps\recipes\forms.py:973
+#: .\apps\recipes\forms.py:1037
 msgid "Record how long it took, how far it went, or both."
 msgstr "Eintragen, wie lange es gedauert hat, wie weit es gereicht hat — oder beides."
 
@@ -847,176 +851,180 @@ msgstr "Dieses Foto ist zu groß (höchstens %(mb)s MB)."
 msgid "That file could not be read as an image."
 msgstr "Diese Datei konnte nicht als Bild gelesen werden."
 
-#: .\apps\recipes\models.py:53
+#: .\apps\recipes\models.py:61
 msgid "tag"
 msgstr "Tag"
 
-#: .\apps\recipes\models.py:67
+#: .\apps\recipes\models.py:75
 msgid "title"
 msgstr "Titel"
 
-#: .\apps\recipes\models.py:70
+#: .\apps\recipes\models.py:78
 msgid "description"
 msgstr "Beschreibung"
 
-#: .\apps\recipes\models.py:71
+#: .\apps\recipes\models.py:79
 msgid "One or two sentences — what this is, and when you would make it."
 msgstr "Ein, zwei Sätze — was das ist und wann man es macht."
 
-#: .\apps\recipes\models.py:77 .\templates\recipes\_recipe_grid.html:32
+#: .\apps\recipes\models.py:85 .\templates\recipes\_recipe_grid.html:32
 #: .\templates\recipes\recipe_cook.html:54
 #: .\templates\recipes\recipe_detail.html:125
 msgid "servings"
 msgstr "Portionen"
 
-#: .\apps\recipes\models.py:79
+#: .\apps\recipes\models.py:87
 msgid "preparation time"
 msgstr "Vorbereitungszeit"
 
-#: .\apps\recipes\models.py:80 .\apps\recipes\models.py:82
+#: .\apps\recipes\models.py:88 .\apps\recipes\models.py:90
 msgid "In minutes."
 msgstr "In Minuten."
 
-#: .\apps\recipes\models.py:81
+#: .\apps\recipes\models.py:89
 msgid "cooking time"
 msgstr "Garzeit"
 
-#: .\apps\recipes\models.py:84
+#: .\apps\recipes\models.py:92
 msgid "instructions"
 msgstr "Zubereitung"
 
-#: .\apps\recipes\models.py:86
+#: .\apps\recipes\models.py:94
 msgid "photograph"
 msgstr "Foto"
 
-#: .\apps\recipes\models.py:91
+#: .\apps\recipes\models.py:99
 msgid "source"
 msgstr "Quelle"
 
-#: .\apps\recipes\models.py:92
+#: .\apps\recipes\models.py:100
 msgid "A person, a cookbook, a magazine."
 msgstr "Eine Person, ein Kochbuch, eine Zeitschrift."
 
-#: .\apps\recipes\models.py:93
+#: .\apps\recipes\models.py:101
 msgid "link"
 msgstr "Link"
 
-#: .\apps\recipes\models.py:95 .\apps\recipes\models.py:518
+#: .\apps\recipes\models.py:103 .\apps\recipes\models.py:551
 msgid "notes"
 msgstr "Notizen"
 
-#: .\apps\recipes\models.py:96
+#: .\apps\recipes\models.py:104
 msgid "What you would do differently next time."
 msgstr "Was man beim nächsten Mal anders machen würde."
 
-#: .\apps\recipes\models.py:110
+#: .\apps\recipes\models.py:124
+msgid "looked after by"
+msgstr "zuständig"
+
+#: .\apps\recipes\models.py:131
 msgid "recipe"
 msgstr "Rezept"
 
-#: .\apps\recipes\models.py:111
+#: .\apps\recipes\models.py:132
 msgid "recipes"
 msgstr "Rezepte"
 
-#: .\apps\recipes\models.py:159
+#: .\apps\recipes\models.py:192
 msgid "feeds into"
 msgstr "geht ein in"
 
-#: .\apps\recipes\models.py:183 .\apps\recipes\models.py:242
+#: .\apps\recipes\models.py:216 .\apps\recipes\models.py:275
 msgid "step"
 msgstr "Schritt"
 
-#: .\apps\recipes\models.py:190
+#: .\apps\recipes\models.py:223
 msgid "oven temperature"
 msgstr "Ofentemperatur"
 
-#: .\apps\recipes\models.py:191
+#: .\apps\recipes\models.py:224
 msgid "In °C."
 msgstr "In °C."
 
-#: .\apps\recipes\models.py:193
+#: .\apps\recipes\models.py:226
 msgid "oven mode"
 msgstr "Ofenmodus"
 
-#: .\apps\recipes\models.py:195
+#: .\apps\recipes\models.py:228
 msgid "detail"
 msgstr "Erläuterung"
 
-#: .\apps\recipes\models.py:196
+#: .\apps\recipes\models.py:229
 msgid "Shown in the cooking view when this step is the current one."
 msgstr "Wird in der Kochansicht gezeigt, wenn dieser Schritt an der Reihe ist."
 
-#: .\apps\recipes\models.py:211
+#: .\apps\recipes\models.py:244
 msgid "duration"
 msgstr "Dauer"
 
-#: .\apps\recipes\models.py:212
+#: .\apps\recipes\models.py:245
 msgid "In minutes. Offers a timer while cooking."
 msgstr "In Minuten. Beim Kochen wird dafür ein Timer angeboten."
 
-#: .\apps\recipes\models.py:214
+#: .\apps\recipes\models.py:247
 msgid "seconds"
 msgstr "Sekunden"
 
-#: .\apps\recipes\models.py:216
+#: .\apps\recipes\models.py:249
 msgid "On top of the minutes, for a step measured more finely than that."
 msgstr "Zusätzlich zu den Minuten, für einen Schritt, der feiner gemessen wird."
 
-#: .\apps\recipes\models.py:243
+#: .\apps\recipes\models.py:276
 msgid "steps"
 msgstr "Schritte"
 
-#: .\apps\recipes\models.py:286
+#: .\apps\recipes\models.py:319
 msgid "top and bottom heat"
 msgstr "Ober-/Unterhitze"
 
-#: .\apps\recipes\models.py:287
+#: .\apps\recipes\models.py:320
 msgid "fan"
 msgstr "Umluft"
 
-#: .\apps\recipes\models.py:288
+#: .\apps\recipes\models.py:321
 msgid "top heat"
 msgstr "Oberhitze"
 
-#: .\apps\recipes\models.py:289
+#: .\apps\recipes\models.py:322
 msgid "bottom heat"
 msgstr "Unterhitze"
 
-#: .\apps\recipes\models.py:290
+#: .\apps\recipes\models.py:323
 msgid "grill"
 msgstr "Grill"
 
-#: .\apps\recipes\models.py:291
+#: .\apps\recipes\models.py:324
 msgid "fan grill"
 msgstr "Umluftgrill"
 
-#: .\apps\recipes\models.py:328
+#: .\apps\recipes\models.py:361
 #, python-format
 msgid "%(n)s min"
 msgstr "%(n)s Min."
 
-#: .\apps\recipes\models.py:330
+#: .\apps\recipes\models.py:363
 #, python-format
 msgid "%(n)s s"
 msgstr "%(n)s Sek."
 
-#: .\apps\recipes\models.py:331
+#: .\apps\recipes\models.py:364
 #, python-format
 msgid "%(m)s:%(s)s min"
 msgstr "%(m)s:%(s)s Min."
 
-#: .\apps\recipes\models.py:366
+#: .\apps\recipes\models.py:399
 msgid "used in"
 msgstr "verwendet in"
 
-#: .\apps\recipes\models.py:396
+#: .\apps\recipes\models.py:429
 msgid "in the catalogue"
 msgstr "im Zutatenverzeichnis"
 
-#: .\apps\recipes\models.py:401
+#: .\apps\recipes\models.py:434
 msgid "e.g. “finely chopped”, “at room temperature”."
 msgstr "z. B. „fein gehackt“, „zimmerwarm“."
 
-#: .\apps\recipes\models.py:404 .\templates\recipes\_diagram.html:34
+#: .\apps\recipes\models.py:437 .\templates\recipes\_diagram.html:34
 #: .\templates\recipes\_ingredient_row.html:100
 #: .\templates\recipes\_steps_list.html:44
 #: .\templates\recipes\recipe_cook.html:108
@@ -1025,107 +1033,116 @@ msgstr "z. B. „fein gehackt“, „zimmerwarm“."
 msgid "optional"
 msgstr "optional"
 
-#: .\apps\recipes\models.py:405
+#: .\apps\recipes\models.py:438
 msgid "The recipe works without it."
 msgstr "Das Rezept funktioniert auch ohne."
 
-#: .\apps\recipes\models.py:414 .\templates\recipes\_ingredient_row.html:73
+#: .\apps\recipes\models.py:447 .\templates\recipes\_ingredient_row.html:73
 msgid "no fixed amount"
 msgstr "keine feste Menge"
 
-#: .\apps\recipes\models.py:415
+#: .\apps\recipes\models.py:448
 msgid "To taste — salt, pepper, a little oil."
 msgstr "Nach Geschmack — Salz, Pfeffer, etwas Öl."
 
-#: .\apps\recipes\models.py:422
+#: .\apps\recipes\models.py:455
 msgid "alternative for"
 msgstr "Alternative zu"
 
-#: .\apps\recipes\models.py:472
+#: .\apps\recipes\models.py:505
 msgid "large portion"
 msgstr "große Portion"
 
-#: .\apps\recipes\models.py:473 .\apps\recipes\models.py:560
+#: .\apps\recipes\models.py:506 .\apps\recipes\models.py:593
 msgid "portion"
 msgstr "Portion"
 
-#: .\apps\recipes\models.py:474
+#: .\apps\recipes\models.py:507
 msgid "small portion"
 msgstr "kleine Portion"
 
-#: .\apps\recipes\models.py:475
+#: .\apps\recipes\models.py:508
 msgid "child’s portion"
 msgstr "Kinderportion"
 
-#: .\apps\recipes\models.py:476
+#: .\apps\recipes\models.py:509
 msgid "portion to take away"
 msgstr "Portion zum Mitnehmen"
 
-#: .\apps\recipes\models.py:504
+#: .\apps\recipes\models.py:537
 msgid "cooked by"
 msgstr "gekocht von"
 
-#: .\apps\recipes\models.py:507
+#: .\apps\recipes\models.py:540
 msgid "cooked on"
 msgstr "gekocht am"
 
-#: .\apps\recipes\models.py:512
+#: .\apps\recipes\models.py:545
 msgid "servings made"
 msgstr "zubereitete Portionen"
 
-#: .\apps\recipes\models.py:515
+#: .\apps\recipes\models.py:548
 msgid "time taken"
 msgstr "gebrauchte Zeit"
 
-#: .\apps\recipes\models.py:516
+#: .\apps\recipes\models.py:549
 msgid "In minutes. Measured by the cooking view, or typed in."
 msgstr "In Minuten. Von der Kochansicht gemessen oder von Hand eingetragen."
 
-#: .\apps\recipes\models.py:521
+#: .\apps\recipes\models.py:554
 msgid "cooking"
 msgstr "Zubereitung"
 
-#: .\apps\recipes\models.py:522
+#: .\apps\recipes\models.py:555
 msgid "cookings"
 msgstr "Zubereitungen"
 
-#: .\apps\recipes\models.py:556
+#: .\apps\recipes\models.py:589
 msgid "size"
 msgstr "Größe"
 
-#: .\apps\recipes\models.py:557
+#: .\apps\recipes\models.py:590
 msgid "how many"
 msgstr "wie viele"
 
-#: .\apps\recipes\models.py:561
+#: .\apps\recipes\models.py:594
 msgid "portions"
 msgstr "Portionen"
 
-#: .\apps\recipes\views.py:308
+#: .\apps\recipes\views.py:328
 #, python-format
 msgid "“%(title)s” was added."
 msgstr "„%(title)s“ wurde hinzugefügt."
 
-#: .\apps\recipes\views.py:340
+#: .\apps\recipes\views.py:360
 #, python-format
 msgid "“%(title)s” was saved."
 msgstr "„%(title)s“ wurde gespeichert."
 
-#: .\apps\recipes\views.py:386
+#: .\apps\recipes\views.py:423
+msgid "Choose somebody to hand it to."
+msgstr "Wähle aus, wem du es übergeben willst."
+
+#: .\apps\recipes\views.py:428
+#, python-format
+msgid "“%(title)s” now belongs to %(who)s."
+msgstr "„%(title)s“ gehört jetzt %(who)s."
+
+#: .\apps\recipes\views.py:442
 #, python-format
 msgid "“%(title)s” was deleted."
 msgstr "„%(title)s“ wurde gelöscht."
 
-#: .\apps\recipes\views.py:461
+#: .\apps\recipes\views.py:517
 #, python-format
 msgid "Noted — “%(title)s” cooked."
 msgstr "Notiert — „%(title)s“ gekocht."
 
-#: .\apps\recipes\views.py:535
+#: .\apps\recipes\views.py:591
 msgid "The entry was updated."
 msgstr "Der Eintrag wurde aktualisiert."
 
-#: .\apps\recipes\views.py:558
+#: .\apps\recipes\views.py:614
 msgid "The entry was removed."
 msgstr "Der Eintrag wurde entfernt."
 
@@ -1678,7 +1695,7 @@ msgstr "Das Konto wird endgültig entfernt. Die eingetragenen Rezepte bleiben in
 
 #: .\templates\accounts\user_list.html:89
 #: .\templates\accounts\user_list.html:92
-#: .\templates\recipes\recipe_detail.html:314
+#: .\templates\recipes\recipe_detail.html:352
 msgid "Delete"
 msgstr "Löschen"
 
@@ -2484,16 +2501,38 @@ msgstr "Bisher hat niemand eingetragen, dass er das gekocht hat."
 msgid "Source"
 msgstr "Quelle"
 
-#: .\templates\recipes\recipe_detail.html:312
+#: .\templates\recipes\recipe_detail.html:317
+#, python-format
+msgid "Looked after by %(who)s"
+msgstr "Zuständig: %(who)s"
+
+#: .\templates\recipes\recipe_detail.html:333
+msgid "Hand this recipe over?"
+msgstr "Dieses Rezept übergeben?"
+
+#: .\templates\recipes\recipe_detail.html:334
+msgid "They will be able to edit it. Unless you manage accounts, you will not be able to change it yourself afterwards."
+msgstr "Diese Person kann es dann bearbeiten. Wenn du keine Konten verwaltest, kannst du es danach selbst nicht mehr ändern."
+
+#: .\templates\recipes\recipe_detail.html:335
+#: .\templates\recipes\recipe_detail.html:343
+msgid "Hand over"
+msgstr "Übergeben"
+
+#: .\templates\recipes\recipe_detail.html:339
+msgid "Looked after by"
+msgstr "Zuständig"
+
+#: .\templates\recipes\recipe_detail.html:350
 msgid "Delete this recipe?"
 msgstr "Dieses Rezept löschen?"
 
-#: .\templates\recipes\recipe_detail.html:313
+#: .\templates\recipes\recipe_detail.html:351
 #, python-format
 msgid "“%(title)s” and its ingredient list will be removed. This cannot be undone."
 msgstr "„%(title)s“ und die Zutatenliste werden entfernt. Das lässt sich nicht rückgängig machen."
 
-#: .\templates\recipes\recipe_detail.html:317
+#: .\templates\recipes\recipe_detail.html:355
 msgid "Delete recipe"
 msgstr "Rezept löschen"
 

@@ -72,6 +72,8 @@ Everything below was observed working, not merely written.
 | The standing-instruction note is gone | `[data-standing-note]` no longer exists on any card, and `markStanding` with it |
 | **Adding a step no longer reorders the recipe** | "+ Schritt danach" on "Zerbröseln", on the real Brot form: it stays in rows 1–3 with Hefe and Wasser, "Vormischen" stays below it with its three lines, the new box lands in the column between, and every `position` is untouched. Doing what the old code did — minting the row and leaving it at the end of `stepOrder` — reproduces the report on the spot: Zerbröseln drops to rows 4–6 and Vormischen rises to the top |
 | **"+ Step" on a recipe with no steps yet takes the ingredients** | The reported case, driven on the real new-recipe form: three lines typed in, no steps, "+ Schritt" pressed. The new box lands in column 2 spanning all three rows with every `step_index` pointing at it and the tray empty — it used to be a parentless row with nothing in it, drawn as a band over none of them. Then the mixed case: a fourth line added loose beside the existing arm, and the join "+" gave one step that took *both* — "Vermischen" reparented to it and "Hefe" assigned to it, column 3 over all four rows. No console errors, and `[data-step-row]` still matches `steps-TOTAL_FORMS` |
+| **A recipe changes hands** | Driven on the real recipe page as the account that owns Kartoffelsalat: the "Zuständig" select offers everybody active by name, "Übergeben" asks first through the app's own dialog, and afterwards the banner says so, a "Zuständig: Christian Häußler" line appears under the method — it is absent while the owner is also the author, which is every recipe until one is handed over — and the topbar still reads "hinzugefügt von claude", because `created_by` is not what moved. Pressing it again with the same person selected came back with "Dieses Rezept gehört dieser Person schon". Handed back afterwards, and the four seeded recipes plus the household's own "brot" all read `owner == created_by` again |
+| The migration adopts the existing collection | Run against the development database, which has the household's hand-typed recipe in it: all five rows came out of `0007` with `owner` equal to `created_by`. Without that half the column arrives NULL and `_may_edit` — which reads `owner` alone — turns the whole existing collection staff-only, presenting as "Edit disappeared from my own recipes" |
 | **A timer follows you off the cooking page** | Started the 60-minute timer on Zwetschgenkuchen with a real click, then walked to the pantry: a card in the bottom-right corner reading ZWETSCHGENKUCHEN / "Hefeteig ansetzen, gehen lassen" / 59:39, linked back to the cooking view. The record in localStorage carries the step, the recipe, its URL and the chosen sound |
 | **…and rings there** | Deadline brought forward on the pantry page: four oscillators in three seconds on a `running` context, the card green with "Zeit ist um" and "Alarm ausschalten", `⏰` on the tab title, and the sr-only status announcing it once. Left alone it was **still ringing twelve seconds later** — sampled once a second, with the store intact throughout |
 | Two at once | A ringing one and a running one stack, only the expired one makes a noise, and stopping it leaves the other counting; stopping the second takes the dock away entirely. On the cooking view for Zwetschgenkuchen only the *other* recipe's card appears — its own timer is the one beside the step, restored from the same store on load (19:38, marked running, after a reload) |
@@ -128,9 +130,11 @@ the NAS.
   discovery-document parsing in particular is written from what OIDC discovery
   documents contain, not from one Synology returned.
 - **A migration on a database that already has recipes in it.** Every migration
-  so far has run against an empty or development database. The first update that
-  carries a schema change to a `/data` with the household's real collection in
-  it is the one to take a copy before — see DEPLOYMENT.md §7.
+  so far has run against an empty or development database — `0007_recipe_owner`
+  included, and that one carries a data step (it fills the new `owner` column
+  from `created_by`, without which every existing recipe becomes staff-only).
+  It is the next thing to reach the NAS, so it is the update to take a copy
+  before — see DEPLOYMENT.md §7.
 - **An *update* of a running container.** v0.2.0 is now installed and running on
   the DS723+ (§1), but it went onto an empty folder — it was the first thing
   ever put there. Replacing a *running* container with a newer image — the path

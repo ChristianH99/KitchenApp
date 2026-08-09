@@ -149,6 +149,11 @@ def user_delete(request, pk):
     deleted. Deleting sets ``created_by`` to NULL on their recipes rather than
     taking the recipes with it (see the model), so the collection survives
     either way.
+
+    It sets ``owner`` to NULL as well, which is the more consequential half:
+    those recipes are then editable by staff alone until somebody hands them
+    on again from the recipe page. That is deliberate — the alternative is
+    guessing an heir — and it is the reason "switch off" is offered first.
     """
     person = get_object_or_404(User, pk=pk)
 

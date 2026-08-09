@@ -28,8 +28,8 @@ from apps.pantry import catalogue, matching
 from apps.pantry.models import PantryItem
 from apps.recipes import diagram as diagram_module
 from apps.recipes.forms import (
-    CookLogForm, IngredientFormSet, RecipeForm, StepFormSet,
-    prime_diagram_indices, validate_structure, wire_diagram,
+    CookLogForm, IngredientFormSet, RecipeForm, RecipeOwnerForm, StepFormSet,
+    person_label, prime_diagram_indices, validate_structure, wire_diagram,
 )
 from apps.recipes.models import CookLog, CookPortion, Recipe, Tag
 
@@ -68,13 +68,21 @@ def _visible_recipes():
 def _may_edit(user, recipe):
     """Who may change a recipe.
 
-    The person who added it, or a staff user. Not "anyone signed in": a
+    The person who looks after it, or a staff user. Not "anyone signed in": a
     household collection is shared to *cook* from, and somebody quietly
     rewriting the family Rouladen recipe is the failure worth preventing.
     Staff is the escape hatch for the obvious cases — a typo in somebody
     else's, a recipe left behind by an account that is gone.
+
+    ``owner``, not ``created_by``, and reading exactly one of the two is the
+    point. ``owner`` starts as whoever typed the recipe in (Recipe.save fills
+    it), so for a collection nobody has handed anything over in the two are the
+    same answer; the moment one is transferred they are not, and a rule that
+    accepted either would mean giving a recipe away without losing it. That is
+    a share, not a transfer, and it would be invisible on the page — the old
+    owner would simply still see Edit.
     """
-    return user.is_staff or (recipe.created_by_id and recipe.created_by_id == user.id)
+    return user.is_staff or (recipe.owner_id and recipe.owner_id == user.id)
 
 
 @login_required
@@ -195,7 +203,7 @@ def _loaded_recipe(slug):
     with how many sections it has.
     """
     return get_object_or_404(
-        Recipe.objects.select_related("created_by").prefetch_related(
+        Recipe.objects.select_related("created_by", "owner").prefetch_related(
             "tags", "steps",
             # The catalogue row and its packet sizes come along with the lines.
             # Without them the pantry check walks the ingredients and touches
@@ -210,6 +218,7 @@ def _loaded_recipe(slug):
 @login_required
 def recipe_detail(request, slug):
     recipe = _loaded_recipe(slug)
+    may_edit = _may_edit(request.user, recipe)
     ingredients = list(recipe.ingredients.all())
     steps = list(recipe.steps.all())
 
@@ -232,7 +241,18 @@ def recipe_detail(request, slug):
         "log_count": log_count,
         "log_more": max(0, log_count - len(logs)),
         "typical_minutes": _typical_minutes(logs),
-        "may_edit": _may_edit(request.user, recipe),
+        "may_edit": may_edit,
+        # Built here rather than in the template so the list of people is one
+        # query and one place. Only for somebody who may edit: it is a control,
+        # and rendering it disabled would be a page telling everybody else who
+        # they could not give this recipe to.
+        "owner_form": RecipeOwnerForm(instance=recipe) if may_edit else None,
+        # One implementation of "what do we call this person", shared with the
+        # dropdown above rather than written again as a {% firstof %}: an SSO
+        # account's username is an opaque `sub`, and a page that falls back to
+        # it in one place and to the e-mail in another is two names for one
+        # person on one screen.
+        "owner_label": person_label(recipe.owner) if recipe.owner_id else None,
         **_pantry_context(lines),
     })
 
@@ -373,6 +393,42 @@ def _link_catalogue(recipe, user):
     actually cooks with, rather than only what it was shipped knowing.
     """
     catalogue.resolve_lines(list(recipe.ingredients.all()), user=user)
+
+
+@login_required
+@require_POST
+def recipe_transfer(request, slug):
+    """Hand a recipe to somebody else.
+
+    A POST of its own rather than a field on the edit form: it is the one
+    control on that page whose effect is on *this* page rather than on the
+    recipe, and pressing it is usually the last thing the person pressing it
+    can do here. It sits beside Delete for that reason — both are decisions
+    about the recipe as an object — and above it, because only one of them is
+    irreversible.
+
+    Nothing special happens to the previous owner: they lose Edit because
+    ``_may_edit`` reads one column. That is the whole of the feature, and the
+    reason it is one column.
+    """
+    recipe = get_object_or_404(Recipe, slug=slug)
+    if not _may_edit(request.user, recipe):
+        raise Http404
+
+    form = RecipeOwnerForm(request.POST, instance=recipe)
+    if not form.is_valid():
+        # The form has one field, so there is exactly one thing that can be
+        # wrong with it and a whole page rendered around a single error is
+        # ceremony. Said in the banner every other action here uses.
+        for error in form.errors.get("owner", [_("Choose somebody to hand it to.")]):
+            messages.error(request, error)
+        return redirect(recipe.get_absolute_url())
+
+    form.save()
+    messages.success(request, _("“%(title)s” now belongs to %(who)s.") % {
+        "title": recipe.title, "who": person_label(recipe.owner),
+    })
+    return redirect(recipe.get_absolute_url())
 
 
 @login_required

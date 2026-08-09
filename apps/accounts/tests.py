@@ -548,6 +548,20 @@ class TestSwitchingAnAccountOff:
         session.post(reverse("accounts:user-delete", args=[user.pk]))
         assert Recipe.objects.get(title="Griesbrei").created_by is None
 
+    def test_deleting_leaves_their_recipes_with_nobody_looking_after_them(
+        self, boss, user, db,
+    ):
+        """The consequential half, and it is deliberate: those recipes answer
+        to staff alone until somebody hands them on from the recipe page.
+        Guessing an heir is the alternative, and it is worse."""
+        from apps.recipes.models import Recipe
+
+        session, _ = boss
+        recipe = Recipe.objects.create(title="Griesbrei", created_by=user)
+        assert recipe.owner == user
+        session.post(reverse("accounts:user-delete", args=[user.pk]))
+        assert Recipe.objects.get(title="Griesbrei").owner is None
+
 
 # --------------------------------------------------------------------------
 # The SSO configuration, and the page that edits it

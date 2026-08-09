@@ -29,6 +29,7 @@ the server rendered it and says the order separately.
 """
 
 from django import forms
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.forms import inlineformset_factory
 from django.utils.translation import gettext_lazy as _
@@ -133,6 +134,69 @@ class RecipeForm(forms.ModelForm):
                 tag = Tag.objects.create(name=name)
             tags.append(tag)
         recipe.tags.set(tags)
+
+
+class RecipeOwnerForm(forms.ModelForm):
+    """Handing a recipe to somebody else.
+
+    A form of one field, kept apart from ``RecipeForm`` on purpose. Everything
+    on that form is a statement about the *food*; this is a statement about who
+    may change it, and the person pressing it usually loses the right to press
+    anything on this recipe again. A select sitting among the servings and the
+    tags is one somebody changes by accident on the way to saving a typo fix.
+
+    Everybody active is offered — a local account and a Synology one are the
+    same row here, and a household that signs in over SSO would otherwise have
+    nobody to give a recipe to. Inactive accounts are not: handing a recipe to
+    somebody who has left is a way of losing it, and the People page is where
+    that state is managed.
+
+    ``required``, and that is the guard rail. "Nobody" is a value the column
+    accepts — it is what an account being deleted leaves behind — but choosing
+    it here would be a member of the household removing a recipe from everybody
+    who is not staff, which is not a transfer.
+    """
+
+    class Meta:
+        model = Recipe
+        fields = ["owner"]
+        # The same small inline control the recipe form's cards use. No new
+        # component and therefore no new step on any of the scales in
+        # static/css/main.css — this is a label and a select on one line, which
+        # is a thing the app already draws.
+        widgets = {"owner": forms.Select(attrs={"class": "row-extra-select"})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        field = self.fields["owner"]
+        field.required = True
+        field.empty_label = None
+        field.queryset = (
+            get_user_model().objects.filter(is_active=True)
+            .order_by("first_name", "last_name", "username")
+        )
+        # A Synology account's username is the provider's `sub` — a stable
+        # opaque string. Offering that in a dropdown is offering a row of
+        # gibberish, so the name DSM sent comes first and the e-mail second;
+        # the username is the last resort, which is where a local account
+        # without a name lands.
+        field.label_from_instance = person_label
+
+    def clean_owner(self):
+        owner = self.cleaned_data.get("owner")
+        # The queryset already refuses an inactive account; this is the message
+        # for the one case somebody will actually hit, which is choosing
+        # themselves and wondering why the page came back.
+        if owner and self.instance.owner_id == owner.pk:
+            raise ValidationError(_("This recipe is already theirs."))
+        return owner
+
+
+def person_label(person):
+    """What to call somebody in a dropdown: their name, their e-mail, or their
+    username — in that order, because the last of those is an opaque ``sub``
+    for every account that came in over SSO."""
+    return person.get_full_name().strip() or person.email or person.get_username()
 
 
 class _StructureField(forms.IntegerField):

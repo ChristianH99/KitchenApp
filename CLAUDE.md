@@ -416,6 +416,21 @@ Each of these is here because breaking it produces a page that still renders.
   two *are* per-view — the exposure a forgotten one would create is covered from
   the other side, by a test that walks the URLconf for `accounts:user-*` and
   refuses to let any of them answer an ordinary account.
+- **Who may edit is one column, and handing it over means losing it.**
+  `_may_edit` reads `Recipe.owner` and nothing else. `created_by` is beside it
+  and answers a different question — who typed the recipe in, which is history
+  and never moves — so the recipe page can go on saying "added by" truthfully
+  after the recipe has changed hands. A rule that accepted *either* column would
+  pass every check that the new owner can edit and would quietly make a transfer
+  a **share**, with nothing on the page to see: the old owner would simply still
+  be offered Edit. `owner` starts as `created_by` (filled in `Recipe.save`, on
+  insert only, so every way of making a recipe produces one its author can
+  edit), and the transfer is a POST of its own from the recipe page rather than
+  a field on the form — it is the one control there whose effect is on *this*
+  page, and for everybody who is not staff it is the last thing they can do on
+  it. A recipe whose owner's account has been deleted has nobody looking after
+  it and answers to staff alone; guessing an heir is the alternative, and it is
+  worse.
 - **The account pages must not close the door behind you.** Switching off,
   demoting or deleting yourself is refused, and so is removing the last active
   superuser: an app with none cannot be recovered without a shell on the NAS.
@@ -827,7 +842,9 @@ recognises them as decided rather than missed.
 - **No in-app export or backup.** The collection is one SQLite file plus
   `media/` under `/data`; Hyper Backup already covers that share.
 - **Anyone signed in can read every recipe.** Editing is limited to whoever
-  added it, or staff.
+  looks after it, or staff — and it can be handed to somebody else from the
+  recipe page, an SSO account included. See the Security section for why that is
+  a column of its own rather than a rewrite of `created_by`.
 - **DSM itself should not be exposed to the internet**, whatever the original
   briefing said. DEPLOYMENT.md §1.
 - **Instructions are plain text**, rendered with `linebreaks`. A rich-text

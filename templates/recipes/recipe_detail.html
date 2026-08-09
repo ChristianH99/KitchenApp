@@ -293,6 +293,42 @@ to the one people press every day is one somebody will press by accident.{% endc
         </p>
       {% endif %}
 
+      {% comment %}Who looks after it, and only once that is somebody other than
+      whoever typed it in. On a collection nobody has handed anything over in,
+      the two are the same person and the topbar has already said so — a second
+      line repeating it is a page answering a question nobody asked. It appears
+      the moment it carries information.{% endcomment %}
+      {% if owner_label and recipe.owner_id != recipe.created_by_id %}
+        <p class="recipe-source">
+          {% blocktranslate with who=owner_label %}Looked after by {{ who }}{% endblocktranslate %}
+        </p>
+      {% endif %}
+
+      {% comment %}Handing the recipe on. Beside Delete because both are
+      decisions about the recipe as an object rather than about the food, and
+      above it because only one of the two is irreversible.
+
+      It asks first, through the app's own dialog: for everybody who is not
+      staff this is the last thing they can do on this page, and a select that
+      takes effect on change would do it while somebody was still reading the
+      names.{% endcomment %}
+      {% if owner_form %}
+        <form method="post" action="{% url 'recipes:transfer' recipe.slug %}"
+              class="form-actions"
+              data-confirm-title="{% translate 'Hand this recipe over?' %}"
+              data-confirm="{% translate 'They will be able to edit it. Unless you manage accounts, you will not be able to change it yourself afterwards.' %}"
+              data-confirm-accept="{% translate 'Hand over' %}">
+          {% csrf_token %}
+          <span class="row-extra">
+            <label class="row-extra-label" for="{{ owner_form.owner.id_for_label }}">
+              {% translate "Looked after by" %}
+            </label>
+            {{ owner_form.owner }}
+          </span>
+          <button type="submit" class="button button--secondary button--small">{% translate "Hand over" %}</button>
+        </form>
+      {% endif %}
+
       {% if may_edit %}
         <form method="post" action="{% url 'recipes:delete' recipe.slug %}"
               class="form-actions"
