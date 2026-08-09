@@ -14,64 +14,71 @@ selector rather than a map of ids.
 
 `unlocalize` on data-amount is load-bearing here for the same reason as on the
 detail page: German writes 1.5 as "1,5" and parseFloat stops at the comma.{% endcomment %}
-<div class="diagram-scroll">
-  <table class="diagram">
-    <caption class="sr-only">{% blocktranslate with title=recipe.title %}Method for {{ title }} as a diagram{% endblocktranslate %}</caption>
-    {% for block in diagram.blocks %}
-      <tbody>
-        {% for row in block %}
-          <tr>
-            {% for cell in row %}
-              {% if cell.kind == "ingredient" %}
-                <td class="diagram-cell diagram-cell--ingredient{% if cell.ingredient.optional %} is-optional{% endif %}"
-                    rowspan="{{ cell.rowspan }}" colspan="{{ cell.colspan }}"
-                    data-step="{{ cell.ingredient.step_id|default_if_none:'' }}">
-                  <span class="ingredient-amount" data-amount="{{ cell.ingredient.amount|default_if_none:''|unlocalize }}">{{ cell.ingredient.amount_display }}</span>
-                  <span class="diagram-unit">{{ cell.ingredient.unit|unit_label }}</span>
-                  <span class="diagram-name">{{ cell.ingredient.name }}</span>
-                  {% if cell.ingredient.note %}<span class="diagram-note">{{ cell.ingredient.note }}</span>{% endif %}
-                  {% if cell.ingredient.optional %}<span class="diagram-flag">{% translate "optional" %}</span>{% endif %}
-                  {% for alt in cell.alternatives %}
-                    <span class="diagram-alt">
-                      {% translate "or" %}
-                      <span class="ingredient-amount" data-amount="{{ alt.amount|default_if_none:''|unlocalize }}">{{ alt.amount_display }}</span>
-                      {{ alt.unit|unit_label }} {{ alt.name }}{% if alt.note %} <span class="diagram-note">{{ alt.note }}</span>{% endif %}
-                    </span>
-                  {% endfor %}
-                </td>
-              {% elif cell.kind == "step" %}
-                <td class="diagram-cell diagram-cell--step{% if cell.step.heats_the_oven %} diagram-cell--oven{% endif %}"
-                    rowspan="{{ cell.rowspan }}"
-                    colspan="{{ cell.colspan }}" data-step="{{ cell.step.id }}">
-                  {% comment %}One box, and it may hold more than one thing to
-                  do — the household writes "- Topf in Ofen stellen / - Ofen
-                  vorheizen" because those are two actions at one point in the
-                  flow. A single line stays a single line rather than becoming a
-                  one-item list, which would put a bullet beside every step in
-                  the recipe.{% endcomment %}
-                  {% if cell.step.is_multipart %}
-                    <ul class="diagram-step-parts">
-                      {% for part in cell.step.parts %}<li>{{ part }}</li>{% endfor %}
-                    </ul>
-                  {% else %}
-                    <span class="diagram-step-text">{{ cell.step.headline }}</span>
-                  {% endif %}
-                  {% if cell.step.heats_the_oven %}
-                    {% include "recipes/_oven.html" with step=cell.step %}
-                  {% endif %}
-                  {% comment %}`duration_label`, never `minutes`: a step set to
-                  1:30 has `minutes` of 1, and printing that says "1 min" for a
-                  step that is half as long again.{% endcomment %}
-                  {% if cell.step.timer_seconds %}<span class="diagram-step-time">{{ cell.step.duration_label }}</span>{% endif %}
-                </td>
-              {% else %}
-                <td class="diagram-cell diagram-cell--filler" rowspan="{{ cell.rowspan }}"
-                    colspan="{{ cell.colspan }}"></td>
-              {% endif %}
-            {% endfor %}
-          </tr>
-        {% endfor %}
-      </tbody>
-    {% endfor %}
-  </table>
+{% comment %}Two elements, and they are not one because a scroll container cannot
+carry the padding: Chrome leaves the inline-end padding out of the scrollable
+overflow, so the drawing comes back to touching the edge the moment somebody
+scrolls a wide diagram. The frame is the card and stands still; the scroller
+inside it is what moves. See `.diagram-frame` in main.css.{% endcomment %}
+<div class="diagram-frame">
+  <div class="diagram-scroll">
+    <table class="diagram">
+      <caption class="sr-only">{% blocktranslate with title=recipe.title %}Method for {{ title }} as a diagram{% endblocktranslate %}</caption>
+      {% for block in diagram.blocks %}
+        <tbody>
+          {% for row in block %}
+            <tr>
+              {% for cell in row %}
+                {% if cell.kind == "ingredient" %}
+                  <td class="diagram-cell diagram-cell--ingredient{% if cell.ingredient.optional %} is-optional{% endif %}"
+                      rowspan="{{ cell.rowspan }}" colspan="{{ cell.colspan }}"
+                      data-step="{{ cell.ingredient.step_id|default_if_none:'' }}">
+                    <span class="ingredient-amount" data-amount="{{ cell.ingredient.amount|default_if_none:''|unlocalize }}">{{ cell.ingredient.amount_display }}</span>
+                    <span class="diagram-unit">{{ cell.ingredient.unit|unit_label }}</span>
+                    <span class="diagram-name">{{ cell.ingredient.name }}</span>
+                    {% if cell.ingredient.note %}<span class="diagram-note">{{ cell.ingredient.note }}</span>{% endif %}
+                    {% if cell.ingredient.optional %}<span class="diagram-flag">{% translate "optional" %}</span>{% endif %}
+                    {% for alt in cell.alternatives %}
+                      <span class="diagram-alt">
+                        {% translate "or" %}
+                        <span class="ingredient-amount" data-amount="{{ alt.amount|default_if_none:''|unlocalize }}">{{ alt.amount_display }}</span>
+                        {{ alt.unit|unit_label }} {{ alt.name }}{% if alt.note %} <span class="diagram-note">{{ alt.note }}</span>{% endif %}
+                      </span>
+                    {% endfor %}
+                  </td>
+                {% elif cell.kind == "step" %}
+                  <td class="diagram-cell diagram-cell--step{% if cell.step.heats_the_oven %} diagram-cell--oven{% endif %}"
+                      rowspan="{{ cell.rowspan }}"
+                      colspan="{{ cell.colspan }}" data-step="{{ cell.step.id }}">
+                    {% comment %}One box, and it may hold more than one thing to
+                    do — the household writes "- Topf in Ofen stellen / - Ofen
+                    vorheizen" because those are two actions at one point in the
+                    flow. A single line stays a single line rather than becoming a
+                    one-item list, which would put a bullet beside every step in
+                    the recipe.{% endcomment %}
+                    {% if cell.step.is_multipart %}
+                      <ul class="diagram-step-parts">
+                        {% for part in cell.step.parts %}<li>{{ part }}</li>{% endfor %}
+                      </ul>
+                    {% else %}
+                      <span class="diagram-step-text">{{ cell.step.headline }}</span>
+                    {% endif %}
+                    {% if cell.step.heats_the_oven %}
+                      {% include "recipes/_oven.html" with step=cell.step %}
+                    {% endif %}
+                    {% comment %}`duration_label`, never `minutes`: a step set to
+                    1:30 has `minutes` of 1, and printing that says "1 min" for a
+                    step that is half as long again.{% endcomment %}
+                    {% if cell.step.timer_seconds %}<span class="diagram-step-time">{{ cell.step.duration_label }}</span>{% endif %}
+                  </td>
+                {% else %}
+                  <td class="diagram-cell diagram-cell--filler" rowspan="{{ cell.rowspan }}"
+                      colspan="{{ cell.colspan }}"></td>
+                {% endif %}
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      {% endfor %}
+    </table>
+  </div>
 </div>

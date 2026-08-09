@@ -1422,7 +1422,31 @@ body.modal-open { overflow: hidden; }
 .builder-block > *,
 .form-grid > *,
 .builder-scroll,
+.diagram-frame,
 .diagram-scroll { min-width: 0; }
+
+/* The card the drawing sits on. Separate from the element that scrolls, and
+   that separation is the fix rather than a tidy-up.
+
+   With one element doing both, the table was welded to the card: its square,
+   `border-collapse`d corner ran straight into the card's 12px radius and was
+   clipped by the overflow, so every corner ended in a hard line stopping in
+   mid-air. Padding is the obvious answer and cannot go on a scroll container —
+   Chrome leaves the inline-end padding out of the scrollable overflow, so a
+   diagram wide enough to scroll comes back to touching the edge at exactly the
+   moment somebody scrolls to look at it (measured: 23.2px of space, 2.7px once
+   scrolled to the end).
+
+   So the padding is here, outside the scroller, where it is a fixed frame the
+   drawing moves inside. */
+.diagram-frame {
+  padding: var(--space-5);
+  margin-bottom: var(--space-6);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
+}
 
 .diagram-scroll {
   /* A diagram with five columns does not fit a phone, and the alternative to
@@ -1434,17 +1458,20 @@ body.modal-open { overflow: hidden; }
      phone case, so the bar is always visible rather than the overlay kind that
      fades out — on a long diagram, a scrollbar you have to discover is a
      diagram that looks truncated. `scroll-padding` keeps a cell the cooking
-     view scrolls to off the very edge. */
+     view scrolls to off the very edge.
+
+     There is no `scrollbar-gutter` here any more, and that is half of the
+     chopped-off edge. It reserves room for the *vertical* bar, which this box
+     can never show — its height is its content's — so the reservation was
+     11.2px of empty space on the right against 0.8px on the left, on every
+     diagram, including the ones narrow enough never to scroll at all. A
+     drawing sitting 10px off-centre in its own card is exactly what "the edges
+     look cut off" describes. `scrollbar-width: thin` is what the comment above
+     is about and stays; it is the horizontal bar, and it is not affected. */
   scrollbar-width: thin;
-  scrollbar-gutter: stable;
   scroll-padding-inline: var(--space-6);
   overscroll-behavior-x: contain;
   overflow-x: auto;
-  margin-bottom: var(--space-6);
-  border-radius: var(--radius-md);
-  background: var(--paper);
-  border: 1px solid var(--border-light);
-  box-shadow: var(--shadow-sm);
 }
 .diagram { width: 100%; min-width: 28rem; border-collapse: collapse; }
 .diagram-cell {
